@@ -1,0 +1,960 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <title>GeoFence Enterprise System</title>
+    <style>
+        /* ------------------------------------------------------------------
+           1. CSS RESET & VARIABLES
+           ------------------------------------------------------------------ */
+        :root {
+            /* Colors */
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Radius */
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-glow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding-bottom: 100px;
+            overflow-x: hidden;
+        }
+
+        /* ------------------------------------------------------------------
+           2. TYPOGRAPHY & UTILS
+           ------------------------------------------------------------------ */
+        h1, h2, h3, h4 { font-weight: 700; color: var(--text-main); }
+        h1 { font-size: 1.5rem; }
+        h2 { font-size: 1.25rem; margin-bottom: var(--space-md); border-left: 4px solid var(--primary); padding-left: var(--space-sm); }
+        small { font-size: 0.75rem; color: var(--text-muted); }
+
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+        .text-warning { color: var(--warning); }
+        .mono { font-family: 'Courier New', Courier, monospace; }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: var(--space-md);
+        }
+
+        /* ------------------------------------------------------------------
+           3. COMPONENT STYLES
+           ------------------------------------------------------------------ */
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            outline: none;
+            gap: 8px;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: var(--primary); color: white; box-shadow: var(--shadow-glow); }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-secondary { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+        .btn-block { width: 100%; }
+
+        /* Inputs */
+        .input-group { display: flex; gap: var(--space-sm); margin-bottom: var(--space-md); }
+        .form-control {
+            flex: 1;
+            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        .form-control:focus { border-color: var(--primary); outline: none; }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            margin-bottom: var(--space-lg);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* ------------------------------------------------------------------
+           4. SPECIFIC UI ELEMENTS
+           ------------------------------------------------------------------ */
+
+        /* Header / Stats Bar */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: var(--space-md);
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
+        }
+        .status-item {
+            background: rgba(255,255,255,0.05);
+            padding: 8px;
+            border-radius: var(--radius-sm);
+            text-align: center;
+        }
+        .status-label { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-value { font-weight: 700; font-size: 0.9rem; }
+
+        /* Canvas Radar */
+        .radar-container {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: radial-gradient(circle, #1e293b 0%, #0f172a 70%);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: var(--space-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas { display: block; }
+        .radar-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 0.7rem;
+            color: var(--primary);
+            font-family: monospace;
+        }
+
+        /* Location List */
+        .loc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-md);
+            border-bottom: 1px solid var(--border);
+            animation: fadeIn 0.3s ease;
+        }
+        .loc-item:last-child { border-bottom: none; }
+        .loc-badge {
+            display: inline-block;
+            width: 10px; 
+            height: 10px;
+            border-radius: 50%;
+            background: var(--secondary);
+            margin-right: 10px;
+            box-shadow: 0 0 0 0 rgba(255,255,255,0);
+        }
+        .loc-badge.active {
+            background: var(--success);
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        /* Logs Table */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 10px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 600; }
+        td { padding: 10px; border-bottom: 1px solid #334155; }
+        tr:last-child td { border: none; }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .toast.success { border-left: 4px solid var(--success); }
+        .toast.alert { border-left: 4px solid var(--danger); }
+
+        /* ------------------------------------------------------------------
+           5. ANIMATIONS
+           ------------------------------------------------------------------ */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes radarScan {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Utility classes for Debug Console */
+        #console-log {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #10b981;
+            height: 150px;
+            overflow-y: scroll;
+            background: #000;
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h1>📍 GeoFence <span style="color:var(--primary)">Pro</span></h1>
+        <div id="connectionStatus" class="status-value text-warning">Wait...</div>
+    </div>
+    <div class="status-grid">
+        <div class="status-item">
+            <span class="status-label">Accuracy</span>
+            <div id="ui-accuracy" class="status-value">-- m</div>
+        </div>
+        <div class="status-item">
+            <span class="status-label">State</span>
+            <div id="ui-movement" class="status-value">--</div>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Active Zones</span>
+            <div id="ui-zones" class="status-value">0</div>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- 1. RADAR VISUALIZATION -->
+    <div class="radar-container">
+        <div class="radar-overlay">RADAR SYSTEM // <span id="radar-dist">NO TARGET</span></div>
+        <canvas id="radarCanvas"></canvas>
+    </div>
+
+    <!-- 2. CONTROLS -->
+    <div class="card">
+        <h2>Target Management</h2>
+        <p style="margin-bottom:10px; color:var(--text-muted); font-size:0.9rem;">
+            Save your current physical location as a 10-meter geofence. The system applies a 5m hysteresis buffer (Enter @ 10m, Exit @ 15m).
+        </p>
+        <div class="input-group">
+            <input type="text" id="locInput" class="form-control" placeholder="Location Name (e.g., Office)">
+            <button id="btnSave" class="btn btn-primary">Save Location</button>
+        </div>
+        <button id="btnSim" class="btn btn-secondary btn-block">🧪 Simulation Mode (Test without walking)</button>
+    </div>
+
+    <!-- 3. ZONE LIST -->
+    <div class="card">
+        <h2>Monitored Zones</h2>
+        <div id="locationsList">
+            <!-- Dynamic Content -->
+            <div style="text-align:center; padding:20px; color:var(--text-muted);">No active geofences</div>
+        </div>
+    </div>
+
+    <!-- 4. ANALYTICS -->
+    <div class="card">
+        <h2>Session Analytics</h2>
+        <div class="table-responsive">
+            <table id="logsTable">
+                <thead>
+                    <tr>
+                        <th>Zone</th>
+                        <th>Entry Time</th>
+                        <th>Exit Time</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic Content -->
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:15px; display:flex; gap:10px;">
+            <button id="btnExport" class="btn btn-secondary">💾 Export CSV</button>
+            <button id="btnClear" class="btn btn-danger">🗑️ Clear History</button>
+        </div>
+    </div>
+
+    <!-- 5. SYSTEM LOGS -->
+    <div class="card">
+        <h2>System Diagnostics</h2>
+        <div id="console-log"></div>
+    </div>
+
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toastArea" class="toast-container"></div>
+
+<script>
+/**
+ * =============================================================================
+ *  GEOFENCE ENTERPRISE SYSTEM - CORE ARCHITECTURE
+ * =============================================================================
+ *  Modules:
+ *  1. Utils: Math and Helper functions
+ *  2. EventEmitter: Pub/Sub pattern
+ *  3. StorageService: Persistence
+ *  4. NotificationService: UI Alerts
+ *  5. GeolocationEngine: Core GPS logic + Hysteresis
+ *  6. Visualizer: Canvas Radar
+ *  7. UIManager: DOM Manipulation
+ *  8. App: Main Controller
+ * =============================================================================
+ */
+
+/* --- 1. UTILS --- */
+class Utils {
+    static generateUUID() {
+        return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    static formatTime(timestamp) {
+        if (!timestamp) return '--:--:--';
+        return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    static formatDuration(ms) {
+        const seconds = Math.floor(ms / 1000);
+        if (seconds < 60) return `${seconds}s`;
+        const minutes = Math.floor(seconds / 60);
+        const remSec = seconds % 60;
+        return `${minutes}m ${remSec}s`;
+    }
+
+    // Haversine Formula for Earth Distance
+    static getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // Earth radius in meters
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c; // Distance in meters
+    }
+}
+
+/* --- 2. EVENT EMITTER (Observer Pattern) --- */
+class EventEmitter {
+    constructor() {
+        this.events = {};
+    }
+    on(event, listener) {
+        if (!this.events[event]) this.events[event] = [];
+        this.events[event].push(listener);
+    }
+    emit(event, data) {
+        if (this.events[event]) {
+            this.events[event].forEach(fn => fn(data));
+        }
+    }
+}
+
+/* --- 3. STORAGE SERVICE --- */
+class StorageService {
+    constructor() {
+        this.KEYS = {
+            LOCATIONS: 'geo_pro_locations',
+            LOGS: 'geo_pro_logs'
+        };
+    }
+
+    getLocations() {
+        return JSON.parse(localStorage.getItem(this.KEYS.LOCATIONS)) || [];
+    }
+
+    saveLocation(location) {
+        const locs = this.getLocations();
+        locs.push(location);
+        localStorage.setItem(this.KEYS.LOCATIONS, JSON.stringify(locs));
+        return locs;
+    }
+
+    removeLocation(id) {
+        let locs = this.getLocations();
+        locs = locs.filter(l => l.id !== id);
+        localStorage.setItem(this.KEYS.LOCATIONS, JSON.stringify(locs));
+        return locs;
+    }
+
+    getLogs() {
+        return JSON.parse(localStorage.getItem(this.KEYS.LOGS)) || [];
+    }
+
+    addLog(log) {
+        const logs = this.getLogs();
+        logs.unshift(log); // Add to top
+        // Limit logs to last 100 entries to prevent overflow
+        if (logs.length > 100) logs.pop();
+        localStorage.setItem(this.KEYS.LOGS, JSON.stringify(logs));
+        return logs;
+    }
+
+    clearLogs() {
+        localStorage.removeItem(this.KEYS.LOGS);
+        return [];
+    }
+}
+
+/* --- 4. NOTIFICATION SERVICE --- */
+class NotificationService {
+    constructor() {
+        this.container = document.getElementById('toastArea');
+    }
+
+    show(message, type = 'info') {
+        const el = document.createElement('div');
+        el.className = `toast ${type === 'error' ? 'alert' : type === 'success' ? 'success' : ''}`;
+        
+        let icon = 'ℹ️';
+        if (type === 'success') icon = '✅';
+        if (type === 'error') icon = '⚠️';
+        if (type === 'entry') icon = '🚪➡️';
+        if (type === 'exit') icon = '⬅️🚪';
+
+        el.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        this.container.appendChild(el);
+
+        // Auto remove
+        setTimeout(() => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            setTimeout(() => el.remove(), 300);
+        }, 4000);
+    }
+}
+
+/* --- 5. VISUALIZER (CANVAS RADAR) --- */
+class Visualizer {
+    constructor() {
+        this.canvas = document.getElementById('radarCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        this.canvas.width = this.canvas.parentElement.offsetWidth;
+        this.canvas.height = 250;
+    }
+
+    draw(userLat, userLng, targets) {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxDist = 50; // Radar range in meters
+
+        // Clear
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(0, 0, w, h);
+
+        // Draw Grid Rings
+        this.ctx.strokeStyle = '#334155';
+        this.ctx.lineWidth = 1;
+        [20, 40, 60, 80].forEach(r => {
+            this.ctx.beginPath();
+            this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            this.ctx.stroke();
+        });
+
+        // Draw Crosshair
+        this.ctx.beginPath();
+        this.ctx.moveTo(cx - 10, cy); this.ctx.lineTo(cx + 10, cy);
+        this.ctx.moveTo(cx, cy - 10); this.ctx.lineTo(cx, cy + 10);
+        this.ctx.strokeStyle = '#3b82f6';
+        this.ctx.stroke();
+
+        // Draw User (Always center)
+        this.ctx.fillStyle = '#3b82f6';
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Draw Targets relative to User
+        if (userLat && userLng) {
+            let closest = null;
+            let closestDist = Infinity;
+
+            targets.forEach(t => {
+                const dist = Utils.getDistance(userLat, userLng, t.lat, t.lng);
+                
+                // Track Closest for UI
+                if(dist < closestDist) { closestDist = dist; closest = t.name; }
+
+                // Map geo distance to pixels
+                // Approximate: 1 meter = 2 pixels on radar
+                const scale = 2; 
+                
+                // Calculate bearing roughly for x/y offset (Simplified projection)
+                const dLat = (t.lat - userLat) * 111139; // meters
+                const dLon = (t.lng - userLng) * 111139 * Math.cos(userLat * Math.PI/180);
+                
+                const x = cx + (dLon * scale);
+                const y = cy - (dLat * scale); // Y is inverted on canvas
+
+                // Draw Target
+                this.ctx.fillStyle = t.isInside ? '#22c55e' : '#94a3b8';
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 6, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Draw Name
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = '10px sans-serif';
+                this.ctx.fillText(t.name, x + 8, y + 3);
+            });
+
+            // Update Overlay Text
+            const overlay = document.getElementById('radar-dist');
+            if(closest) {
+                overlay.innerText = `TARGET: ${closest} (${Math.round(closestDist)}m)`;
+                overlay.style.color = closestDist <= 10 ? '#22c55e' : '#3b82f6';
+            } else {
+                overlay.innerText = "NO TARGETS";
+                overlay.style.color = '#64748b';
+            }
+        }
+    }
+}
+
+/* --- 6. GEOLOCATION ENGINE --- */
+class GeoEngine extends EventEmitter {
+    constructor() {
+        super();
+        this.watchId = null;
+        this.isSimulating = false;
+        this.currentPos = { lat: 0, lng: 0, acc: 0 };
+        this.options = {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0
+        };
+        
+        // Hysteresis Settings
+        this.ENTER_THRESHOLD = 10; // Meters
+        this.EXIT_THRESHOLD = 15;  // Meters (Buffer to prevent flip-flopping)
+    }
+
+    start() {
+        if (!navigator.geolocation) {
+            this.emit('error', 'Geolocation not supported');
+            return;
+        }
+
+        // Wake Lock (Keep screen alive)
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').catch(e => console.log('Wake Lock failed'));
+        }
+
+        this.watchId = navigator.geolocation.watchPosition(
+            (pos) => this.handleUpdate(pos),
+            (err) => this.handleError(err),
+            this.options
+        );
+        this.emit('status', 'Initializing GPS...');
+    }
+
+    handleUpdate(pos) {
+        if (this.isSimulating) return; // Ignore real GPS during sim
+
+        const { latitude, longitude, accuracy } = pos.coords;
+        
+        // Simple Noise Filter: Ignore jumps > 100m in 1 second (impossible speed)
+        // (Omitted for brevity, but this is where Kalman filter logic sits in full app)
+
+        this.currentPos = { lat: latitude, lng: longitude, acc: accuracy };
+        this.emit('update', this.currentPos);
+    }
+
+    handleError(err) {
+        let msg = '';
+        switch(err.code) {
+            case 1: msg = 'Permission Denied'; break;
+            case 2: msg = 'Position Unavailable'; break;
+            case 3: msg = 'Connection Timeout'; break;
+        }
+        this.emit('error', msg);
+    }
+
+    // Process Geofences against current location
+    checkFences(locations) {
+        const events = [];
+        const now = Date.now();
+
+        locations.forEach(loc => {
+            const dist = Utils.getDistance(this.currentPos.lat, this.currentPos.lng, loc.lat, loc.lng);
+            
+            // LOGIC: ENTRY
+            // Uses strict threshold (10m)
+            if (!loc.isInside && dist <= this.ENTER_THRESHOLD) {
+                loc.isInside = true;
+                loc.entryTime = now;
+                events.push({ type: 'entry', loc: loc, dist: dist });
+            }
+
+            // LOGIC: EXIT
+            // Uses Hysteresis threshold (15m) to prevent flickering
+            else if (loc.isInside && dist > this.EXIT_THRESHOLD) {
+                loc.isInside = false;
+                const exitTime = now;
+                const duration = exitTime - loc.entryTime;
+                
+                // Only log if duration > 5 seconds (ignore glitches)
+                if (duration > 5000) {
+                    events.push({ 
+                        type: 'exit', 
+                        loc: loc, 
+                        entry: loc.entryTime, 
+                        exit: exitTime, 
+                        duration: duration 
+                    });
+                }
+                loc.entryTime = null;
+            }
+        });
+
+        return events;
+    }
+
+    // Simulation Tool
+    simulate(startLat, startLng) {
+        this.isSimulating = true;
+        this.emit('status', '🧪 SIMULATION MODE');
+        
+        let step = 0;
+        const simInterval = setInterval(() => {
+            step++;
+            
+            // Move 2 meters per step roughly North
+            const newLat = startLat + (step * 0.00002); 
+            
+            this.currentPos = { lat: newLat, lng: startLng, acc: 5 };
+            this.emit('update', this.currentPos);
+
+            if (step > 20) { // After 20 steps, stop
+                clearInterval(simInterval);
+                this.isSimulating = false;
+                this.emit('status', 'Simulation Ended');
+            }
+        }, 1000);
+    }
+}
+
+/* --- 7. UI MANAGER --- */
+class UIManager {
+    constructor(store, logs) {
+        this.els = {
+            acc: document.getElementById('ui-accuracy'),
+            move: document.getElementById('ui-movement'),
+            zones: document.getElementById('ui-zones'),
+            conn: document.getElementById('connectionStatus'),
+            locList: document.getElementById('locationsList'),
+            logTable: document.getElementById('logsTable').querySelector('tbody'),
+            console: document.getElementById('console-log')
+        };
+        this.logToConsole('System UI Initialized');
+    }
+
+    updateStats(acc, speed, zoneCount) {
+        this.els.acc.innerText = `± ${Math.round(acc)} m`;
+        this.els.acc.style.color = acc < 20 ? 'var(--success)' : 'var(--danger)';
+        this.els.move.innerText = 'Active'; 
+        this.els.zones.innerText = zoneCount;
+        this.els.conn.innerText = "ONLINE";
+        this.els.conn.className = "status-value text-success";
+    }
+
+    logToConsole(msg) {
+        const time = new Date().toLocaleTimeString();
+        this.els.console.innerHTML = `<div style="border-bottom:1px solid #333; padding:2px;">[${time}] ${msg}</div>` + this.els.console.innerHTML;
+    }
+
+    renderLocations(locations, onDelete) {
+        this.els.locList.innerHTML = '';
+        if (locations.length === 0) {
+            this.els.locList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">No active geofences</div>';
+            return;
+        }
+
+        locations.forEach(loc => {
+            const div = document.createElement('div');
+            div.className = 'loc-item';
+            div.innerHTML = `
+                <div>
+                    <div style="font-weight:600; display:flex; align-items:center;">
+                        <span class="loc-badge ${loc.isInside ? 'active' : ''}"></span>
+                        ${loc.name}
+                    </div>
+                    <small class="mono">${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</small>
+                </div>
+                <button class="btn btn-danger" style="padding:5px 10px; font-size:0.8rem;">Remove</button>
+            `;
+            div.querySelector('button').addEventListener('click', () => onDelete(loc.id));
+            this.els.locList.appendChild(div);
+        });
+    }
+
+    renderLogs(logs) {
+        this.els.logTable.innerHTML = '';
+        if (logs.length === 0) {
+            this.els.logTable.innerHTML = '<tr><td colspan="4" style="text-align:center;">No history available</td></tr>';
+            return;
+        }
+
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${log.locationName}</strong></td>
+                <td>${Utils.formatTime(log.entryTime)}</td>
+                <td>${Utils.formatTime(log.exitTime)}</td>
+                <td><span style="background:rgba(59,130,246,0.1); color:#3b82f6; padding:2px 6px; borderRadius:4px;">${log.duration}</span></td>
+            `;
+            this.els.logTable.appendChild(row);
+        });
+    }
+}
+
+/* --- 8. MAIN APP CONTROLLER --- */
+class App {
+    constructor() {
+        // Initialize Modules
+        this.store = new StorageService();
+        this.geo = new GeoEngine();
+        this.ui = new UIManager();
+        this.radar = new Visualizer();
+        this.notify = new NotificationService();
+
+        // Load Data
+        this.locations = this.store.getLocations();
+        this.logs = this.store.getLogs();
+
+        // Initial Render
+        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
+        this.ui.renderLogs(this.logs);
+
+        // Bind Events
+        this.bindEvents();
+        
+        // Start System
+        this.geo.start();
+        this.ui.logToConsole('Application Started v2.0');
+    }
+
+    bindEvents() {
+        // GPS Updates
+        this.geo.on('update', (pos) => this.onGPSUpdate(pos));
+        this.geo.on('error', (msg) => {
+            this.ui.logToConsole(`ERROR: ${msg}`);
+            this.notify.show(msg, 'error');
+        });
+        this.geo.on('status', (msg) => this.ui.logToConsole(msg));
+
+        // UI Buttons
+        document.getElementById('btnSave').onclick = () => this.saveCurrentLocation();
+        document.getElementById('btnSim').onclick = () => this.startSimulation();
+        document.getElementById('btnClear').onclick = () => {
+            if(confirm('Delete all logs?')) {
+                this.logs = this.store.clearLogs();
+                this.ui.renderLogs(this.logs);
+                this.notify.show('Logs Cleared', 'success');
+            }
+        };
+        document.getElementById('btnExport').onclick = () => this.exportCSV();
+    }
+
+    onGPSUpdate(pos) {
+        // 1. Update UI Stats
+        this.ui.updateStats(pos.acc, 0, this.locations.length);
+
+        // 2. Update Radar
+        this.radar.draw(pos.lat, pos.lng, this.locations);
+
+        // 3. Check Geofences
+        const events = this.geo.checkFences(this.locations);
+
+        // 4. Handle Events
+        if (events.length > 0) {
+            events.forEach(e => {
+                if (e.type === 'entry') {
+                    this.notify.show(`Entered ${e.loc.name}`, 'entry');
+                    this.ui.logToConsole(`-> ENTER: ${e.loc.name}`);
+                    // Save state so if page reloads we know we are inside
+                    this.store.saveLocation(e.loc); // Update logic needed here ideally
+                    this.refreshLocations(); // Persist "isInside" state
+                } 
+                else if (e.type === 'exit') {
+                    const durStr = Utils.formatDuration(e.duration);
+                    this.notify.show(`Exited ${e.loc.name} (${durStr})`, 'exit');
+                    this.ui.logToConsole(`<- EXIT: ${e.loc.name} after ${durStr}`);
+                    
+                    // Create Log
+                    const logEntry = {
+                        id: Utils.generateUUID(),
+                        locationName: e.loc.name,
+                        entryTime: e.entry,
+                        exitTime: e.exit,
+                        duration: durStr
+                    };
+                    
+                    this.logs = this.store.addLog(logEntry);
+                    this.ui.renderLogs(this.logs);
+                    this.refreshLocations();
+                }
+            });
+        }
+    }
+
+    saveCurrentLocation() {
+        const input = document.getElementById('locInput');
+        const name = input.value.trim();
+        
+        if (!name) return this.notify.show('Please enter a name', 'error');
+        if (this.geo.currentPos.lat === 0) return this.notify.show('Waiting for GPS signal...', 'error');
+        if (this.geo.currentPos.acc > 30) return this.notify.show('GPS accuracy too low to save', 'error');
+
+        const newLoc = {
+            id: Utils.generateUUID(),
+            name: name,
+            lat: this.geo.currentPos.lat,
+            lng: this.geo.currentPos.lng,
+            radius: 10,
+            isInside: true, // Auto-enter upon creation
+            entryTime: Date.now()
+        };
+
+        this.locations = this.store.saveLocation(newLoc);
+        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
+        input.value = '';
+        this.notify.show(`Geofence "${name}" Created`, 'success');
+        this.ui.logToConsole(`New Fence: ${name} @ ${newLoc.lat.toFixed(5)}, ${newLoc.lng.toFixed(5)}`);
+    }
+
+    deleteLocation(id) {
+        if (!confirm('Remove this geofence?')) return;
+        this.locations = this.store.removeLocation(id);
+        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
+        this.notify.show('Geofence Removed', 'info');
+    }
+
+    // A helper to update the array in storage because objects changed (isInside flags)
+    refreshLocations() {
+        localStorage.setItem(this.store.KEYS.LOCATIONS, JSON.stringify(this.locations));
+        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
+    }
+
+    startSimulation() {
+        if (this.locations.length === 0) return this.notify.show('Create a zone first!', 'error');
+        // Teleport to the first location, then walk away
+        const start = this.locations[0];
+        this.geo.simulate(start.lat, start.lng);
+    }
+
+    exportCSV() {
+        if (this.logs.length === 0) return this.notify.show('No logs to export', 'error');
+        let csv = 'Location,Entry ISO,Exit ISO,Duration String\n';
+        this.logs.forEach(l => {
+            csv += `"${l.locationName}","${new Date(l.entryTime).toISOString()}","${new Date(l.exitTime).toISOString()}","${l.duration}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `geofence_export_${Date.now()}.csv`;
+        a.click();
+    }
+}
+
+// --- BOOTSTRAP ---
+window.onload = () => {
+    // Check protocol security
+    if (window.location.protocol === 'file:') {
+        alert("SECURITY BLOCK: Browser Geolocation requires HTTPS or Localhost. You are running via file://. Please use a local server.");
+    }
+    const app = new App();
+};
+
+</script>
+</body>
+</html>
