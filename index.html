@@ -1,1063 +1,615 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="description" content="Enterprise Geofencing Solution with Kalman Filtering and Indoor Logic">
-    <title>GeoGuard Enterprise | Indoor Precision</title>
+    <meta name="theme-color" content="#020617">
+    <title>GeoGuard 360° | Tactical Tracker</title>
+    
+    <!-- TAILWIND CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#1e293b', 950: '#020617' },
+                        primary: '#6366f1',
+                        accent: '#06b6d4'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 4s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
     
     <style>
-        /* 
-         * ==========================================================================
-         *  MODULE: GLOBAL STYLES & RESET
-         * ==========================================================================
-         */
-        :root {
-            /* Color Palette - Slate & Indigo */
-            --bg-body: #0f172a;
-            --bg-card: #1e293b;
-            --bg-input: #020617;
-            
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
-            --primary-glow: rgba(99, 102, 241, 0.5);
-
-            --success: #10b981;
-            --success-bg: rgba(16, 185, 129, 0.1);
-            
-            --warning: #f59e0b;
-            --warning-bg: rgba(245, 158, 11, 0.1);
-            
-            --danger: #ef4444;
-            --danger-bg: rgba(239, 68, 68, 0.1);
-
-            --border: #334155;
-            --radius-sm: 6px;
-            --radius-md: 12px;
-            --radius-lg: 24px;
-            
-            --font-mono: 'SF Mono', 'Roboto Mono', Consolas, monospace;
-            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            
-            --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-glow: 0 0 20px var(--primary-glow);
-        }
-
-        *, *::before, *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background-color: var(--bg-body);
-            color: var(--text-primary);
-            font-family: var(--font-sans);
-            line-height: 1.6;
-            overflow-x: hidden;
-            padding-bottom: 120px; /* Space for bottom nav or toasts */
-        }
-
-        /* 
-         * ==========================================================================
-         *  MODULE: TYPOGRAPHY
-         * ==========================================================================
-         */
-        h1, h2, h3, h4, h5, h6 {
-            color: var(--text-primary);
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        
-        h1 { font-size: 1.5rem; letter-spacing: -0.5px; }
-        h2 { font-size: 1.125rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
-        p { margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.95rem; }
-        
-        .text-mono { font-family: var(--font-mono); }
-        .text-sm { font-size: 0.875rem; }
-        .text-xs { font-size: 0.75rem; }
-        
-        .text-success { color: var(--success); }
-        .text-warning { color: var(--warning); }
-        .text-danger { color: var(--danger); }
-
-        /* 
-         * ==========================================================================
-         *  MODULE: LAYOUT & COMPONENTS
-         * ==========================================================================
-         */
-        .container {
-            width: 100%;
-            max-width: 768px;
-            margin: 0 auto;
-            padding: 16px;
-        }
-
-        /* Header */
-        .app-header {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-card);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .card:hover {
-            box-shadow: var(--shadow-glow);
-            border-color: var(--primary);
-        }
-
-        /* Status Grid */
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        
-        .status-box {
-            background: rgba(255,255,255,0.03);
-            border-radius: var(--radius-sm);
-            padding: 12px;
-            text-align: center;
-            border: 1px solid transparent;
-        }
-        .status-box.active { border-color: var(--success); background: var(--success-bg); }
-        .status-box.poor { border-color: var(--danger); background: var(--danger-bg); }
-        
-        .status-label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
-        .status-value { font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); }
-
-        /* Buttons & Inputs */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 24px;
-            font-weight: 600;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-            font-size: 0.95rem;
-            width: 100%;
-        }
-        
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 12px var(--primary-glow); }
-        .btn-primary:active { transform: translateY(1px); background: var(--primary-hover); }
-        
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
-        .btn-outline:hover { border-color: var(--text-primary); color: var(--text-primary); }
-        
-        .input-group { position: relative; display: flex; gap: 8px; margin-bottom: 12px; }
-        .form-input {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            border-radius: var(--radius-sm);
-            font-size: 1rem;
-            transition: border-color 0.2s;
-        }
-        .form-input:focus { outline: none; border-color: var(--primary); }
-
-        /* 
-         * ==========================================================================
-         *  MODULE: RADAR COMPONENT
-         * ==========================================================================
-         */
-        .radar-wrapper {
-            position: relative;
-            width: 100%;
-            padding-bottom: 100%; /* 1:1 Aspect Ratio */
-            background: radial-gradient(circle at center, #1e293b 0%, #020617 70%);
-            border-radius: 50%;
-            border: 4px solid var(--border);
-            overflow: hidden;
-            margin-bottom: 24px;
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
-        }
-        
-        .radar-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .radar-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            color: var(--primary);
-            white-space: nowrap;
-            border: 1px solid var(--border);
-        }
-
-        /* 
-         * ==========================================================================
-         *  MODULE: LISTS & TABLES
-         * ==========================================================================
-         */
-        .list-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px;
-            border-bottom: 1px solid var(--border);
-            animation: fadeIn 0.4s ease;
-        }
-        .list-item:last-child { border-bottom: none; }
-        
-        .log-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .log-table th { text-align: left; padding: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
-        .log-table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
-        .log-table tr:last-child td { border: none; }
-
-        /* 
-         * ==========================================================================
-         *  MODULE: NOTIFICATIONS (TOASTS)
-         * ==========================================================================
-         */
-        #toast-area {
-            position: fixed;
-            bottom: 24px;
-            left: 24px;
-            right: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            z-index: 9999;
-            pointer-events: none;
-        }
-        
-        .toast {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 16px;
-            border-radius: var(--radius-sm);
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transform: translateY(20px);
-            opacity: 0;
-            animation: slideUp 0.3s forwards;
-            pointer-events: auto;
-        }
-        
-        .toast-icon { font-size: 1.2rem; }
-        .toast-content { flex: 1; }
-        .toast-title { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
-        .toast-msg { font-size: 0.8rem; color: var(--text-secondary); }
-
-        .toast.success { border-left: 4px solid var(--success); }
-        .toast.warn { border-left: 4px solid var(--warning); }
-        .toast.error { border-left: 4px solid var(--danger); }
-
-        @keyframes slideUp { to { transform: translateY(0); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        /* Debug Console */
-        #console-output {
-            background: #000;
-            color: #10b981;
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            padding: 12px;
-            height: 150px;
-            overflow-y: auto;
-            border-radius: var(--radius-sm);
-            border: 1px solid #333;
-        }
+        /* Custom scrollbar for logs */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen pb-32 selection:bg-primary selection:text-white">
 
-    <!-- APP HEADER -->
-    <header class="app-header">
-        <div>
-            <h1>GeoGuard <span style="color:var(--primary)">Pro</span></h1>
-            <div style="font-size:0.75rem; color:var(--text-muted);">Enterprise Indoor Edition</div>
+    <!-- HEADER -->
+    <header class="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-lg">
+        <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-primary animate-pulse"></span>
+                    GeoGuard <span class="text-primary">360°</span>
+                </h1>
+                <p class="text-xs text-slate-400 font-mono mt-0.5">TACTICAL GEOFENCING</p>
+            </div>
+            <div id="gps-status" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-bold text-yellow-500 flex items-center gap-1">
+                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                INIT
+            </div>
         </div>
-        <div id="connection-status" class="text-xs text-warning">● Connecting</div>
     </header>
 
-    <div class="container">
-
-        <!-- STATUS DASHBOARD -->
-        <section class="status-grid">
-            <div class="status-box" id="box-acc">
-                <span class="status-label">GPS Accuracy</span>
-                <div class="status-value" id="val-acc">--</div>
-            </div>
-            <div class="status-box" id="box-filter">
-                <span class="status-label">Kalman State</span>
-                <div class="status-value" id="val-filter">OFF</div>
-            </div>
-            <div class="status-box" id="box-zone">
-                <span class="status-label">Current Zone</span>
-                <div class="status-value text-success" id="val-zone">NONE</div>
-            </div>
-        </section>
+    <main class="max-w-2xl mx-auto px-4 pt-20 space-y-6">
 
         <!-- RADAR VISUALIZATION -->
-        <div class="radar-wrapper">
-            <canvas id="radar-canvas" class="radar-canvas"></canvas>
-            <div class="radar-overlay" id="radar-status">SYSTEM INITIALIZING...</div>
+        <div class="relative w-full aspect-square max-h-[400px] mx-auto bg-slate-900 rounded-full border-4 border-slate-800 shadow-2xl overflow-hidden ring-1 ring-slate-700">
+            <!-- Canvas Layer -->
+            <canvas id="radar-canvas" class="absolute inset-0 w-full h-full z-10"></canvas>
+            
+            <!-- HUD Overlays -->
+            <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-slate-950/80 px-3 py-1 rounded-full border border-slate-700 text-xs font-mono text-cyan-400">
+                <span id="heading-val">0</span>° MAGNETIC
+            </div>
+            
+            <!-- Central Crosshair (Fixed User) -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+                <div class="w-4 h-4 bg-primary rounded-full shadow-[0_0_15px_rgba(99,102,241,0.6)] ring-2 ring-white"></div>
+                <!-- Cone of vision -->
+                <div class="absolute -top-12 -left-8 w-0 h-0 border-l-[32px] border-l-transparent border-r-[32px] border-r-transparent border-t-[60px] border-t-primary/10"></div>
+            </div>
+
+            <!-- Overlay for Permission -->
+            <div id="compass-overlay" class="absolute inset-0 z-30 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
+                <p class="text-sm text-slate-300 mb-4">Enable compass to rotate map with your movement.</p>
+                <button id="btn-compass" class="px-6 py-2 bg-primary hover:bg-indigo-600 text-white font-bold rounded-lg transition-all shadow-lg active:scale-95">
+                    Enable Compass
+                </button>
+            </div>
         </div>
 
-        <!-- CONTROL PANEL -->
-        <section class="card">
-            <h2>
-                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Manage Geofence
+        <!-- STATS GRID -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Accuracy</div>
+                <div id="val-acc" class="text-xl font-bold font-mono text-slate-200">--</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">State</div>
+                <div id="val-status" class="text-xl font-bold font-mono text-emerald-400">IDLE</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Zones</div>
+                <div id="val-zones" class="text-xl font-bold font-mono text-slate-200">0</div>
+            </div>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg">
+            <h2 class="text-sm font-bold text-slate-300 flex items-center gap-2 mb-3">
+                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Current Location
             </h2>
-            <p>
-                Saves your current location using <strong>Smart Buffer Logic</strong>. 
-                <br>
-                <small class="text-warning">⚠️ Keep Wi-Fi ON for indoor triangulation.</small>
-            </p>
-            
-            <div class="input-group">
-                <input type="text" id="input-name" class="form-input" placeholder="Location Name (e.g., Home Base)">
-                <button id="btn-save" class="btn btn-primary" style="width: auto;">Save Spot</button>
+            <div class="flex gap-2 mb-3">
+                <input type="text" id="input-name" placeholder="Name (e.g. Base Alpha)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors">
+                <button onclick="app.actionSave()" class="bg-primary hover:bg-indigo-600 text-white font-semibold px-4 rounded-lg text-sm transition-colors shadow-lg shadow-indigo-500/20">
+                    Save
+                </button>
             </div>
-            
-            <div style="display:flex; gap:10px;">
-                <button id="btn-sim" class="btn btn-outline">🧪 Run Simulation</button>
-                <button id="btn-clear" class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);">Reset Data</button>
-            </div>
-        </section>
+            <button onclick="app.actionSim()" class="w-full py-2 border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs font-mono transition-colors">
+                🧪 RUN SIMULATION PROTOCOL
+            </button>
+        </div>
 
-        <!-- ACTIVE LOCATIONS -->
-        <section class="card">
-            <h2>Active Monitoring</h2>
-            <div id="list-locations">
-                <!-- Injected via JS -->
+        <!-- ZONE LIST -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Zones</h3>
             </div>
-        </section>
+            <div id="list-locations" class="divide-y divide-slate-800 max-h-40 overflow-y-auto no-scrollbar">
+                <!-- Zones Injected Here -->
+                <div class="p-4 text-center text-xs text-slate-500">No active geofences</div>
+            </div>
+        </div>
 
-        <!-- AUDIT LOGS -->
-        <section class="card">
-            <h2>Audit Logs</h2>
-            <div style="overflow-x: auto;">
-                <table class="log-table">
-                    <thead>
+        <!-- LOGS -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+             <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Event Log</h3>
+                <button onclick="app.actionClear()" class="text-[10px] text-red-400 hover:text-red-300">CLEAR ALL</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-950 text-slate-500">
                         <tr>
-                            <th>Zone</th>
-                            <th>Entry</th>
-                            <th>Exit</th>
-                            <th>Duration</th>
+                            <th class="px-4 py-2 font-medium">Zone</th>
+                            <th class="px-4 py-2 font-medium">Time</th>
+                            <th class="px-4 py-2 font-medium">Duration</th>
                         </tr>
                     </thead>
-                    <tbody id="list-logs">
-                        <!-- Injected via JS -->
+                    <tbody id="list-logs" class="divide-y divide-slate-800 text-slate-300">
+                        <!-- Logs Injected Here -->
                     </tbody>
                 </table>
             </div>
-            <button id="btn-export" class="btn btn-outline" style="margin-top:16px;">💾 Export CSV</button>
-        </section>
+        </div>
 
-        <!-- SYSTEM DIAGNOSTICS -->
-        <section class="card">
-            <h2>System Diagnostics</h2>
-            <div id="console-output"></div>
-        </section>
+        <!-- DEBUG CONSOLE -->
+        <div id="console-out" class="bg-black rounded-lg border border-slate-800 p-3 font-mono text-[10px] text-green-500 h-24 overflow-y-auto mb-10">
+            > System initialized...
+        </div>
 
-    </div>
+    </main>
 
-    <!-- TOAST CONTAINER -->
-    <div id="toast-area"></div>
+    <!-- TOAST NOTIFICATIONS -->
+    <div id="toast-container" class="fixed bottom-6 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
 <script>
 /**
- * ==========================================================================
- *  ENTERPRISE GEOFENCING LIBRARY (GeoGuard Core)
- * ==========================================================================
- *  Architecture:
- *  1. MathUtils: Pure functions for Geodesy.
- *  2. KalmanFilter: Noise reduction class.
- *  3. StorageManager: LocalStorage wrapper.
- *  4. NotificationService: UI Toast handler.
- *  5. GeofenceEngine: The core logic processor (Smart Buffer).
- *  6. RadarRenderer: Canvas visualization.
- *  7. AppController: Main glue code.
- * ==========================================================================
+ * ====================================================================
+ *  GeoGuard 360° - Enterprise Logic + Sensor Fusion
+ * ====================================================================
  */
 
-/* --- 1. MATH UTILITIES --- */
+/* --- UTILITIES --- */
 const Utils = {
-    // Earth Radius in meters
     R: 6371e3,
-
-    // Generate Unique ID
     uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
-
-    // Haversine Formula (Distance between two Lat/Lng points)
+    
     getDistance: (lat1, lon1, lat2, lon2) => {
         const toRad = x => x * Math.PI / 180;
         const dLat = toRad(lat2 - lat1);
         const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return Utils.R * c;
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+        return Utils.R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     },
 
-    // Format Duration (ms -> string)
-    formatDuration: (ms) => {
-        const sec = Math.floor(ms / 1000);
-        if (sec < 60) return `${sec}s`;
-        const min = Math.floor(sec / 60);
-        const remSec = sec % 60;
-        return `${min}m ${remSec}s`;
+    // Calculate Bearing (Angle) between two points
+    getBearing: (lat1, lon1, lat2, lon2) => {
+        const toRad = x => x * Math.PI / 180;
+        const toDeg = x => x * 180 / Math.PI;
+        const dLon = toRad(lon2 - lon1);
+        const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - 
+                  Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+        const brng = toDeg(Math.atan2(y, x));
+        return (brng + 360) % 360; // Normalize 0-360
     },
 
-    // Format Time
-    formatTime: (ts) => new Date(ts).toLocaleTimeString()
+    formatTime: (ts) => new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})
 };
 
-/* --- 2. KALMAN FILTER (NOISE REDUCTION) --- */
-/**
- * A simplified 1D Kalman Filter.
- * Used to smooth out jumpy GPS coordinates (Lat and Lng separately).
- */
+/* --- KALMAN FILTER (Noise Reduction) --- */
 class KalmanFilter {
-    constructor(R = 1, Q = 1, A = 1, B = 0, C = 1) {
-        this.R = R; // Noise covariance (Measurement Noise)
-        this.Q = Q; // Process covariance (Environment Noise)
-        this.A = A; // State vector
-        this.B = B; // Control vector
-        this.C = C; // Measurement vector
-        
-        this.cov = NaN;
-        this.x = NaN; // Value
-    }
-
-    filter(measurement) {
-        if (isNaN(this.x)) {
-            this.x = measurement;
-            this.cov = this.R;
-            return measurement;
-        }
-
-        // Prediction
-        const predX = (this.A * this.x) + (this.B * 0);
-        const predCov = ((this.A * this.cov) * this.A) + this.Q;
-
-        // Correction
-        const K = predCov * this.C * (1 / ((this.C * predCov * this.C) + this.R));
-        this.x = predX + K * (measurement - (this.C * predX));
-        this.cov = predCov - (K * this.C * predCov);
-
+    constructor() { this.R = 5; this.Q = 1; this.A = 1; this.B = 0; this.C = 1; this.x = NaN; this.cov = NaN; }
+    filter(m) {
+        if (isNaN(this.x)) { this.x = m; this.cov = this.R; return m; }
+        const predX = this.x; const predCov = this.cov + this.Q;
+        const K = predCov / (predCov + this.R);
+        this.x = predX + K * (m - predX);
+        this.cov = predCov - (K * predCov);
         return this.x;
     }
 }
 
-/* --- 3. STORAGE MANAGER --- */
+/* --- STORAGE --- */
 class StorageManager {
-    constructor() {
-        this.KEY_LOCS = 'geoguard_locs';
-        this.KEY_LOGS = 'geoguard_logs';
-    }
-
-    getLocations() {
-        try { return JSON.parse(localStorage.getItem(this.KEY_LOCS)) || []; }
-        catch { return []; }
-    }
-
-    saveLocation(loc) {
-        const list = this.getLocations();
-        list.push(loc);
-        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
-        return list;
-    }
-
-    updateLocation(updatedLoc) {
-        const list = this.getLocations().map(l => l.id === updatedLoc.id ? updatedLoc : l);
-        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
-    }
-
-    deleteLocation(id) {
-        const list = this.getLocations().filter(l => l.id !== id);
-        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
-        return list;
-    }
-
-    getLogs() {
-        try { return JSON.parse(localStorage.getItem(this.KEY_LOGS)) || []; }
-        catch { return []; }
-    }
-
-    addLog(log) {
-        const list = this.getLogs();
-        list.unshift(log); // Prepend
-        if (list.length > 100) list.pop(); // Keep max 100
-        localStorage.setItem(this.KEY_LOGS, JSON.stringify(list));
-        return list;
-    }
-
-    clearAll() {
-        localStorage.removeItem(this.KEY_LOCS);
-        localStorage.removeItem(this.KEY_LOGS);
-    }
+    constructor() { this.K_LOC = 'geo_locs_v3'; this.K_LOG = 'geo_logs_v3'; }
+    getLocs() { return JSON.parse(localStorage.getItem(this.K_LOC)) || []; }
+    saveLoc(l) { const ls = this.getLocs(); ls.push(l); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); return ls; }
+    delLoc(id) { const ls = this.getLocs().filter(l => l.id !== id); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); return ls; }
+    updateLoc(l) { const ls = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); }
+    addLog(l) { const ls = JSON.parse(localStorage.getItem(this.K_LOG)) || []; ls.unshift(l); if(ls.length>50) ls.pop(); localStorage.setItem(this.K_LOG, JSON.stringify(ls)); return ls; }
+    clear() { localStorage.removeItem(this.K_LOC); localStorage.removeItem(this.K_LOG); }
+    getLogs() { return JSON.parse(localStorage.getItem(this.K_LOG)) || []; }
 }
 
-/* --- 4. NOTIFICATION SERVICE --- */
-class NotificationService {
-    constructor() {
-        this.container = document.getElementById('toast-area');
-    }
-
-    show(title, msg, type = 'info') {
-        const el = document.createElement('div');
-        el.className = `toast ${type}`;
-        
-        const icon = type === 'success' ? '✅' : type === 'warn' ? '⚠️' : 'ℹ️';
-
-        el.innerHTML = `
-            <div class="toast-icon">${icon}</div>
-            <div class="toast-content">
-                <div class="toast-title">${title}</div>
-                <div class="toast-msg">${msg}</div>
-            </div>
-        `;
-        
-        this.container.appendChild(el);
-
-        // Auto remove
-        setTimeout(() => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(20px)';
-            setTimeout(() => el.remove(), 300);
-        }, 4000);
-    }
-}
-
-/* --- 5. GEOFENCE ENGINE (CORE LOGIC) --- */
-class GeofenceEngine {
+/* --- HEADING MANAGER (Sensor Fusion) --- */
+class HeadingManager {
     constructor(callback) {
         this.callback = callback;
-        this.watchId = null;
-        this.simInterval = null;
+        this.heading = 0;
+        this.useCompass = false;
         
-        // Kalman Filters (One for Lat, One for Lng)
-        this.kalmanLat = new KalmanFilter(3, 1);
-        this.kalmanLng = new KalmanFilter(3, 1);
-
-        // Constants
-        this.CONFIG = {
-            RADIUS: 15,          // Base radius in meters
-            HYSTERESIS: 10,      // Buffer for exit (Total 25m needed to exit)
-            MIN_ACCURACY: 60,    // Ignore GPS if accuracy > 60m (prevent huge jumps)
-            DWELL_TIME: 10000    // Must be outside for 10s to confirm exit
+        // Handle iOS Permission
+        const btn = document.getElementById('btn-compass');
+        const overlay = document.getElementById('compass-overlay');
+        
+        btn.onclick = async () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const resp = await DeviceOrientationEvent.requestPermission();
+                    if (resp === 'granted') {
+                        this.startCompass();
+                        overlay.style.display = 'none';
+                    } else alert('Permission denied');
+                } catch (e) { alert(e); }
+            } else {
+                // Non-iOS or older devices
+                this.startCompass();
+                overlay.style.display = 'none';
+            }
         };
+    }
+
+    startCompass() {
+        this.useCompass = true;
+        window.addEventListener('deviceorientation', (e) => {
+            if(e.webkitCompassHeading) {
+                // iOS
+                this.heading = e.webkitCompassHeading;
+            } else if (e.alpha) {
+                // Android (Standard) - Alpha is counter-clockwise, convert to compass
+                this.heading = 360 - e.alpha; 
+            }
+            this.callback(this.heading);
+        }, true);
+    }
+
+    // Call this with GPS Speed & Bearing updates
+    updateFromGPS(speed, bearing) {
+        // If moving faster than ~3km/h (0.8 m/s) and bearing is valid, trust GPS over Compass
+        if (speed > 0.8 && bearing !== null && !isNaN(bearing)) {
+            this.heading = bearing;
+            this.callback(this.heading);
+        }
+        // Else rely on the 'deviceorientation' listener set up in startCompass
+    }
+}
+
+/* --- GEO ENGINE (Smart Buffer) --- */
+class GeoEngine {
+    constructor(cb) {
+        this.cb = cb;
+        this.kLat = new KalmanFilter();
+        this.kLng = new KalmanFilter();
+        this.isSim = false;
+        this.RADIUS = 15;
+        this.BUFFER = 10; // Hysteresis
     }
 
     start() {
-        if (!navigator.geolocation) return this.callback('error', 'Geolocation not supported');
-        
-        const options = {
-            enableHighAccuracy: true, // Forces Wi-Fi/GPS mix
-            timeout: 20000,
-            maximumAge: 0
-        };
-
-        this.watchId = navigator.geolocation.watchPosition(
-            this.handlePosition.bind(this),
-            this.handleError.bind(this),
-            options
+        if(!navigator.geolocation) return this.cb('err', 'No GPS');
+        navigator.geolocation.watchPosition(
+            p => this.process(p),
+            e => this.cb('err', e.message),
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     }
 
-    handlePosition(position) {
-        if (this.simInterval) return; // Don't interrupt simulation
-
-        const { latitude, longitude, accuracy } = position.coords;
+    process(p) {
+        if(this.isSim) return;
         
-        // 1. FILTERING: Apply Kalman Filter to smooth jitter
-        const smoothLat = this.kalmanLat.filter(latitude);
-        const smoothLng = this.kalmanLng.filter(longitude);
+        const { latitude, longitude, accuracy, speed, heading } = p.coords;
+        const lat = this.kLat.filter(latitude);
+        const lng = this.kLng.filter(longitude);
         
-        const posData = {
-            lat: smoothLat,
-            lng: smoothLng,
-            rawLat: latitude,
-            rawLng: longitude,
-            acc: accuracy,
-            timestamp: Date.now()
+        const data = { 
+            lat, lng, acc: accuracy, 
+            speed: speed, gpsHeading: heading, 
+            ts: Date.now() 
         };
 
-        this.callback('update', posData);
+        this.cb('pos', data);
     }
 
-    handleError(err) {
-        let msg = "Unknown GPS Error";
-        if (err.code === 1) msg = "Permission Denied. Please Allow GPS.";
-        if (err.code === 2) msg = "Position Unavailable. Check GPS/Wi-Fi.";
-        if (err.code === 3) msg = "GPS Timeout. Move to open area.";
-        this.callback('error', msg);
-    }
-
-    // THE SMART BUFFER LOGIC
-    checkZones(currentPos, zones) {
-        const events = [];
-        const now = Date.now();
-
-        zones.forEach(zone => {
-            // Raw physical distance
-            const realDist = Utils.getDistance(currentPos.lat, currentPos.lng, zone.lat, zone.lng);
+    check(pos, zones) {
+        zones.forEach(z => {
+            const dist = Utils.getDistance(pos.lat, pos.lng, z.lat, z.lng);
             
-            // --- SMART INDOOR LOGIC START ---
-            
-            // Calculate "Adjusted Distance"
-            // If accuracy is bad (high number), we shrink the distance perception.
-            // Example: Real Dist 20m. Accuracy 30m. Adjusted = 20 - (30/2) = 5m.
-            // Result: System thinks you are 5m away (Inside), not 20m (Outside).
-            const accuracyBuffer = currentPos.acc / 2;
-            const adjustedDist = realDist - accuracyBuffer;
+            // SMART LOGIC: If accuracy is bad, pull user closer to center virtually
+            const smartDist = dist - (pos.acc / 2);
 
-            // STATE: INSIDE -> OUTSIDE
-            if (zone.isInside) {
-                // Must exceed Radius + Hysteresis using Adjusted Distance
-                if (adjustedDist > (this.CONFIG.RADIUS + this.CONFIG.HYSTERESIS)) {
-                    // Dwell Check (Debounce)
-                    if (!zone.tentativeExit) zone.tentativeExit = now;
-                    
-                    if (now - zone.tentativeExit > this.CONFIG.DWELL_TIME) {
-                        zone.isInside = false;
-                        zone.tentativeExit = null;
-                        events.push({ type: 'exit', zone, time: now });
-                    }
-                } else {
-                    zone.tentativeExit = null; // Reset if user comes back in buffer
+            if (!z.isInside && dist <= this.RADIUS) {
+                // STRICT ENTRY
+                z.isInside = true;
+                z.entryTime = Date.now();
+                this.cb('event', { type: 'enter', zone: z });
+            } 
+            else if (z.isInside && smartDist > (this.RADIUS + this.BUFFER)) {
+                // LENIENT EXIT
+                const dur = Date.now() - z.entryTime;
+                if(dur > 15000) { // Glitch filter 15s
+                    z.isInside = false;
+                    const log = { zone: z.name, entry: z.entryTime, exit: Date.now(), dur: Math.round(dur/1000) };
+                    z.entryTime = null;
+                    this.cb('event', { type: 'exit', zone: z, log: log });
                 }
             }
-            
-            // STATE: OUTSIDE -> INSIDE
-            else {
-                // Strict entry: Use Real Distance (don't use buffer for entry)
-                if (realDist <= this.CONFIG.RADIUS) {
-                    zone.isInside = true;
-                    zone.entryTime = now;
-                    events.push({ type: 'entry', zone, time: now });
-                }
-            }
-            // --- SMART INDOOR LOGIC END ---
-            
-            // Attach live distance for UI
-            zone._liveDist = realDist;
+            z._dist = dist; // For UI
         });
-
-        return events;
+        return zones;
     }
 
-    // SIMULATION ENGINE
     simulate(startLat, startLng) {
-        if (this.simInterval) {
-            clearInterval(this.simInterval);
-            this.simInterval = null;
-            this.callback('log', 'Simulation Stopped');
-            return;
-        }
-
-        this.callback('log', '🧪 Simulation Started: Walking in circle');
-        
+        this.isSim = true;
         let angle = 0;
-        const radius = 0.0003; // Approx 30 meters
-        const centerLat = startLat;
-        const centerLng = startLng;
-
-        this.simInterval = setInterval(() => {
-            angle += 0.1;
+        const timer = setInterval(() => {
+            angle += 5;
+            // Move in circle
+            const r = 0.0004; // ~40m
+            const lat = startLat + Math.sin(angle * Math.PI/180) * r;
+            const lng = startLng + Math.cos(angle * Math.PI/180) * r;
             
-            // Generate circular path
-            const simLat = centerLat + (Math.sin(angle) * radius);
-            const simLng = centerLng + (Math.cos(angle) * radius);
-            
-            // Simulate changing accuracy
-            const simAcc = 10 + (Math.random() * 20); // 10m to 30m accuracy
+            // Calc fake bearing
+            const bearing = (angle + 90) % 360;
 
-            this.callback('update', {
-                lat: simLat,
-                lng: simLng,
-                acc: simAcc,
-                isSim: true
-            });
-        }, 1000);
+            this.cb('pos', { lat, lng, acc: 10, speed: 2, gpsHeading: bearing, isSim: true });
+            if(angle > 720) { clearInterval(timer); this.isSim = false; }
+        }, 500);
     }
 }
 
-/* --- 6. RADAR RENDERER (CANVAS) --- */
-class RadarRenderer {
+/* --- RADAR RENDERER (ROTATING MAP) --- */
+class Radar {
     constructor(canvasId) {
-        this.canvas = document.getElementById(canvasId);
-        this.ctx = this.canvas.getContext('2d');
+        this.cvs = document.getElementById(canvasId);
+        this.ctx = this.cvs.getContext('2d');
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+        window.onresize = () => this.resize();
     }
-
     resize() {
-        const parent = this.canvas.parentElement;
-        this.canvas.width = parent.offsetWidth;
-        this.canvas.height = parent.offsetWidth; // Square
+        const p = this.cvs.parentElement;
+        this.cvs.width = p.offsetWidth;
+        this.cvs.height = p.offsetWidth;
     }
-
-    draw(userPos, zones) {
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-        const cx = w / 2;
-        const cy = h / 2;
+    draw(user, zones, heading) {
+        const w = this.cvs.width;
+        const cx = w/2, cy = w/2;
         const ctx = this.ctx;
-
-        // 1. Clear & Background
-        ctx.clearRect(0, 0, w, h);
         
-        // 2. Draw Grid Rings (Range Indicators)
-        // Let's say canvas edge is 60 meters
-        const maxRange = 60; 
-        const pxPerMeter = (w / 2) / maxRange;
+        // Clear
+        ctx.clearRect(0,0,w,w);
 
-        ctx.strokeStyle = '#334155';
+        // --- COORDINATE TRANSFORMATION ---
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        // ROTATE WORLD OPPOSITE TO HEADING (So "Up" is always "Ahead")
+        ctx.rotate(-heading * Math.PI / 180);
+
+        // 1. Draw Grid (North Locked relative to world)
         ctx.lineWidth = 1;
-        [15, 30, 45].forEach(r => {
+        
+        // Draw Range Rings (20m, 40m, 60m)
+        const scale = (w/2) / 60; // Max range 60m
+        [20, 40, 60].forEach(r => {
             ctx.beginPath();
-            ctx.arc(cx, cy, r * pxPerMeter, 0, Math.PI * 2);
+            ctx.strokeStyle = '#334155'; // slate-700
+            ctx.arc(0, 0, r * scale, 0, Math.PI*2);
             ctx.stroke();
         });
 
-        // 3. Draw Axis
-        ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
-
-        // 4. Draw User Accuracy Bubble (Center)
-        const accRadius = (userPos.acc * pxPerMeter) / 2; // Scaled
-        ctx.fillStyle = 'rgba(99, 102, 241, 0.2)';
+        // Draw North Line (World Coordinates)
         ctx.beginPath();
-        ctx.arc(cx, cy, accRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#6366f1';
+        ctx.moveTo(0, 0); ctx.lineTo(0, -w); // Line to North
+        ctx.strokeStyle = '#ef4444'; // Red for North
+        ctx.setLineDash([5, 5]);
         ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw 'N' Label
+        ctx.save();
+        ctx.translate(0, -50 * scale);
+        ctx.rotate(heading * Math.PI / 180); // Counter-rotate text so it's readable
+        ctx.fillStyle = '#ef4444';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('N', 0, 0);
+        ctx.restore();
 
-        // 5. Draw User Dot
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
-
-        // 6. Draw Zones relative to User
-        zones.forEach(zone => {
-            // Standard Equirectangular projection approximation for small distances
-            const dLat = (zone.lat - userPos.lat) * 111139; // meters
-            const dLng = (zone.lng - userPos.lng) * 111139 * Math.cos(userPos.lat * Math.PI / 180);
+        // 2. Draw Zones
+        zones.forEach(z => {
+            // Distance & Bearing from User
+            const d = Utils.getDistance(user.lat, user.lng, z.lat, z.lng);
+            const b = Utils.getBearing(user.lat, user.lng, z.lat, z.lng);
             
-            // Invert Y because canvas Y goes down, Latitude goes up
-            const x = cx + (dLng * pxPerMeter);
-            const y = cy - (dLat * pxPerMeter);
+            // Convert to Polar Coord on Canvas
+            const rads = (b - 90) * Math.PI / 180; // -90 adjustment for canvas math
+            const x = Math.cos(rads) * (d * scale);
+            const y = Math.sin(rads) * (d * scale);
 
             // Draw Zone Circle
-            ctx.fillStyle = zone.isInside ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)';
             ctx.beginPath();
-            ctx.arc(x, y, 15 * pxPerMeter, 0, Math.PI * 2); // 15m radius visual
+            ctx.fillStyle = z.isInside ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)';
+            ctx.strokeStyle = z.isInside ? '#10b981' : '#6366f1';
+            ctx.arc(x, y, 15 * scale, 0, Math.PI*2); // 15m radius
             ctx.fill();
+            ctx.stroke();
 
-            // Draw Zone Center
-            ctx.fillStyle = zone.isInside ? '#10b981' : '#94a3b8';
-            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
-
-            // Label
+            // Draw Zone Label
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(heading * Math.PI / 180); // Counter-rotate text
             ctx.fillStyle = '#fff';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(zone.name, x + 8, y + 4);
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(z.name, 0, 4);
+            ctx.restore();
         });
 
-        // 7. Scanning Line Animation
-        const time = Date.now() / 1000;
-        const scanAngle = (time % 2) * Math.PI; // Full circle every 2s
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(scanAngle);
-        const grad = ctx.createLinearGradient(0, 0, w/2, 0);
-        grad.addColorStop(0, 'rgba(99, 102, 241, 0)');
-        grad.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.arc(0, 0, w, -0.2, 0.2);
-        ctx.fill();
-        ctx.restore();
+        ctx.restore(); // Undo all rotation
     }
 }
 
-/* --- 7. APP CONTROLLER (MAIN) --- */
-class AppController {
+/* --- APP CONTROLLER --- */
+class App {
     constructor() {
-        this.storage = new StorageManager();
-        this.notify = new NotificationService();
-        this.radar = new RadarRenderer('radar-canvas');
-        this.engine = new GeofenceEngine((t, d) => this.handleEngineEvent(t, d));
+        this.store = new StorageManager();
+        this.ui = {
+            acc: document.getElementById('val-acc'),
+            stat: document.getElementById('val-status'),
+            zones: document.getElementById('val-zones'),
+            list: document.getElementById('list-locations'),
+            logs: document.getElementById('list-logs'),
+            con: document.getElementById('console-out'),
+            gps: document.getElementById('gps-status'),
+            head: document.getElementById('heading-val')
+        };
         
-        this.locations = this.storage.getLocations();
         this.currentPos = null;
-
-        this.initUI();
-        this.engine.start();
-
-        this.log("System Started. Enable Wi-Fi for better accuracy.");
-        this.notify.show("Tip", "Ensure Wi-Fi is ON for indoor precision.", "warn");
-    }
-
-    initUI() {
-        // Buttons
-        document.getElementById('btn-save').onclick = () => this.actionSave();
-        document.getElementById('btn-sim').onclick = () => this.actionSim();
-        document.getElementById('btn-clear').onclick = () => this.actionClear();
-        document.getElementById('btn-export').onclick = () => this.actionExport();
-
-        this.renderLocations();
+        this.zones = this.store.getLocs();
+        
+        this.radar = new Radar('radar-canvas');
+        
+        // Engines
+        this.geo = new GeoEngine((t, d) => this.onGeoEvent(t, d));
+        this.headingMgr = new HeadingManager((h) => this.onHeading(h));
+        
+        this.renderZones();
         this.renderLogs();
+        this.geo.start();
+        
+        this.log('System Initialized. Waiting for GPS...');
     }
 
-    handleEngineEvent(type, data) {
-        if (type === 'error') {
-            document.getElementById('connection-status').innerText = "● Error";
-            document.getElementById('connection-status').style.color = "var(--danger)";
-            this.log(`Error: ${data}`);
-            this.notify.show("GPS Error", data, "error");
+    onGeoEvent(type, data) {
+        if(type === 'err') {
+            this.ui.gps.innerHTML = `<span class="text-red-500">ERR</span>`;
+            this.log('GPS Error: ' + data);
             return;
         }
 
-        if (type === 'log') {
-            this.log(data);
-            return;
-        }
-
-        if (type === 'update') {
+        if(type === 'pos') {
             this.currentPos = data;
             
-            // 1. Process Geofencing Logic
-            const events = this.engine.checkZones(data, this.locations);
-            
-            // 2. Handle Events
-            if (events.length > 0) {
-                this.handleZoneEvents(events);
-            }
+            // 1. Update UI Stats
+            this.ui.gps.innerHTML = `<span class="text-green-400">LIVE</span>`;
+            this.ui.acc.innerText = `±${Math.round(data.acc)}m`;
+            this.ui.acc.className = data.acc < 20 ? 'text-2xl font-bold font-mono text-emerald-400' : 'text-2xl font-bold font-mono text-red-400';
 
-            // 3. Update UI
-            this.updateDashboard(data);
-            this.radar.draw(data, this.locations);
-            this.renderLocations(); // Update distances
+            // 2. Feed GPS Heading to Manager (if moving)
+            this.headingMgr.updateFromGPS(data.speed, data.gpsHeading);
+
+            // 3. Logic Check
+            this.zones = this.geo.check(data, this.zones);
+            
+            // 4. Update Status Text
+            const inside = this.zones.find(z => z.isInside);
+            this.ui.stat.innerText = inside ? inside.name : "OUTSIDE";
+            this.ui.stat.className = inside ? "text-xl font-bold font-mono text-emerald-400 animate-pulse" : "text-xl font-bold font-mono text-slate-500";
+            
+            this.renderZones();
+        }
+
+        if(type === 'event') {
+            const { type: evtType, zone, log } = data;
+            if(evtType === 'enter') {
+                this.toast(`Entered: ${zone.name}`, 'green');
+                this.store.updateLoc(zone);
+                this.log(`>> ENTER ${zone.name}`);
+            } else {
+                this.toast(`Exited: ${zone.name} (${log.dur}s)`, 'indigo');
+                this.store.updateLoc(zone);
+                this.store.addLog(log);
+                this.log(`<< EXIT ${zone.name}`);
+                this.renderLogs();
+            }
         }
     }
 
-    handleZoneEvents(events) {
-        events.forEach(e => {
-            if (e.type === 'entry') {
-                this.notify.show("Entered Zone", e.zone.name, "success");
-                this.log(`🟢 ENTER: ${e.zone.name}`);
-                
-                // Save state to storage
-                this.storage.updateLocation(e.zone);
-            }
-            else if (e.type === 'exit') {
-                const dur = e.time - e.zone.entryTime;
-                const durStr = Utils.formatDuration(dur);
-                
-                this.notify.show("Exited Zone", `${e.zone.name} (${durStr})`, "warn");
-                this.log(`🔴 EXIT: ${e.zone.name} after ${durStr}`);
-
-                // Log it
-                const logEntry = {
-                    zone: e.zone.name,
-                    entry: e.zone.entryTime,
-                    exit: e.time,
-                    duration: durStr
-                };
-                this.storage.addLog(logEntry);
-                this.storage.updateLocation(e.zone);
-                this.renderLogs();
-            }
-        });
+    onHeading(h) {
+        // Redraw radar with new rotation
+        this.ui.head.innerText = Math.round(h);
+        if(this.currentPos) {
+            this.radar.draw(this.currentPos, this.zones, h);
+        }
     }
 
     // --- ACTIONS ---
-
     actionSave() {
-        if (!this.currentPos) return this.notify.show("Error", "Waiting for GPS signal...", "error");
-        
-        const nameInput = document.getElementById('input-name');
-        const name = nameInput.value.trim();
-        if (!name) return this.notify.show("Error", "Please enter a name", "error");
-
-        const newLoc = {
-            id: Utils.uuid(),
-            name: name,
-            lat: this.currentPos.lat,
-            lng: this.currentPos.lng,
-            isInside: true, // Auto-assume inside on creation
-            entryTime: Date.now()
-        };
-
-        this.locations = this.storage.saveLocation(newLoc);
-        this.renderLocations();
-        nameInput.value = "";
-        this.notify.show("Success", "Location saved with Indoor Buffer", "success");
+        if(!this.currentPos) return this.toast('Wait for GPS', 'red');
+        const name = document.getElementById('input-name').value || 'Target ' + Math.floor(Math.random()*100);
+        const z = { id: Utils.uuid(), name, lat: this.currentPos.lat, lng: this.currentPos.lng, isInside: true, entryTime: Date.now() };
+        this.store.saveLoc(z);
+        this.zones.push(z);
+        this.renderZones();
+        document.getElementById('input-name').value = '';
+        this.toast('Zone Saved', 'green');
     }
 
     actionSim() {
-        if (this.locations.length === 0) return this.notify.show("Error", "Save a location first", "error");
-        const center = this.locations[0];
-        this.engine.simulate(center.lat, center.lng);
+        if(this.zones.length === 0) return this.toast('Create a zone first', 'red');
+        this.geo.simulate(this.zones[0].lat, this.zones[0].lng);
+        this.toast('Simulation Started', 'indigo');
     }
 
     actionClear() {
-        if (confirm("Delete all data?")) {
-            this.storage.clearAll();
+        if(confirm('Clear all data?')) {
+            this.store.clear();
             window.location.reload();
         }
     }
 
-    actionExport() {
-        const logs = this.storage.getLogs();
-        if (logs.length === 0) return this.notify.show("Info", "No logs to export", "warn");
-        
-        let csv = "Zone,Entry Time,Exit Time,Duration\n";
-        logs.forEach(l => {
-            csv += `"${l.zone}","${new Date(l.entry).toISOString()}","${new Date(l.exit).toISOString()}","${l.duration}"\n`;
-        });
-        
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `geoguard_export_${Date.now()}.csv`;
-        a.click();
-    }
-
-    actionDelete(id) {
-        if (confirm("Remove this zone?")) {
-            this.locations = this.storage.deleteLocation(id);
-            this.renderLocations();
-        }
-    }
-
-    // --- UI UPDATERS ---
-
-    updateDashboard(pos) {
-        document.getElementById('connection-status').innerText = "● Live";
-        document.getElementById('connection-status').style.color = "var(--success)";
-        
-        // Accuracy
-        const accEl = document.getElementById('val-acc');
-        const accBox = document.getElementById('box-acc');
-        accEl.innerText = `±${Math.round(pos.acc)}m`;
-        accBox.className = pos.acc < 20 ? 'status-box active' : 'status-box poor';
-
-        // Filter Status
-        document.getElementById('val-filter').innerText = "ACTIVE";
-        document.getElementById('val-filter').style.color = "#10b981";
-
-        // Zone status
-        const inside = this.locations.find(l => l.isInside);
-        document.getElementById('val-zone').innerText = inside ? inside.name : "OUTSIDE";
-        document.getElementById('val-zone').className = inside ? "status-value text-success" : "status-value text-muted";
-        
-        // Update overlay text
-        document.getElementById('radar-status').innerText = inside ? `MONITORING: ${inside.name}` : "SCANNING SECTOR...";
-    }
-
-    renderLocations() {
-        const list = document.getElementById('list-locations');
-        list.innerHTML = "";
-        
-        if (this.locations.length === 0) {
-            list.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted)">No zones active. Save one above.</div>`;
-            return;
-        }
-
-        this.locations.forEach(loc => {
-            const dist = loc._liveDist ? Math.round(loc._liveDist) : "?";
-            const el = document.createElement('div');
-            el.className = 'list-item';
-            el.innerHTML = `
+    // --- RENDERERS ---
+    renderZones() {
+        this.ui.zones.innerText = this.zones.length;
+        this.ui.list.innerHTML = this.zones.map(z => `
+            <div class="px-4 py-3 flex justify-between items-center bg-slate-900/50 hover:bg-slate-800 transition-colors">
                 <div>
-                    <div style="font-weight:700; color:${loc.isInside ? 'var(--success)' : 'var(--text-primary)'}">
-                        ${loc.name}
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full ${z.isInside ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-slate-600'}"></div>
+                        <span class="text-sm font-bold text-slate-200">${z.name}</span>
                     </div>
-                    <div class="text-xs text-mono" style="color:var(--text-muted)">
-                        Dist: ${dist}m | ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}
+                    <div class="text-[10px] font-mono text-slate-500 pl-4 mt-1">
+                        DIST: ${z._dist ? Math.round(z._dist) : '?'}m
                     </div>
                 </div>
-                <button class="btn btn-outline" style="width:auto; padding:8px 12px; font-size:0.75rem" onclick="app.actionDelete('${loc.id}')">Remove</button>
-            `;
-            list.appendChild(el);
-        });
+                <button onclick="app.delZone('${z.id}')" class="text-xs text-red-500 hover:text-white hover:bg-red-500 px-2 py-1 rounded transition">DEL</button>
+            </div>
+        `).join('') || '<div class="p-4 text-center text-xs text-slate-500">No active geofences</div>';
     }
 
     renderLogs() {
-        const list = document.getElementById('list-logs');
-        const logs = this.storage.getLogs();
-        list.innerHTML = "";
-        
-        if (logs.length === 0) {
-            list.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No history recorded yet.</td></tr>`;
-            return;
-        }
+        const logs = this.store.getLogs();
+        this.ui.logs.innerHTML = logs.map(l => `
+            <tr class="hover:bg-slate-800/50 transition">
+                <td class="px-4 py-2 font-bold text-indigo-400">${l.zone}</td>
+                <td class="px-4 py-2 font-mono text-slate-400">${Utils.formatTime(l.exit)}</td>
+                <td class="px-4 py-2"><span class="bg-slate-800 px-2 py-0.5 rounded text-[10px]">${l.dur}s</span></td>
+            </tr>
+        `).join('');
+    }
 
-        logs.forEach(log => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${log.zone}</strong></td>
-                <td>${Utils.formatTime(log.entry)}</td>
-                <td>${Utils.formatTime(log.exit)}</td>
-                <td><span style="background:var(--bg-body); padding:2px 6px; border-radius:4px; font-family:var(--font-mono)">${log.duration}</span></td>
-            `;
-            list.appendChild(tr);
-        });
+    delZone(id) {
+        if(confirm('Delete?')) {
+            this.store.delLoc(id);
+            this.zones = this.zones.filter(z => z.id !== id);
+            this.renderZones();
+        }
     }
 
     log(msg) {
-        const consoleEl = document.getElementById('console-output');
-        const time = new Date().toLocaleTimeString();
-        consoleEl.innerHTML = `<div><span style="opacity:0.5">[${time}]</span> ${msg}</div>` + consoleEl.innerHTML;
+        const t = new Date().toLocaleTimeString();
+        this.ui.con.innerHTML = `<div><span class="opacity-50">[${t}]</span> ${msg}</div>` + this.ui.con.innerHTML;
+    }
+
+    toast(msg, color) {
+        const el = document.createElement('div');
+        const colors = { green: 'border-emerald-500 bg-emerald-900/80 text-white', red: 'border-red-500 bg-red-900/80 text-white', indigo: 'border-indigo-500 bg-indigo-900/80 text-white' };
+        el.className = `px-4 py-3 rounded-lg border-l-4 shadow-xl backdrop-blur-md text-sm font-semibold pointer-events-auto transform transition-all duration-300 translate-y-10 opacity-0 ${colors[color]}`;
+        el.innerText = msg;
+        document.getElementById('toast-container').appendChild(el);
+        requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
+        setTimeout(() => { el.classList.add('opacity-0', 'translate-y-4'); setTimeout(() => el.remove(), 300); }, 3000);
     }
 }
 
-// --- BOOTSTRAP ---
-const app = new AppController();
-
-// Expose to window for inline HTML onclick handlers
+// Start App
+const app = new App();
 window.app = app;
-
 </script>
 </body>
 </html>
