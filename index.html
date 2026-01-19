@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#020617">
-    <title>GeoGuard 360° | Tactical Tracker</title>
+    <meta name="theme-color" content="#0f172a">
+    <title>GeoGuard Logistics | Rider App</title>
     
-    <!-- TAILWIND CSS (CDN) -->
+    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -15,601 +15,699 @@
                 extend: {
                     colors: {
                         slate: { 850: '#1e293b', 950: '#020617' },
-                        primary: '#6366f1',
-                        accent: '#06b6d4'
+                        primary: '#3b82f6',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b'
                     },
                     animation: {
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'spin-slow': 'spin 4s linear infinite',
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     }
                 }
             }
         }
     </script>
-    
+
+    <!-- ICONS (Phosphor) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
     <style>
-        /* Custom scrollbar for logs */
+        /* Base & Reset */
+        body { -webkit-tap-highlight-color: transparent; user-select: none; }
+        
+        /* Custom Scrollbar */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Modal Transitions */
+        .modal { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0; pointer-events: none; transform: scale(0.95); }
+        .modal.open { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+        /* Range Slider */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #334155; border-radius: 2px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen pb-32 selection:bg-primary selection:text-white">
+<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen pb-40">
 
     <!-- HEADER -->
-    <header class="fixed top-0 w-full z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-lg">
-        <div class="max-w-2xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div>
-                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-primary animate-pulse"></span>
-                    GeoGuard <span class="text-primary">360°</span>
-                </h1>
-                <p class="text-xs text-slate-400 font-mono mt-0.5">TACTICAL GEOFENCING</p>
+    <header class="fixed top-0 w-full z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-md">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <i class="ph-fill ph-moped text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-white leading-tight">LOGISTICS <span class="text-blue-500">PRO</span></h1>
+                    <div class="flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-[10px] text-slate-400 font-mono tracking-wide" id="status-text">ONLINE</span>
+                    </div>
+                </div>
             </div>
-            <div id="gps-status" class="px-2 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-bold text-yellow-500 flex items-center gap-1">
-                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                INIT
+            <div id="gps-badge" class="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-yellow-500 flex items-center gap-1">
+                <i class="ph-bold ph-spinner animate-spin"></i> GPS
             </div>
         </div>
     </header>
 
-    <main class="max-w-2xl mx-auto px-4 pt-20 space-y-6">
+    <!-- MAIN CONTENT -->
+    <main class="max-w-md mx-auto pt-20 px-4 space-y-5">
 
-        <!-- RADAR VISUALIZATION -->
-        <div class="relative w-full aspect-square max-h-[400px] mx-auto bg-slate-900 rounded-full border-4 border-slate-800 shadow-2xl overflow-hidden ring-1 ring-slate-700">
-            <!-- Canvas Layer -->
-            <canvas id="radar-canvas" class="absolute inset-0 w-full h-full z-10"></canvas>
+        <!-- 1. NAVIGATION & RADAR -->
+        <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden group">
             
-            <!-- HUD Overlays -->
-            <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-slate-950/80 px-3 py-1 rounded-full border border-slate-700 text-xs font-mono text-cyan-400">
-                <span id="heading-val">0</span>° MAGNETIC
-            </div>
-            
-            <!-- Central Crosshair (Fixed User) -->
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                <div class="w-4 h-4 bg-primary rounded-full shadow-[0_0_15px_rgba(99,102,241,0.6)] ring-2 ring-white"></div>
-                <!-- Cone of vision -->
-                <div class="absolute -top-12 -left-8 w-0 h-0 border-l-[32px] border-l-transparent border-r-[32px] border-r-transparent border-t-[60px] border-t-primary/10"></div>
+            <!-- Canvas Map -->
+            <canvas id="radar-canvas" class="absolute inset-0 w-full h-full z-10 block"></canvas>
+
+            <!-- HUD: Compass Heading -->
+            <div class="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-black/60 backdrop-blur px-3 py-1 rounded-full border border-slate-700 text-xs font-mono text-cyan-400 flex items-center gap-2">
+                <i class="ph-fill ph-compass"></i> <span id="val-heading">0</span>°
             </div>
 
-            <!-- Overlay for Permission -->
-            <div id="compass-overlay" class="absolute inset-0 z-30 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
-                <p class="text-sm text-slate-300 mb-4">Enable compass to rotate map with your movement.</p>
-                <button id="btn-compass" class="px-6 py-2 bg-primary hover:bg-indigo-600 text-white font-bold rounded-lg transition-all shadow-lg active:scale-95">
-                    Enable Compass
+            <!-- HUD: Zoom Controls -->
+            <div class="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+                <button onclick="app.zoom(1)" class="w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center active:scale-95 shadow-lg">
+                    <i class="ph-bold ph-plus"></i>
+                </button>
+                <button onclick="app.zoom(-1)" class="w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center active:scale-95 shadow-lg">
+                    <i class="ph-bold ph-minus"></i>
                 </button>
             </div>
-        </div>
 
-        <!-- STATS GRID -->
-        <div class="grid grid-cols-3 gap-3">
-            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Accuracy</div>
-                <div id="val-acc" class="text-xl font-bold font-mono text-slate-200">--</div>
-            </div>
-            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">State</div>
-                <div id="val-status" class="text-xl font-bold font-mono text-emerald-400">IDLE</div>
-            </div>
-            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Zones</div>
-                <div id="val-zones" class="text-xl font-bold font-mono text-slate-200">0</div>
-            </div>
-        </div>
-
-        <!-- CONTROLS -->
-        <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg">
-            <h2 class="text-sm font-bold text-slate-300 flex items-center gap-2 mb-3">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                Current Location
-            </h2>
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="input-name" placeholder="Name (e.g. Base Alpha)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors">
-                <button onclick="app.actionSave()" class="bg-primary hover:bg-indigo-600 text-white font-semibold px-4 rounded-lg text-sm transition-colors shadow-lg shadow-indigo-500/20">
-                    Save
-                </button>
-            </div>
-            <button onclick="app.actionSim()" class="w-full py-2 border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg text-xs font-mono transition-colors">
-                🧪 RUN SIMULATION PROTOCOL
+            <!-- HUD: Compass Permission (iOS) -->
+            <button id="btn-compass" class="absolute top-4 right-4 z-20 w-8 h-8 bg-slate-800 border border-slate-600 rounded text-amber-500 flex items-center justify-center shadow-lg" title="Calibrate Compass">
+                <i class="ph-fill ph-compass-tool"></i>
             </button>
-        </div>
 
-        <!-- ZONE LIST -->
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-            <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Zones</h3>
-            </div>
-            <div id="list-locations" class="divide-y divide-slate-800 max-h-40 overflow-y-auto no-scrollbar">
-                <!-- Zones Injected Here -->
-                <div class="p-4 text-center text-xs text-slate-500">No active geofences</div>
+            <!-- Center User Icon -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                <div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                <!-- Vision Cone -->
+                <div class="absolute -top-16 -left-10 w-0 h-0 border-l-[40px] border-l-transparent border-r-[40px] border-r-transparent border-t-[80px] border-t-blue-500/10"></div>
             </div>
         </div>
 
-        <!-- LOGS -->
-        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-             <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Event Log</h3>
-                <button onclick="app.actionClear()" class="text-[10px] text-red-400 hover:text-red-300">CLEAR ALL</button>
+        <!-- 2. ROUTING & TARGET -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+            <label class="text-[10px] uppercase text-slate-500 font-bold mb-2 block">Select Destination</label>
+            <div class="flex gap-2">
+                <select id="select-target" onchange="app.setTarget()" class="flex-1 bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-white">
+                    <option value="">-- Select Shop --</option>
+                    <!-- Filled dynamically -->
+                </select>
+                <button onclick="app.openMaps()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 transition-colors">
+                    <i class="ph-bold ph-google-logo text-blue-400"></i>
+                </button>
             </div>
-            <div class="overflow-x-auto">
+            
+            <!-- Guidance Info -->
+            <div id="nav-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-800 rounded-lg flex justify-between items-center">
+                <div>
+                    <div class="text-xs text-blue-400">Straight Line Distance</div>
+                    <div class="text-lg font-bold text-white font-mono"><span id="nav-dist">0</span>m</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-blue-400">Bearing</div>
+                    <div class="text-lg font-bold text-white font-mono"><span id="nav-bear">0</span>°</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. CURRENT LOCATION ACTION -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+            <div class="bg-slate-800/50 p-4 border-b border-slate-800 flex justify-between items-center">
+                <span class="text-xs font-bold text-slate-400 uppercase">Current Status</span>
+                <span id="zone-status" class="px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500">OUTSIDE</span>
+            </div>
+            
+            <div class="p-4 space-y-3">
+                <!-- Location Name Display -->
+                <div>
+                    <div class="text-[10px] text-slate-500 mb-1">CURRENT LOCATION</div>
+                    <div id="current-loc-name" class="text-lg font-bold text-white truncate">Moving...</div>
+                    <div id="current-coords" class="text-xs font-mono text-slate-500">Waiting for GPS...</div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <!-- ADD SHOP (Admin/Setup function) -->
+                    <button onclick="app.openAddModal()" class="py-3 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition">
+                        SAVE SHOP LOC
+                    </button>
+                    
+                    <!-- TAKE ORDER (Locked if outside) -->
+                    <button id="btn-order" onclick="app.openOrderModal()" disabled class="py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="ph-bold ph-shopping-cart"></i> TAKE ORDER
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. VISIT & ORDER LOGS -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden mb-8">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-xs font-bold text-white">TODAY'S ACTIVITY</h3>
+                <span class="text-[10px] text-slate-500">No Deletion Allowed</span>
+            </div>
+            <div class="max-h-60 overflow-y-auto no-scrollbar">
                 <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-950 text-slate-500">
+                    <thead class="bg-slate-950 text-slate-500 sticky top-0">
                         <tr>
-                            <th class="px-4 py-2 font-medium">Zone</th>
-                            <th class="px-4 py-2 font-medium">Time</th>
-                            <th class="px-4 py-2 font-medium">Duration</th>
+                            <th class="px-4 py-2">Type</th>
+                            <th class="px-4 py-2">Location</th>
+                            <th class="px-4 py-2">Time/Info</th>
                         </tr>
                     </thead>
-                    <tbody id="list-logs" class="divide-y divide-slate-800 text-slate-300">
-                        <!-- Logs Injected Here -->
+                    <tbody id="log-list" class="divide-y divide-slate-800 text-slate-300">
+                        <!-- Logs injected here -->
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <!-- DEBUG CONSOLE -->
-        <div id="console-out" class="bg-black rounded-lg border border-slate-800 p-3 font-mono text-[10px] text-green-500 h-24 overflow-y-auto mb-10">
-            > System initialized...
+            <!-- Export Button -->
+            <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-bold border-t border-slate-700 flex items-center justify-center gap-2">
+                <i class="ph-bold ph-download-simple"></i> EXPORT TO CSV
+            </button>
         </div>
 
     </main>
 
-    <!-- TOAST NOTIFICATIONS -->
-    <div id="toast-container" class="fixed bottom-6 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+    <!-- === MODALS === -->
+
+    <!-- 1. ADD LOCATION MODAL -->
+    <div id="modal-add" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800"><h3 class="font-bold text-white">Save New Shop</h3></div>
+            <div class="p-4 space-y-4">
+                <p class="text-xs text-slate-400">Use this to mark a new customer location. Ensure you are standing at the entrance.</p>
+                <input type="text" id="input-loc-name" placeholder="Shop Name (e.g. Gupta General Store)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-sm text-white focus:border-blue-500 outline-none">
+            </div>
+            <div class="p-4 bg-slate-950 flex gap-3">
+                <button onclick="app.closeModals()" class="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 text-sm">Cancel</button>
+                <button onclick="app.saveLocation()" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-lg shadow-blue-500/30">Save Location</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. TAKE ORDER MODAL -->
+    <div id="modal-order" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 bg-emerald-900/20">
+                <h3 class="font-bold text-emerald-400 flex items-center gap-2"><i class="ph-fill ph-check-circle"></i> Location Verified</h3>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div>
+                <textarea id="input-order-details" rows="3" placeholder="Enter Order Details / Items..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-sm text-white focus:border-emerald-500 outline-none"></textarea>
+                <input type="number" id="input-order-amt" placeholder="Amount (₹)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-sm text-white focus:border-emerald-500 outline-none">
+            </div>
+            <div class="p-4 bg-slate-950 flex gap-3">
+                <button onclick="app.closeModals()" class="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 text-sm">Cancel</button>
+                <button onclick="app.submitOrder()" class="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold shadow-lg shadow-emerald-500/30">Confirm Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ACCURACY WARNING MODAL -->
+    <div id="modal-wifi" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6 text-center">
+        <div class="bg-slate-900 p-6 rounded-2xl border border-red-500 shadow-2xl max-w-xs">
+            <div class="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="ph-fill ph-wifi-slash text-2xl"></i>
+            </div>
+            <h2 class="text-lg font-bold text-white mb-2">Weak GPS Signal</h2>
+            <p class="text-sm text-slate-300 mb-6">
+                Accuracy is too low (<span id="wifi-acc-val">--</span>m). 
+                <br><br>
+                <strong>Please turn on Wi-Fi</strong> to improve indoor location accuracy.
+            </p>
+            <button class="w-full py-2 bg-slate-800 text-slate-400 text-xs rounded border border-slate-700">Waiting for better signal...</button>
+        </div>
+    </div>
 
 <script>
 /**
- * ====================================================================
- *  GeoGuard 360° - Enterprise Logic + Sensor Fusion
- * ====================================================================
+ * ==========================================================================================
+ * GEOGUARD LOGISTICS PRO - SINGLE FILE APPLICATION
+ * ==========================================================================================
  */
 
-/* --- UTILITIES --- */
+/* --- 1. CORE UTILITIES & MATH --- */
 const Utils = {
-    R: 6371e3,
-    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
+    // Haversine Distance
+    getDist: (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3; // meters
+        const rad = Math.PI / 180;
+        const dLat = (lat2 - lat1) * rad;
+        const dLon = (lon2 - lon1) * rad;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*rad) * Math.cos(lat2*rad) * Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    },
     
-    getDistance: (lat1, lon1, lat2, lon2) => {
-        const toRad = x => x * Math.PI / 180;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-        return Utils.R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    },
-
-    // Calculate Bearing (Angle) between two points
+    // Bearing calculation (0-360)
     getBearing: (lat1, lon1, lat2, lon2) => {
-        const toRad = x => x * Math.PI / 180;
-        const toDeg = x => x * 180 / Math.PI;
-        const dLon = toRad(lon2 - lon1);
-        const y = Math.sin(dLon) * Math.cos(toRad(lat2));
-        const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - 
-                  Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
-        const brng = toDeg(Math.atan2(y, x));
-        return (brng + 360) % 360; // Normalize 0-360
+        const rad = Math.PI / 180;
+        const deg = 180 / Math.PI;
+        const y = Math.sin((lon2 - lon1) * rad) * Math.cos(lat2 * rad);
+        const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lon2 - lon1) * rad);
+        return (Math.atan2(y, x) * deg + 360) % 360;
     },
 
-    formatTime: (ts) => new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})
+    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+    
+    timeStr: (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })
 };
 
-/* --- KALMAN FILTER (Noise Reduction) --- */
-class KalmanFilter {
-    constructor() { this.R = 5; this.Q = 1; this.A = 1; this.B = 0; this.C = 1; this.x = NaN; this.cov = NaN; }
-    filter(m) {
-        if (isNaN(this.x)) { this.x = m; this.cov = this.R; return m; }
-        const predX = this.x; const predCov = this.cov + this.Q;
-        const K = predCov / (predCov + this.R);
-        this.x = predX + K * (m - predX);
-        this.cov = predCov - (K * predCov);
-        return this.x;
+/* --- 2. DATA STORAGE --- */
+class Store {
+    constructor() {
+        this.LOCS = 'geo_shops';
+        this.LOGS = 'geo_activity';
+    }
+    getLocs() { return JSON.parse(localStorage.getItem(this.LOCS)) || []; }
+    saveLoc(l) { const d = this.getLocs(); d.push(l); localStorage.setItem(this.LOCS, JSON.stringify(d)); return d; }
+    updateLoc(l) { const d = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
+    
+    getLogs() { return JSON.parse(localStorage.getItem(this.LOGS)) || []; }
+    log(type, locName, details) {
+        const l = { id: Utils.uuid(), type, loc: locName, desc: details, ts: Date.now() };
+        const d = this.getLogs();
+        d.unshift(l);
+        localStorage.setItem(this.LOGS, JSON.stringify(d));
+        return l;
     }
 }
 
-/* --- STORAGE --- */
-class StorageManager {
-    constructor() { this.K_LOC = 'geo_locs_v3'; this.K_LOG = 'geo_logs_v3'; }
-    getLocs() { return JSON.parse(localStorage.getItem(this.K_LOC)) || []; }
-    saveLoc(l) { const ls = this.getLocs(); ls.push(l); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); return ls; }
-    delLoc(id) { const ls = this.getLocs().filter(l => l.id !== id); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); return ls; }
-    updateLoc(l) { const ls = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.K_LOC, JSON.stringify(ls)); }
-    addLog(l) { const ls = JSON.parse(localStorage.getItem(this.K_LOG)) || []; ls.unshift(l); if(ls.length>50) ls.pop(); localStorage.setItem(this.K_LOG, JSON.stringify(ls)); return ls; }
-    clear() { localStorage.removeItem(this.K_LOC); localStorage.removeItem(this.K_LOG); }
-    getLogs() { return JSON.parse(localStorage.getItem(this.K_LOG)) || []; }
-}
-
-/* --- HEADING MANAGER (Sensor Fusion) --- */
-class HeadingManager {
-    constructor(callback) {
-        this.callback = callback;
-        this.heading = 0;
-        this.useCompass = false;
-        
-        // Handle iOS Permission
-        const btn = document.getElementById('btn-compass');
-        const overlay = document.getElementById('compass-overlay');
-        
-        btn.onclick = async () => {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const resp = await DeviceOrientationEvent.requestPermission();
-                    if (resp === 'granted') {
-                        this.startCompass();
-                        overlay.style.display = 'none';
-                    } else alert('Permission denied');
-                } catch (e) { alert(e); }
-            } else {
-                // Non-iOS or older devices
-                this.startCompass();
-                overlay.style.display = 'none';
-            }
-        };
-    }
-
-    startCompass() {
-        this.useCompass = true;
-        window.addEventListener('deviceorientation', (e) => {
-            if(e.webkitCompassHeading) {
-                // iOS
-                this.heading = e.webkitCompassHeading;
-            } else if (e.alpha) {
-                // Android (Standard) - Alpha is counter-clockwise, convert to compass
-                this.heading = 360 - e.alpha; 
-            }
-            this.callback(this.heading);
-        }, true);
-    }
-
-    // Call this with GPS Speed & Bearing updates
-    updateFromGPS(speed, bearing) {
-        // If moving faster than ~3km/h (0.8 m/s) and bearing is valid, trust GPS over Compass
-        if (speed > 0.8 && bearing !== null && !isNaN(bearing)) {
-            this.heading = bearing;
-            this.callback(this.heading);
-        }
-        // Else rely on the 'deviceorientation' listener set up in startCompass
-    }
-}
-
-/* --- GEO ENGINE (Smart Buffer) --- */
+/* --- 3. GEOLOCATION & SENSOR ENGINE --- */
 class GeoEngine {
     constructor(cb) {
         this.cb = cb;
-        this.kLat = new KalmanFilter();
-        this.kLng = new KalmanFilter();
-        this.isSim = false;
-        this.RADIUS = 15;
-        this.BUFFER = 10; // Hysteresis
+        // Kalman Filter State
+        this.latK = { x: NaN, p: NaN, q: 0.001, r: 0.01 }; // q=process noise, r=sensor noise
+        this.lngK = { x: NaN, p: NaN, q: 0.001, r: 0.01 };
+    }
+
+    // Simplified 1D Kalman Filter
+    kalman(k, z) {
+        if (isNaN(k.x)) { k.x = z; k.p = 1; return z; }
+        k.p = k.p + k.q;
+        const kg = k.p / (k.p + k.r);
+        k.x = k.x + kg * (z - k.x);
+        k.p = (1 - kg) * k.p;
+        return k.x;
     }
 
     start() {
-        if(!navigator.geolocation) return this.cb('err', 'No GPS');
+        if (!navigator.geolocation) return alert("GPS Required");
+        
         navigator.geolocation.watchPosition(
-            p => this.process(p),
-            e => this.cb('err', e.message),
+            pos => {
+                const { latitude, longitude, accuracy, speed, heading } = pos.coords;
+                
+                // Apply Filter
+                const lat = this.kalman(this.latK, latitude);
+                const lng = this.kalman(this.lngK, longitude);
+
+                this.cb('gps', { lat, lng, acc: accuracy, speed, heading, ts: Date.now() });
+            },
+            err => this.cb('err', err),
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     }
+}
 
-    process(p) {
-        if(this.isSim) return;
+/* --- 4. COMPASS MANAGER --- */
+class Compass {
+    constructor(cb) {
+        this.cb = cb;
+        this.heading = 0;
         
-        const { latitude, longitude, accuracy, speed, heading } = p.coords;
-        const lat = this.kLat.filter(latitude);
-        const lng = this.kLng.filter(longitude);
-        
-        const data = { 
-            lat, lng, acc: accuracy, 
-            speed: speed, gpsHeading: heading, 
-            ts: Date.now() 
-        };
-
-        this.cb('pos', data);
-    }
-
-    check(pos, zones) {
-        zones.forEach(z => {
-            const dist = Utils.getDistance(pos.lat, pos.lng, z.lat, z.lng);
-            
-            // SMART LOGIC: If accuracy is bad, pull user closer to center virtually
-            const smartDist = dist - (pos.acc / 2);
-
-            if (!z.isInside && dist <= this.RADIUS) {
-                // STRICT ENTRY
-                z.isInside = true;
-                z.entryTime = Date.now();
-                this.cb('event', { type: 'enter', zone: z });
-            } 
-            else if (z.isInside && smartDist > (this.RADIUS + this.BUFFER)) {
-                // LENIENT EXIT
-                const dur = Date.now() - z.entryTime;
-                if(dur > 15000) { // Glitch filter 15s
-                    z.isInside = false;
-                    const log = { zone: z.name, entry: z.entryTime, exit: Date.now(), dur: Math.round(dur/1000) };
-                    z.entryTime = null;
-                    this.cb('event', { type: 'exit', zone: z, log: log });
-                }
+        // Handle iOS Permission
+        document.getElementById('btn-compass').onclick = () => {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(r => { if(r === 'granted') this.listen(); else alert("Compass Denied"); })
+                    .catch(console.error);
+            } else {
+                this.listen();
             }
-            z._dist = dist; // For UI
-        });
-        return zones;
+        };
+        // Auto start for Android/Non-permission browsers
+        this.listen();
     }
 
-    simulate(startLat, startLng) {
-        this.isSim = true;
-        let angle = 0;
-        const timer = setInterval(() => {
-            angle += 5;
-            // Move in circle
-            const r = 0.0004; // ~40m
-            const lat = startLat + Math.sin(angle * Math.PI/180) * r;
-            const lng = startLng + Math.cos(angle * Math.PI/180) * r;
-            
-            // Calc fake bearing
-            const bearing = (angle + 90) % 360;
-
-            this.cb('pos', { lat, lng, acc: 10, speed: 2, gpsHeading: bearing, isSim: true });
-            if(angle > 720) { clearInterval(timer); this.isSim = false; }
-        }, 500);
+    listen() {
+        window.addEventListener('deviceorientation', e => {
+            if(e.webkitCompassHeading) this.heading = e.webkitCompassHeading;
+            else if(e.alpha) this.heading = 360 - e.alpha;
+            this.cb(this.heading);
+        }, true);
     }
 }
 
-/* --- RADAR RENDERER (ROTATING MAP) --- */
-class Radar {
-    constructor(canvasId) {
-        this.cvs = document.getElementById(canvasId);
-        this.ctx = this.cvs.getContext('2d');
-        this.resize();
-        window.onresize = () => this.resize();
-    }
-    resize() {
-        const p = this.cvs.parentElement;
-        this.cvs.width = p.offsetWidth;
-        this.cvs.height = p.offsetWidth;
-    }
-    draw(user, zones, heading) {
-        const w = this.cvs.width;
-        const cx = w/2, cy = w/2;
-        const ctx = this.ctx;
-        
-        // Clear
-        ctx.clearRect(0,0,w,w);
-
-        // --- COORDINATE TRANSFORMATION ---
-        ctx.save();
-        ctx.translate(cx, cy);
-        
-        // ROTATE WORLD OPPOSITE TO HEADING (So "Up" is always "Ahead")
-        ctx.rotate(-heading * Math.PI / 180);
-
-        // 1. Draw Grid (North Locked relative to world)
-        ctx.lineWidth = 1;
-        
-        // Draw Range Rings (20m, 40m, 60m)
-        const scale = (w/2) / 60; // Max range 60m
-        [20, 40, 60].forEach(r => {
-            ctx.beginPath();
-            ctx.strokeStyle = '#334155'; // slate-700
-            ctx.arc(0, 0, r * scale, 0, Math.PI*2);
-            ctx.stroke();
-        });
-
-        // Draw North Line (World Coordinates)
-        ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.lineTo(0, -w); // Line to North
-        ctx.strokeStyle = '#ef4444'; // Red for North
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Draw 'N' Label
-        ctx.save();
-        ctx.translate(0, -50 * scale);
-        ctx.rotate(heading * Math.PI / 180); // Counter-rotate text so it's readable
-        ctx.fillStyle = '#ef4444';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('N', 0, 0);
-        ctx.restore();
-
-        // 2. Draw Zones
-        zones.forEach(z => {
-            // Distance & Bearing from User
-            const d = Utils.getDistance(user.lat, user.lng, z.lat, z.lng);
-            const b = Utils.getBearing(user.lat, user.lng, z.lat, z.lng);
-            
-            // Convert to Polar Coord on Canvas
-            const rads = (b - 90) * Math.PI / 180; // -90 adjustment for canvas math
-            const x = Math.cos(rads) * (d * scale);
-            const y = Math.sin(rads) * (d * scale);
-
-            // Draw Zone Circle
-            ctx.beginPath();
-            ctx.fillStyle = z.isInside ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)';
-            ctx.strokeStyle = z.isInside ? '#10b981' : '#6366f1';
-            ctx.arc(x, y, 15 * scale, 0, Math.PI*2); // 15m radius
-            ctx.fill();
-            ctx.stroke();
-
-            // Draw Zone Label
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(heading * Math.PI / 180); // Counter-rotate text
-            ctx.fillStyle = '#fff';
-            ctx.font = '10px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(z.name, 0, 4);
-            ctx.restore();
-        });
-
-        ctx.restore(); // Undo all rotation
-    }
-}
-
-/* --- APP CONTROLLER --- */
+/* --- 5. APP CONTROLLER (MAIN LOGIC) --- */
 class App {
     constructor() {
-        this.store = new StorageManager();
-        this.ui = {
-            acc: document.getElementById('val-acc'),
-            stat: document.getElementById('val-status'),
-            zones: document.getElementById('val-zones'),
-            list: document.getElementById('list-locations'),
-            logs: document.getElementById('list-logs'),
-            con: document.getElementById('console-out'),
-            gps: document.getElementById('gps-status'),
-            head: document.getElementById('heading-val')
+        this.store = new Store();
+        this.geo = new GeoEngine((t,d) => this.onGeo(t,d));
+        this.compass = new Compass(h => this.onHeading(h));
+        
+        // State
+        this.pos = null;
+        this.heading = 0;
+        this.locs = this.store.getLocs();
+        this.targetLoc = null; // Routing target
+        this.zoomLevel = 1.0; // Scale factor
+        
+        // UI Elements
+        this.els = {
+            canvas: document.getElementById('radar-canvas'),
+            ctx: document.getElementById('radar-canvas').getContext('2d'),
+            gpsBadge: document.getElementById('gps-badge'),
+            statusText: document.getElementById('status-text'),
+            currentName: document.getElementById('current-loc-name'),
+            currentCoords: document.getElementById('current-coords'),
+            zoneStatus: document.getElementById('zone-status'),
+            btnOrder: document.getElementById('btn-order'),
+            logList: document.getElementById('log-list'),
+            selectTarget: document.getElementById('select-target'),
+            navInfo: document.getElementById('nav-info'),
+            valHeading: document.getElementById('val-heading')
         };
-        
-        this.currentPos = null;
-        this.zones = this.store.getLocs();
-        
-        this.radar = new Radar('radar-canvas');
-        
-        // Engines
-        this.geo = new GeoEngine((t, d) => this.onGeoEvent(t, d));
-        this.headingMgr = new HeadingManager((h) => this.onHeading(h));
-        
-        this.renderZones();
+
+        // Init
+        this.resizeCanvas();
+        window.onresize = () => this.resizeCanvas();
         this.renderLogs();
-        this.geo.start();
+        this.populateTargets();
         
-        this.log('System Initialized. Waiting for GPS...');
+        this.geo.start();
+        console.log("System Started");
     }
 
-    onGeoEvent(type, data) {
-        if(type === 'err') {
-            this.ui.gps.innerHTML = `<span class="text-red-500">ERR</span>`;
-            this.log('GPS Error: ' + data);
+    /* --- EVENT HANDLERS --- */
+    onGeo(type, data) {
+        if (type === 'err') {
+            this.els.gpsBadge.classList.replace('text-yellow-500', 'text-red-500');
+            this.els.gpsBadge.innerHTML = 'ERR';
             return;
         }
 
-        if(type === 'pos') {
-            this.currentPos = data;
-            
-            // 1. Update UI Stats
-            this.ui.gps.innerHTML = `<span class="text-green-400">LIVE</span>`;
-            this.ui.acc.innerText = `±${Math.round(data.acc)}m`;
-            this.ui.acc.className = data.acc < 20 ? 'text-2xl font-bold font-mono text-emerald-400' : 'text-2xl font-bold font-mono text-red-400';
+        // 1. Process Data
+        this.pos = data;
+        this.els.gpsBadge.classList.replace('text-yellow-500', 'text-emerald-500');
+        this.els.gpsBadge.innerHTML = `GPS ±${Math.round(data.acc)}m`;
+        this.els.currentCoords.innerText = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
 
-            // 2. Feed GPS Heading to Manager (if moving)
-            this.headingMgr.updateFromGPS(data.speed, data.gpsHeading);
-
-            // 3. Logic Check
-            this.zones = this.geo.check(data, this.zones);
-            
-            // 4. Update Status Text
-            const inside = this.zones.find(z => z.isInside);
-            this.ui.stat.innerText = inside ? inside.name : "OUTSIDE";
-            this.ui.stat.className = inside ? "text-xl font-bold font-mono text-emerald-400 animate-pulse" : "text-xl font-bold font-mono text-slate-500";
-            
-            this.renderZones();
+        // 2. Wi-Fi / Accuracy Enforcer
+        const wifiModal = document.getElementById('modal-wifi');
+        if (data.acc > 35) { // Threshold: 35m (typical cell tower range is >50m)
+            wifiModal.classList.add('open');
+            document.getElementById('wifi-acc-val').innerText = Math.round(data.acc);
+        } else {
+            wifiModal.classList.remove('open');
         }
 
-        if(type === 'event') {
-            const { type: evtType, zone, log } = data;
-            if(evtType === 'enter') {
-                this.toast(`Entered: ${zone.name}`, 'green');
-                this.store.updateLoc(zone);
-                this.log(`>> ENTER ${zone.name}`);
-            } else {
-                this.toast(`Exited: ${zone.name} (${log.dur}s)`, 'indigo');
-                this.store.updateLoc(zone);
-                this.store.addLog(log);
-                this.log(`<< EXIT ${zone.name}`);
-                this.renderLogs();
-            }
+        // 3. Geofence Logic (Smart Buffer)
+        this.checkGeofences(data);
+
+        // 4. Update Navigation Info if active
+        if (this.targetLoc) {
+            const dist = Utils.getDist(data.lat, data.lng, this.targetLoc.lat, this.targetLoc.lng);
+            const bear = Utils.getBearing(data.lat, data.lng, this.targetLoc.lat, this.targetLoc.lng);
+            document.getElementById('nav-dist').innerText = Math.round(dist);
+            document.getElementById('nav-bear').innerText = Math.round(bear);
         }
+
+        // 5. Redraw Map
+        this.drawRadar();
     }
 
     onHeading(h) {
-        // Redraw radar with new rotation
-        this.ui.head.innerText = Math.round(h);
-        if(this.currentPos) {
-            this.radar.draw(this.currentPos, this.zones, h);
+        this.heading = h;
+        this.els.valHeading.innerText = Math.round(h);
+        if (this.pos) this.drawRadar(); // Smooth rotation
+    }
+
+    /* --- GEOFENCE LOGIC --- */
+    checkGeofences(pos) {
+        let insideAny = false;
+        
+        this.locs.forEach(loc => {
+            const realDist = Utils.getDist(pos.lat, pos.lng, loc.lat, loc.lng);
+            
+            // SMART BUFFER: Subtract half accuracy to handle drift
+            const buffer = pos.acc / 2;
+            const adjustedDist = Math.max(0, realDist - buffer);
+            const radius = 20; // 20m Geofence
+            const hysteresis = 10; // Extra 10m to exit
+
+            // ENTER
+            if (!loc.isInside && realDist <= radius) {
+                loc.isInside = true;
+                loc.entryTime = Date.now();
+                this.store.log('VISIT_IN', loc.name, `Acc: ${Math.round(pos.acc)}m`);
+                this.renderLogs();
+                this.store.updateLoc(loc); // Save state
+            }
+            // EXIT
+            else if (loc.isInside && adjustedDist > (radius + hysteresis)) {
+                // Time Dwell Check (must be out for 15s)
+                if (!loc._exitTentative) loc._exitTentative = Date.now();
+                if (Date.now() - loc._exitTentative > 15000) {
+                    loc.isInside = false;
+                    loc._exitTentative = null;
+                    const dur = Math.round((Date.now() - loc.entryTime) / 60000); // mins
+                    this.store.log('VISIT_OUT', loc.name, `Duration: ${dur} min`);
+                    this.renderLogs();
+                    this.store.updateLoc(loc);
+                }
+            } else {
+                loc._exitTentative = null;
+            }
+
+            if (loc.isInside) {
+                insideAny = true;
+                this.els.currentName.innerText = loc.name;
+                this.els.zoneStatus.innerText = "INSIDE";
+                this.els.zoneStatus.className = "px-2 py-1 bg-emerald-900/50 border border-emerald-500 rounded text-[10px] font-bold text-emerald-400";
+                
+                // Enable Order Button
+                this.els.btnOrder.disabled = false;
+                this.els.btnOrder.classList.replace('bg-slate-800', 'bg-emerald-600');
+                this.els.btnOrder.classList.replace('text-slate-500', 'text-white');
+                document.getElementById('order-shop-name').innerText = loc.name;
+            }
+        });
+
+        if (!insideAny) {
+            this.els.currentName.innerText = "In Transit";
+            this.els.zoneStatus.innerText = "OUTSIDE";
+            this.els.zoneStatus.className = "px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500";
+            
+            // Disable Order Button
+            this.els.btnOrder.disabled = true;
+            this.els.btnOrder.classList.add('bg-slate-800', 'text-slate-500');
+            this.els.btnOrder.classList.remove('bg-emerald-600', 'text-white');
         }
     }
 
-    // --- ACTIONS ---
-    actionSave() {
-        if(!this.currentPos) return this.toast('Wait for GPS', 'red');
-        const name = document.getElementById('input-name').value || 'Target ' + Math.floor(Math.random()*100);
-        const z = { id: Utils.uuid(), name, lat: this.currentPos.lat, lng: this.currentPos.lng, isInside: true, entryTime: Date.now() };
-        this.store.saveLoc(z);
-        this.zones.push(z);
-        this.renderZones();
-        document.getElementById('input-name').value = '';
-        this.toast('Zone Saved', 'green');
+    /* --- CANVAS RADAR --- */
+    resizeCanvas() {
+        const p = this.els.canvas.parentElement;
+        this.els.canvas.width = p.clientWidth;
+        this.els.canvas.height = p.clientHeight;
+        if(this.pos) this.drawRadar();
     }
 
-    actionSim() {
-        if(this.zones.length === 0) return this.toast('Create a zone first', 'red');
-        this.geo.simulate(this.zones[0].lat, this.zones[0].lng);
-        this.toast('Simulation Started', 'indigo');
+    zoom(dir) {
+        this.zoomLevel = Math.max(0.5, Math.min(3.0, this.zoomLevel + (dir * 0.25)));
+        this.drawRadar();
     }
 
-    actionClear() {
-        if(confirm('Clear all data?')) {
-            this.store.clear();
-            window.location.reload();
+    drawRadar() {
+        if (!this.pos) return;
+        
+        const w = this.els.canvas.width;
+        const h = this.els.canvas.height;
+        const ctx = this.els.ctx;
+        const cx = w/2, cy = h/2;
+        
+        // Scale: Base 2px per meter * zoom
+        const scale = 2 * this.zoomLevel; 
+
+        ctx.clearRect(0, 0, w, h);
+        
+        // --- SAVE CONTEXT & ROTATE WORLD ---
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-this.heading * Math.PI / 180); // Rotate map opposite to heading
+
+        // 1. Draw Grid
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        [20, 50, 100].forEach(r => {
+            ctx.beginPath(); ctx.arc(0, 0, r * scale, 0, Math.PI*2); ctx.stroke();
+        });
+
+        // 2. Draw North Arrow
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0, -100*scale); 
+        ctx.strokeStyle = '#ef4444'; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+        
+        // 3. Draw Locations
+        this.locs.forEach(loc => {
+            const d = Utils.getDist(this.pos.lat, this.pos.lng, loc.lat, loc.lng);
+            const b = Utils.getBearing(this.pos.lat, this.pos.lng, loc.lat, loc.lng);
+            
+            // Convert polar to cartesian
+            const angle = (b - 90) * Math.PI / 180;
+            const x = Math.cos(angle) * d * scale;
+            const y = Math.sin(angle) * d * scale;
+
+            // Draw Dot
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI*2);
+            ctx.fillStyle = loc.isInside ? '#10b981' : (loc.id === this.targetLoc?.id ? '#f59e0b' : '#3b82f6');
+            ctx.fill();
+
+            // Label (Counter-rotated)
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(this.heading * Math.PI / 180); 
+            ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(loc.name, 0, 15);
+            ctx.restore();
+        });
+
+        // 4. Draw Navigation Line (If Target Set)
+        if (this.targetLoc) {
+            const d = Utils.getDist(this.pos.lat, this.pos.lng, this.targetLoc.lat, this.targetLoc.lng);
+            const b = Utils.getBearing(this.pos.lat, this.pos.lng, this.targetLoc.lat, this.targetLoc.lng);
+            
+            const angle = (b - 90) * Math.PI / 180;
+            const tx = Math.cos(angle) * d * scale;
+            const ty = Math.sin(angle) * d * scale;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(tx, ty);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
+
+        ctx.restore(); // Restore to normal screen coords
     }
 
-    // --- RENDERERS ---
-    renderZones() {
-        this.ui.zones.innerText = this.zones.length;
-        this.ui.list.innerHTML = this.zones.map(z => `
-            <div class="px-4 py-3 flex justify-between items-center bg-slate-900/50 hover:bg-slate-800 transition-colors">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full ${z.isInside ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-slate-600'}"></div>
-                        <span class="text-sm font-bold text-slate-200">${z.name}</span>
-                    </div>
-                    <div class="text-[10px] font-mono text-slate-500 pl-4 mt-1">
-                        DIST: ${z._dist ? Math.round(z._dist) : '?'}m
-                    </div>
-                </div>
-                <button onclick="app.delZone('${z.id}')" class="text-xs text-red-500 hover:text-white hover:bg-red-500 px-2 py-1 rounded transition">DEL</button>
-            </div>
-        `).join('') || '<div class="p-4 text-center text-xs text-slate-500">No active geofences</div>';
+    /* --- ROUTING --- */
+    populateTargets() {
+        this.els.selectTarget.innerHTML = '<option value="">-- Select Shop --</option>' + 
+            this.locs.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
     }
 
+    setTarget() {
+        const id = this.els.selectTarget.value;
+        if (!id) {
+            this.targetLoc = null;
+            this.els.navInfo.classList.add('hidden');
+        } else {
+            this.targetLoc = this.locs.find(l => l.id === id);
+            this.els.navInfo.classList.remove('hidden');
+        }
+        this.drawRadar();
+    }
+
+    openMaps() {
+        if (!this.targetLoc) return alert("Select a shop first");
+        // Open Google Maps Directions
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${this.targetLoc.lat},${this.targetLoc.lng}`;
+        window.open(url, '_blank');
+    }
+
+    /* --- ORDERS & MODALS --- */
+    openAddModal() { document.getElementById('modal-add').classList.add('open'); }
+    openOrderModal() { document.getElementById('modal-order').classList.add('open'); }
+    closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+
+    saveLocation() {
+        const name = document.getElementById('input-loc-name').value;
+        if (!name || !this.pos) return;
+        
+        const loc = { 
+            id: Utils.uuid(), 
+            name, 
+            lat: this.pos.lat, 
+            lng: this.pos.lng, 
+            isInside: true, 
+            entryTime: Date.now() 
+        };
+        
+        this.store.saveLoc(loc);
+        this.locs.push(loc);
+        this.store.log('NEW_SHOP', name, 'Location Registered');
+        
+        this.populateTargets();
+        this.renderLogs();
+        this.closeModals();
+        document.getElementById('input-loc-name').value = '';
+    }
+
+    submitOrder() {
+        const details = document.getElementById('input-order-details').value;
+        const amt = document.getElementById('input-order-amt').value;
+        const shop = document.getElementById('order-shop-name').innerText;
+        
+        if (!details || !amt) return alert("Fill all fields");
+        
+        this.store.log('ORDER', shop, `₹${amt} - ${details}`);
+        this.renderLogs();
+        this.closeModals();
+        
+        // Reset inputs
+        document.getElementById('input-order-details').value = '';
+        document.getElementById('input-order-amt').value = '';
+    }
+
+    /* --- LOGGING & EXPORT --- */
     renderLogs() {
         const logs = this.store.getLogs();
-        this.ui.logs.innerHTML = logs.map(l => `
-            <tr class="hover:bg-slate-800/50 transition">
-                <td class="px-4 py-2 font-bold text-indigo-400">${l.zone}</td>
-                <td class="px-4 py-2 font-mono text-slate-400">${Utils.formatTime(l.exit)}</td>
-                <td class="px-4 py-2"><span class="bg-slate-800 px-2 py-0.5 rounded text-[10px]">${l.dur}s</span></td>
-            </tr>
-        `).join('');
+        this.els.logList.innerHTML = logs.map(l => {
+            let color = 'text-slate-300';
+            if(l.type === 'VISIT_IN') color = 'text-blue-400';
+            if(l.type === 'ORDER') color = 'text-emerald-400';
+            if(l.type === 'VISIT_OUT') color = 'text-amber-400';
+            
+            return `
+                <tr class="hover:bg-slate-800/50 border-b border-slate-800 last:border-0">
+                    <td class="px-4 py-3 font-bold text-[10px] ${color}">${l.type}</td>
+                    <td class="px-4 py-3 font-bold text-white">${l.loc}</td>
+                    <td class="px-4 py-3">
+                        <div class="text-[10px] text-slate-400">${Utils.timeStr(l.ts)}</div>
+                        <div class="text-[10px] text-slate-500 truncate max-w-[100px]">${l.desc}</div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
-    delZone(id) {
-        if(confirm('Delete?')) {
-            this.store.delLoc(id);
-            this.zones = this.zones.filter(z => z.id !== id);
-            this.renderZones();
-        }
-    }
-
-    log(msg) {
-        const t = new Date().toLocaleTimeString();
-        this.ui.con.innerHTML = `<div><span class="opacity-50">[${t}]</span> ${msg}</div>` + this.ui.con.innerHTML;
-    }
-
-    toast(msg, color) {
-        const el = document.createElement('div');
-        const colors = { green: 'border-emerald-500 bg-emerald-900/80 text-white', red: 'border-red-500 bg-red-900/80 text-white', indigo: 'border-indigo-500 bg-indigo-900/80 text-white' };
-        el.className = `px-4 py-3 rounded-lg border-l-4 shadow-xl backdrop-blur-md text-sm font-semibold pointer-events-auto transform transition-all duration-300 translate-y-10 opacity-0 ${colors[color]}`;
-        el.innerText = msg;
-        document.getElementById('toast-container').appendChild(el);
-        requestAnimationFrame(() => el.classList.remove('translate-y-10', 'opacity-0'));
-        setTimeout(() => { el.classList.add('opacity-0', 'translate-y-4'); setTimeout(() => el.remove(), 300); }, 3000);
+    exportData() {
+        const logs = this.store.getLogs();
+        let csv = "Type,Location,Time,Details\n";
+        logs.forEach(l => {
+            csv += `${l.type},"${l.loc}",${new Date(l.ts).toISOString()},"${l.desc}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `GeoGuard_Export_${Date.now()}.csv`;
+        a.click();
     }
 }
 
-// Start App
+// Initialize Application
 const app = new App();
-window.app = app;
 </script>
 </body>
 </html>
