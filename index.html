@@ -1,49 +1,54 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
-    <title>GeoFence Enterprise System</title>
+    <meta name="description" content="Enterprise Geofencing Solution with Kalman Filtering and Indoor Logic">
+    <title>GeoGuard Enterprise | Indoor Precision</title>
+    
     <style>
-        /* ------------------------------------------------------------------
-           1. CSS RESET & VARIABLES
-           ------------------------------------------------------------------ */
+        /* 
+         * ==========================================================================
+         *  MODULE: GLOBAL STYLES & RESET
+         * ==========================================================================
+         */
         :root {
-            /* Colors */
-            --primary: #3b82f6;
-            --primary-dark: #2563eb;
-            --secondary: #64748b;
-            --success: #22c55e;
-            --warning: #eab308;
+            /* Color Palette - Slate & Indigo */
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #020617;
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.5);
+
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.1);
+            
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.1);
+            
             --danger: #ef4444;
-            --background: #0f172a;
-            --surface: #1e293b;
-            --surface-hover: #334155;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --danger-bg: rgba(239, 68, 68, 0.1);
+
             --border: #334155;
-
-            /* Spacing */
-            --space-xs: 4px;
-            --space-sm: 8px;
-            --space-md: 16px;
-            --space-lg: 24px;
-            --space-xl: 32px;
-
-            /* Radius */
             --radius-sm: 6px;
             --radius-md: 12px;
-            --radius-lg: 16px;
-
-            /* Shadows */
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-glow: 0 0 15px rgba(59, 130, 246, 0.5);
+            --radius-lg: 24px;
+            
+            --font-mono: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            
+            --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-glow: 0 0 20px var(--primary-glow);
         }
 
-        * {
+        *, *::before, *::after {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
@@ -51,449 +56,504 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background);
-            color: var(--text-main);
-            line-height: 1.5;
-            padding-bottom: 100px;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.6;
             overflow-x: hidden;
+            padding-bottom: 120px; /* Space for bottom nav or toasts */
         }
 
-        /* ------------------------------------------------------------------
-           2. TYPOGRAPHY & UTILS
-           ------------------------------------------------------------------ */
-        h1, h2, h3, h4 { font-weight: 700; color: var(--text-main); }
-        h1 { font-size: 1.5rem; }
-        h2 { font-size: 1.25rem; margin-bottom: var(--space-md); border-left: 4px solid var(--primary); padding-left: var(--space-sm); }
-        small { font-size: 0.75rem; color: var(--text-muted); }
-
+        /* 
+         * ==========================================================================
+         *  MODULE: TYPOGRAPHY
+         * ==========================================================================
+         */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-primary);
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        
+        h1 { font-size: 1.5rem; letter-spacing: -0.5px; }
+        h2 { font-size: 1.125rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+        p { margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.95rem; }
+        
+        .text-mono { font-family: var(--font-mono); }
+        .text-sm { font-size: 0.875rem; }
+        .text-xs { font-size: 0.75rem; }
+        
         .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
         .text-warning { color: var(--warning); }
-        .mono { font-family: 'Courier New', Courier, monospace; }
-        
+        .text-danger { color: var(--danger); }
+
+        /* 
+         * ==========================================================================
+         *  MODULE: LAYOUT & COMPONENTS
+         * ==========================================================================
+         */
         .container {
-            max-width: 800px;
+            width: 100%;
+            max-width: 768px;
             margin: 0 auto;
-            padding: var(--space-md);
+            padding: 16px;
         }
 
-        /* ------------------------------------------------------------------
-           3. COMPONENT STYLES
-           ------------------------------------------------------------------ */
+        /* Header */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-card);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
         
-        /* Buttons */
+        .card:hover {
+            box-shadow: var(--shadow-glow);
+            border-color: var(--primary);
+        }
+
+        /* Status Grid */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .status-box {
+            background: rgba(255,255,255,0.03);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+            border: 1px solid transparent;
+        }
+        .status-box.active { border-color: var(--success); background: var(--success-bg); }
+        .status-box.poor { border-color: var(--danger); background: var(--danger-bg); }
+        
+        .status-label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
+        .status-value { font-size: 1.1rem; font-weight: 800; font-family: var(--font-mono); }
+
+        /* Buttons & Inputs */
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 20px;
-            border-radius: var(--radius-sm);
+            padding: 12px 24px;
             font-weight: 600;
-            font-size: 0.95rem;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: all 0.2s ease;
             border: none;
-            outline: none;
-            gap: 8px;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            width: 100%;
         }
-        .btn:active { transform: scale(0.98); }
-        .btn-primary { background: var(--primary); color: white; box-shadow: var(--shadow-glow); }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-secondary { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
-        .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
-        .btn-danger:hover { background: var(--danger); color: white; }
-        .btn-block { width: 100%; }
-
-        /* Inputs */
-        .input-group { display: flex; gap: var(--space-sm); margin-bottom: var(--space-md); }
-        .form-control {
-            flex: 1;
-            padding: 12px;
-            background: var(--surface);
+        
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 12px var(--primary-glow); }
+        .btn-primary:active { transform: translateY(1px); background: var(--primary-hover); }
+        
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        .btn-outline:hover { border-color: var(--text-primary); color: var(--text-primary); }
+        
+        .input-group { position: relative; display: flex; gap: 8px; margin-bottom: 12px; }
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-input);
             border: 1px solid var(--border);
-            color: var(--text-main);
+            color: var(--text-primary);
             border-radius: var(--radius-sm);
             font-size: 1rem;
             transition: border-color 0.2s;
         }
-        .form-control:focus { border-color: var(--primary); outline: none; }
+        .form-input:focus { outline: none; border-color: var(--primary); }
 
-        /* Cards */
-        .card {
-            background: var(--surface);
-            border-radius: var(--radius-md);
-            padding: var(--space-md);
-            margin-bottom: var(--space-lg);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow-md);
-        }
-
-        /* ------------------------------------------------------------------
-           4. SPECIFIC UI ELEMENTS
-           ------------------------------------------------------------------ */
-
-        /* Header / Stats Bar */
-        .header {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border);
-            padding: var(--space-md);
-        }
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-sm);
-            margin-top: var(--space-sm);
-        }
-        .status-item {
-            background: rgba(255,255,255,0.05);
-            padding: 8px;
-            border-radius: var(--radius-sm);
-            text-align: center;
-        }
-        .status-label { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .status-value { font-weight: 700; font-size: 0.9rem; }
-
-        /* Canvas Radar */
-        .radar-container {
+        /* 
+         * ==========================================================================
+         *  MODULE: RADAR COMPONENT
+         * ==========================================================================
+         */
+        .radar-wrapper {
             position: relative;
             width: 100%;
-            height: 250px;
-            background: radial-gradient(circle, #1e293b 0%, #0f172a 70%);
-            border-radius: var(--radius-md);
+            padding-bottom: 100%; /* 1:1 Aspect Ratio */
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 70%);
+            border-radius: 50%;
+            border: 4px solid var(--border);
             overflow: hidden;
-            border: 1px solid var(--border);
-            margin-bottom: var(--space-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            margin-bottom: 24px;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
         }
-        canvas { display: block; }
+        
+        .radar-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
         .radar-overlay {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            font-size: 0.7rem;
-            color: var(--primary);
-            font-family: monospace;
-        }
-
-        /* Location List */
-        .loc-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--space-md);
-            border-bottom: 1px solid var(--border);
-            animation: fadeIn 0.3s ease;
-        }
-        .loc-item:last-child { border-bottom: none; }
-        .loc-badge {
-            display: inline-block;
-            width: 10px; 
-            height: 10px;
-            border-radius: 50%;
-            background: var(--secondary);
-            margin-right: 10px;
-            box-shadow: 0 0 0 0 rgba(255,255,255,0);
-        }
-        .loc-badge.active {
-            background: var(--success);
-            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
-            animation: pulse 2s infinite;
-        }
-
-        /* Logs Table */
-        .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th { text-align: left; padding: 10px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 600; }
-        td { padding: 10px; border-bottom: 1px solid #334155; }
-        tr:last-child td { border: none; }
-
-        /* Toast Notifications */
-        .toast-container {
-            position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--primary);
+            white-space: nowrap;
+            border: 1px solid var(--border);
+        }
+
+        /* 
+         * ==========================================================================
+         *  MODULE: LISTS & TABLES
+         * ==========================================================================
+         */
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            animation: fadeIn 0.4s ease;
+        }
+        .list-item:last-child { border-bottom: none; }
+        
+        .log-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .log-table th { text-align: left; padding: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        .log-table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+        .log-table tr:last-child td { border: none; }
+
+        /* 
+         * ==========================================================================
+         *  MODULE: NOTIFICATIONS (TOASTS)
+         * ==========================================================================
+         */
+        #toast-area {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            right: 24px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            width: 90%;
-            max-width: 400px;
+            gap: 12px;
+            z-index: 9999;
+            pointer-events: none;
         }
+        
         .toast {
-            background: var(--surface);
+            background: var(--bg-card);
             border: 1px solid var(--border);
-            padding: 15px;
+            padding: 16px;
             border-radius: var(--radius-sm);
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
             display: flex;
             align-items: center;
             gap: 12px;
-            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideUp 0.3s forwards;
+            pointer-events: auto;
         }
+        
+        .toast-icon { font-size: 1.2rem; }
+        .toast-content { flex: 1; }
+        .toast-title { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+        .toast-msg { font-size: 0.8rem; color: var(--text-secondary); }
+
         .toast.success { border-left: 4px solid var(--success); }
-        .toast.alert { border-left: 4px solid var(--danger); }
+        .toast.warn { border-left: 4px solid var(--warning); }
+        .toast.error { border-left: 4px solid var(--danger); }
 
-        /* ------------------------------------------------------------------
-           5. ANIMATIONS
-           ------------------------------------------------------------------ */
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-        }
+        @keyframes slideUp { to { transform: translateY(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes radarScan {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Utility classes for Debug Console */
-        #console-log {
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            color: #10b981;
-            height: 150px;
-            overflow-y: scroll;
+        
+        /* Debug Console */
+        #console-output {
             background: #000;
-            padding: 10px;
+            color: #10b981;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 12px;
+            height: 150px;
+            overflow-y: auto;
             border-radius: var(--radius-sm);
-            margin-top: 10px;
+            border: 1px solid #333;
         }
     </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header class="header">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h1>📍 GeoFence <span style="color:var(--primary)">Pro</span></h1>
-        <div id="connectionStatus" class="status-value text-warning">Wait...</div>
-    </div>
-    <div class="status-grid">
-        <div class="status-item">
-            <span class="status-label">Accuracy</span>
-            <div id="ui-accuracy" class="status-value">-- m</div>
+    <!-- APP HEADER -->
+    <header class="app-header">
+        <div>
+            <h1>GeoGuard <span style="color:var(--primary)">Pro</span></h1>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Enterprise Indoor Edition</div>
         </div>
-        <div class="status-item">
-            <span class="status-label">State</span>
-            <div id="ui-movement" class="status-value">--</div>
+        <div id="connection-status" class="text-xs text-warning">● Connecting</div>
+    </header>
+
+    <div class="container">
+
+        <!-- STATUS DASHBOARD -->
+        <section class="status-grid">
+            <div class="status-box" id="box-acc">
+                <span class="status-label">GPS Accuracy</span>
+                <div class="status-value" id="val-acc">--</div>
+            </div>
+            <div class="status-box" id="box-filter">
+                <span class="status-label">Kalman State</span>
+                <div class="status-value" id="val-filter">OFF</div>
+            </div>
+            <div class="status-box" id="box-zone">
+                <span class="status-label">Current Zone</span>
+                <div class="status-value text-success" id="val-zone">NONE</div>
+            </div>
+        </section>
+
+        <!-- RADAR VISUALIZATION -->
+        <div class="radar-wrapper">
+            <canvas id="radar-canvas" class="radar-canvas"></canvas>
+            <div class="radar-overlay" id="radar-status">SYSTEM INITIALIZING...</div>
         </div>
-        <div class="status-item">
-            <span class="status-label">Active Zones</span>
-            <div id="ui-zones" class="status-value">0</div>
-        </div>
-    </div>
-</header>
 
-<div class="container">
+        <!-- CONTROL PANEL -->
+        <section class="card">
+            <h2>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Manage Geofence
+            </h2>
+            <p>
+                Saves your current location using <strong>Smart Buffer Logic</strong>. 
+                <br>
+                <small class="text-warning">⚠️ Keep Wi-Fi ON for indoor triangulation.</small>
+            </p>
+            
+            <div class="input-group">
+                <input type="text" id="input-name" class="form-input" placeholder="Location Name (e.g., Home Base)">
+                <button id="btn-save" class="btn btn-primary" style="width: auto;">Save Spot</button>
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button id="btn-sim" class="btn btn-outline">🧪 Run Simulation</button>
+                <button id="btn-clear" class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);">Reset Data</button>
+            </div>
+        </section>
 
-    <!-- 1. RADAR VISUALIZATION -->
-    <div class="radar-container">
-        <div class="radar-overlay">RADAR SYSTEM // <span id="radar-dist">NO TARGET</span></div>
-        <canvas id="radarCanvas"></canvas>
-    </div>
+        <!-- ACTIVE LOCATIONS -->
+        <section class="card">
+            <h2>Active Monitoring</h2>
+            <div id="list-locations">
+                <!-- Injected via JS -->
+            </div>
+        </section>
 
-    <!-- 2. CONTROLS -->
-    <div class="card">
-        <h2>Target Management</h2>
-        <p style="margin-bottom:10px; color:var(--text-muted); font-size:0.9rem;">
-            Save your current physical location as a 10-meter geofence. The system applies a 5m hysteresis buffer (Enter @ 10m, Exit @ 15m).
-        </p>
-        <div class="input-group">
-            <input type="text" id="locInput" class="form-control" placeholder="Location Name (e.g., Office)">
-            <button id="btnSave" class="btn btn-primary">Save Location</button>
-        </div>
-        <button id="btnSim" class="btn btn-secondary btn-block">🧪 Simulation Mode (Test without walking)</button>
-    </div>
+        <!-- AUDIT LOGS -->
+        <section class="card">
+            <h2>Audit Logs</h2>
+            <div style="overflow-x: auto;">
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th>Zone</th>
+                            <th>Entry</th>
+                            <th>Exit</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="list-logs">
+                        <!-- Injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="btn-export" class="btn btn-outline" style="margin-top:16px;">💾 Export CSV</button>
+        </section>
 
-    <!-- 3. ZONE LIST -->
-    <div class="card">
-        <h2>Monitored Zones</h2>
-        <div id="locationsList">
-            <!-- Dynamic Content -->
-            <div style="text-align:center; padding:20px; color:var(--text-muted);">No active geofences</div>
-        </div>
-    </div>
+        <!-- SYSTEM DIAGNOSTICS -->
+        <section class="card">
+            <h2>System Diagnostics</h2>
+            <div id="console-output"></div>
+        </section>
 
-    <!-- 4. ANALYTICS -->
-    <div class="card">
-        <h2>Session Analytics</h2>
-        <div class="table-responsive">
-            <table id="logsTable">
-                <thead>
-                    <tr>
-                        <th>Zone</th>
-                        <th>Entry Time</th>
-                        <th>Exit Time</th>
-                        <th>Duration</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Dynamic Content -->
-                </tbody>
-            </table>
-        </div>
-        <div style="margin-top:15px; display:flex; gap:10px;">
-            <button id="btnExport" class="btn btn-secondary">💾 Export CSV</button>
-            <button id="btnClear" class="btn btn-danger">🗑️ Clear History</button>
-        </div>
-    </div>
-
-    <!-- 5. SYSTEM LOGS -->
-    <div class="card">
-        <h2>System Diagnostics</h2>
-        <div id="console-log"></div>
     </div>
 
-</div>
-
-<!-- TOAST CONTAINER -->
-<div id="toastArea" class="toast-container"></div>
+    <!-- TOAST CONTAINER -->
+    <div id="toast-area"></div>
 
 <script>
 /**
- * =============================================================================
- *  GEOFENCE ENTERPRISE SYSTEM - CORE ARCHITECTURE
- * =============================================================================
- *  Modules:
- *  1. Utils: Math and Helper functions
- *  2. EventEmitter: Pub/Sub pattern
- *  3. StorageService: Persistence
- *  4. NotificationService: UI Alerts
- *  5. GeolocationEngine: Core GPS logic + Hysteresis
- *  6. Visualizer: Canvas Radar
- *  7. UIManager: DOM Manipulation
- *  8. App: Main Controller
- * =============================================================================
+ * ==========================================================================
+ *  ENTERPRISE GEOFENCING LIBRARY (GeoGuard Core)
+ * ==========================================================================
+ *  Architecture:
+ *  1. MathUtils: Pure functions for Geodesy.
+ *  2. KalmanFilter: Noise reduction class.
+ *  3. StorageManager: LocalStorage wrapper.
+ *  4. NotificationService: UI Toast handler.
+ *  5. GeofenceEngine: The core logic processor (Smart Buffer).
+ *  6. RadarRenderer: Canvas visualization.
+ *  7. AppController: Main glue code.
+ * ==========================================================================
  */
 
-/* --- 1. UTILS --- */
-class Utils {
-    static generateUUID() {
-        return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
+/* --- 1. MATH UTILITIES --- */
+const Utils = {
+    // Earth Radius in meters
+    R: 6371e3,
 
-    static formatTime(timestamp) {
-        if (!timestamp) return '--:--:--';
-        return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false });
-    }
+    // Generate Unique ID
+    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
 
-    static formatDuration(ms) {
-        const seconds = Math.floor(ms / 1000);
-        if (seconds < 60) return `${seconds}s`;
-        const minutes = Math.floor(seconds / 60);
-        const remSec = seconds % 60;
-        return `${minutes}m ${remSec}s`;
-    }
-
-    // Haversine Formula for Earth Distance
-    static getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Earth radius in meters
-        const φ1 = lat1 * Math.PI/180;
-        const φ2 = lat2 * Math.PI/180;
-        const Δφ = (lat2-lat1) * Math.PI/180;
-        const Δλ = (lon2-lon1) * Math.PI/180;
-
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    // Haversine Formula (Distance between two Lat/Lng points)
+    getDistance: (lat1, lon1, lat2, lon2) => {
+        const toRad = x => x * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return Utils.R * c;
+    },
 
-        return R * c; // Distance in meters
-    }
-}
+    // Format Duration (ms -> string)
+    formatDuration: (ms) => {
+        const sec = Math.floor(ms / 1000);
+        if (sec < 60) return `${sec}s`;
+        const min = Math.floor(sec / 60);
+        const remSec = sec % 60;
+        return `${min}m ${remSec}s`;
+    },
 
-/* --- 2. EVENT EMITTER (Observer Pattern) --- */
-class EventEmitter {
-    constructor() {
-        this.events = {};
+    // Format Time
+    formatTime: (ts) => new Date(ts).toLocaleTimeString()
+};
+
+/* --- 2. KALMAN FILTER (NOISE REDUCTION) --- */
+/**
+ * A simplified 1D Kalman Filter.
+ * Used to smooth out jumpy GPS coordinates (Lat and Lng separately).
+ */
+class KalmanFilter {
+    constructor(R = 1, Q = 1, A = 1, B = 0, C = 1) {
+        this.R = R; // Noise covariance (Measurement Noise)
+        this.Q = Q; // Process covariance (Environment Noise)
+        this.A = A; // State vector
+        this.B = B; // Control vector
+        this.C = C; // Measurement vector
+        
+        this.cov = NaN;
+        this.x = NaN; // Value
     }
-    on(event, listener) {
-        if (!this.events[event]) this.events[event] = [];
-        this.events[event].push(listener);
-    }
-    emit(event, data) {
-        if (this.events[event]) {
-            this.events[event].forEach(fn => fn(data));
+
+    filter(measurement) {
+        if (isNaN(this.x)) {
+            this.x = measurement;
+            this.cov = this.R;
+            return measurement;
         }
+
+        // Prediction
+        const predX = (this.A * this.x) + (this.B * 0);
+        const predCov = ((this.A * this.cov) * this.A) + this.Q;
+
+        // Correction
+        const K = predCov * this.C * (1 / ((this.C * predCov * this.C) + this.R));
+        this.x = predX + K * (measurement - (this.C * predX));
+        this.cov = predCov - (K * this.C * predCov);
+
+        return this.x;
     }
 }
 
-/* --- 3. STORAGE SERVICE --- */
-class StorageService {
+/* --- 3. STORAGE MANAGER --- */
+class StorageManager {
     constructor() {
-        this.KEYS = {
-            LOCATIONS: 'geo_pro_locations',
-            LOGS: 'geo_pro_logs'
-        };
+        this.KEY_LOCS = 'geoguard_locs';
+        this.KEY_LOGS = 'geoguard_logs';
     }
 
     getLocations() {
-        return JSON.parse(localStorage.getItem(this.KEYS.LOCATIONS)) || [];
+        try { return JSON.parse(localStorage.getItem(this.KEY_LOCS)) || []; }
+        catch { return []; }
     }
 
-    saveLocation(location) {
-        const locs = this.getLocations();
-        locs.push(location);
-        localStorage.setItem(this.KEYS.LOCATIONS, JSON.stringify(locs));
-        return locs;
+    saveLocation(loc) {
+        const list = this.getLocations();
+        list.push(loc);
+        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
+        return list;
     }
 
-    removeLocation(id) {
-        let locs = this.getLocations();
-        locs = locs.filter(l => l.id !== id);
-        localStorage.setItem(this.KEYS.LOCATIONS, JSON.stringify(locs));
-        return locs;
+    updateLocation(updatedLoc) {
+        const list = this.getLocations().map(l => l.id === updatedLoc.id ? updatedLoc : l);
+        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
+    }
+
+    deleteLocation(id) {
+        const list = this.getLocations().filter(l => l.id !== id);
+        localStorage.setItem(this.KEY_LOCS, JSON.stringify(list));
+        return list;
     }
 
     getLogs() {
-        return JSON.parse(localStorage.getItem(this.KEYS.LOGS)) || [];
+        try { return JSON.parse(localStorage.getItem(this.KEY_LOGS)) || []; }
+        catch { return []; }
     }
 
     addLog(log) {
-        const logs = this.getLogs();
-        logs.unshift(log); // Add to top
-        // Limit logs to last 100 entries to prevent overflow
-        if (logs.length > 100) logs.pop();
-        localStorage.setItem(this.KEYS.LOGS, JSON.stringify(logs));
-        return logs;
+        const list = this.getLogs();
+        list.unshift(log); // Prepend
+        if (list.length > 100) list.pop(); // Keep max 100
+        localStorage.setItem(this.KEY_LOGS, JSON.stringify(list));
+        return list;
     }
 
-    clearLogs() {
-        localStorage.removeItem(this.KEYS.LOGS);
-        return [];
+    clearAll() {
+        localStorage.removeItem(this.KEY_LOCS);
+        localStorage.removeItem(this.KEY_LOGS);
     }
 }
 
 /* --- 4. NOTIFICATION SERVICE --- */
 class NotificationService {
     constructor() {
-        this.container = document.getElementById('toastArea');
+        this.container = document.getElementById('toast-area');
     }
 
-    show(message, type = 'info') {
+    show(title, msg, type = 'info') {
         const el = document.createElement('div');
-        el.className = `toast ${type === 'error' ? 'alert' : type === 'success' ? 'success' : ''}`;
+        el.className = `toast ${type}`;
         
-        let icon = 'ℹ️';
-        if (type === 'success') icon = '✅';
-        if (type === 'error') icon = '⚠️';
-        if (type === 'entry') icon = '🚪➡️';
-        if (type === 'exit') icon = '⬅️🚪';
+        const icon = type === 'success' ? '✅' : type === 'warn' ? '⚠️' : 'ℹ️';
 
-        el.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        el.innerHTML = `
+            <div class="toast-icon">${icon}</div>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-msg">${msg}</div>
+            </div>
+        `;
+        
         this.container.appendChild(el);
 
         // Auto remove
@@ -505,455 +565,498 @@ class NotificationService {
     }
 }
 
-/* --- 5. VISUALIZER (CANVAS RADAR) --- */
-class Visualizer {
-    constructor() {
-        this.canvas = document.getElementById('radarCanvas');
+/* --- 5. GEOFENCE ENGINE (CORE LOGIC) --- */
+class GeofenceEngine {
+    constructor(callback) {
+        this.callback = callback;
+        this.watchId = null;
+        this.simInterval = null;
+        
+        // Kalman Filters (One for Lat, One for Lng)
+        this.kalmanLat = new KalmanFilter(3, 1);
+        this.kalmanLng = new KalmanFilter(3, 1);
+
+        // Constants
+        this.CONFIG = {
+            RADIUS: 15,          // Base radius in meters
+            HYSTERESIS: 10,      // Buffer for exit (Total 25m needed to exit)
+            MIN_ACCURACY: 60,    // Ignore GPS if accuracy > 60m (prevent huge jumps)
+            DWELL_TIME: 10000    // Must be outside for 10s to confirm exit
+        };
+    }
+
+    start() {
+        if (!navigator.geolocation) return this.callback('error', 'Geolocation not supported');
+        
+        const options = {
+            enableHighAccuracy: true, // Forces Wi-Fi/GPS mix
+            timeout: 20000,
+            maximumAge: 0
+        };
+
+        this.watchId = navigator.geolocation.watchPosition(
+            this.handlePosition.bind(this),
+            this.handleError.bind(this),
+            options
+        );
+    }
+
+    handlePosition(position) {
+        if (this.simInterval) return; // Don't interrupt simulation
+
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        // 1. FILTERING: Apply Kalman Filter to smooth jitter
+        const smoothLat = this.kalmanLat.filter(latitude);
+        const smoothLng = this.kalmanLng.filter(longitude);
+        
+        const posData = {
+            lat: smoothLat,
+            lng: smoothLng,
+            rawLat: latitude,
+            rawLng: longitude,
+            acc: accuracy,
+            timestamp: Date.now()
+        };
+
+        this.callback('update', posData);
+    }
+
+    handleError(err) {
+        let msg = "Unknown GPS Error";
+        if (err.code === 1) msg = "Permission Denied. Please Allow GPS.";
+        if (err.code === 2) msg = "Position Unavailable. Check GPS/Wi-Fi.";
+        if (err.code === 3) msg = "GPS Timeout. Move to open area.";
+        this.callback('error', msg);
+    }
+
+    // THE SMART BUFFER LOGIC
+    checkZones(currentPos, zones) {
+        const events = [];
+        const now = Date.now();
+
+        zones.forEach(zone => {
+            // Raw physical distance
+            const realDist = Utils.getDistance(currentPos.lat, currentPos.lng, zone.lat, zone.lng);
+            
+            // --- SMART INDOOR LOGIC START ---
+            
+            // Calculate "Adjusted Distance"
+            // If accuracy is bad (high number), we shrink the distance perception.
+            // Example: Real Dist 20m. Accuracy 30m. Adjusted = 20 - (30/2) = 5m.
+            // Result: System thinks you are 5m away (Inside), not 20m (Outside).
+            const accuracyBuffer = currentPos.acc / 2;
+            const adjustedDist = realDist - accuracyBuffer;
+
+            // STATE: INSIDE -> OUTSIDE
+            if (zone.isInside) {
+                // Must exceed Radius + Hysteresis using Adjusted Distance
+                if (adjustedDist > (this.CONFIG.RADIUS + this.CONFIG.HYSTERESIS)) {
+                    // Dwell Check (Debounce)
+                    if (!zone.tentativeExit) zone.tentativeExit = now;
+                    
+                    if (now - zone.tentativeExit > this.CONFIG.DWELL_TIME) {
+                        zone.isInside = false;
+                        zone.tentativeExit = null;
+                        events.push({ type: 'exit', zone, time: now });
+                    }
+                } else {
+                    zone.tentativeExit = null; // Reset if user comes back in buffer
+                }
+            }
+            
+            // STATE: OUTSIDE -> INSIDE
+            else {
+                // Strict entry: Use Real Distance (don't use buffer for entry)
+                if (realDist <= this.CONFIG.RADIUS) {
+                    zone.isInside = true;
+                    zone.entryTime = now;
+                    events.push({ type: 'entry', zone, time: now });
+                }
+            }
+            // --- SMART INDOOR LOGIC END ---
+            
+            // Attach live distance for UI
+            zone._liveDist = realDist;
+        });
+
+        return events;
+    }
+
+    // SIMULATION ENGINE
+    simulate(startLat, startLng) {
+        if (this.simInterval) {
+            clearInterval(this.simInterval);
+            this.simInterval = null;
+            this.callback('log', 'Simulation Stopped');
+            return;
+        }
+
+        this.callback('log', '🧪 Simulation Started: Walking in circle');
+        
+        let angle = 0;
+        const radius = 0.0003; // Approx 30 meters
+        const centerLat = startLat;
+        const centerLng = startLng;
+
+        this.simInterval = setInterval(() => {
+            angle += 0.1;
+            
+            // Generate circular path
+            const simLat = centerLat + (Math.sin(angle) * radius);
+            const simLng = centerLng + (Math.cos(angle) * radius);
+            
+            // Simulate changing accuracy
+            const simAcc = 10 + (Math.random() * 20); // 10m to 30m accuracy
+
+            this.callback('update', {
+                lat: simLat,
+                lng: simLng,
+                acc: simAcc,
+                isSim: true
+            });
+        }, 1000);
+    }
+}
+
+/* --- 6. RADAR RENDERER (CANVAS) --- */
+class RadarRenderer {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.resize();
         window.addEventListener('resize', () => this.resize());
     }
 
     resize() {
-        this.canvas.width = this.canvas.parentElement.offsetWidth;
-        this.canvas.height = 250;
+        const parent = this.canvas.parentElement;
+        this.canvas.width = parent.offsetWidth;
+        this.canvas.height = parent.offsetWidth; // Square
     }
 
-    draw(userLat, userLng, targets) {
+    draw(userPos, zones) {
         const w = this.canvas.width;
         const h = this.canvas.height;
         const cx = w / 2;
         const cy = h / 2;
-        const maxDist = 50; // Radar range in meters
+        const ctx = this.ctx;
 
-        // Clear
-        this.ctx.fillStyle = '#0f172a';
-        this.ctx.fillRect(0, 0, w, h);
+        // 1. Clear & Background
+        ctx.clearRect(0, 0, w, h);
+        
+        // 2. Draw Grid Rings (Range Indicators)
+        // Let's say canvas edge is 60 meters
+        const maxRange = 60; 
+        const pxPerMeter = (w / 2) / maxRange;
 
-        // Draw Grid Rings
-        this.ctx.strokeStyle = '#334155';
-        this.ctx.lineWidth = 1;
-        [20, 40, 60, 80].forEach(r => {
-            this.ctx.beginPath();
-            this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            this.ctx.stroke();
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        [15, 30, 45].forEach(r => {
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * pxPerMeter, 0, Math.PI * 2);
+            ctx.stroke();
         });
 
-        // Draw Crosshair
-        this.ctx.beginPath();
-        this.ctx.moveTo(cx - 10, cy); this.ctx.lineTo(cx + 10, cy);
-        this.ctx.moveTo(cx, cy - 10); this.ctx.lineTo(cx, cy + 10);
-        this.ctx.strokeStyle = '#3b82f6';
-        this.ctx.stroke();
+        // 3. Draw Axis
+        ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
 
-        // Draw User (Always center)
-        this.ctx.fillStyle = '#3b82f6';
-        this.ctx.beginPath();
-        this.ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-        this.ctx.fill();
+        // 4. Draw User Accuracy Bubble (Center)
+        const accRadius = (userPos.acc * pxPerMeter) / 2; // Scaled
+        ctx.fillStyle = 'rgba(99, 102, 241, 0.2)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, accRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#6366f1';
+        ctx.stroke();
 
-        // Draw Targets relative to User
-        if (userLat && userLng) {
-            let closest = null;
-            let closestDist = Infinity;
+        // 5. Draw User Dot
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
 
-            targets.forEach(t => {
-                const dist = Utils.getDistance(userLat, userLng, t.lat, t.lng);
-                
-                // Track Closest for UI
-                if(dist < closestDist) { closestDist = dist; closest = t.name; }
+        // 6. Draw Zones relative to User
+        zones.forEach(zone => {
+            // Standard Equirectangular projection approximation for small distances
+            const dLat = (zone.lat - userPos.lat) * 111139; // meters
+            const dLng = (zone.lng - userPos.lng) * 111139 * Math.cos(userPos.lat * Math.PI / 180);
+            
+            // Invert Y because canvas Y goes down, Latitude goes up
+            const x = cx + (dLng * pxPerMeter);
+            const y = cy - (dLat * pxPerMeter);
 
-                // Map geo distance to pixels
-                // Approximate: 1 meter = 2 pixels on radar
-                const scale = 2; 
-                
-                // Calculate bearing roughly for x/y offset (Simplified projection)
-                const dLat = (t.lat - userLat) * 111139; // meters
-                const dLon = (t.lng - userLng) * 111139 * Math.cos(userLat * Math.PI/180);
-                
-                const x = cx + (dLon * scale);
-                const y = cy - (dLat * scale); // Y is inverted on canvas
+            // Draw Zone Circle
+            ctx.fillStyle = zone.isInside ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)';
+            ctx.beginPath();
+            ctx.arc(x, y, 15 * pxPerMeter, 0, Math.PI * 2); // 15m radius visual
+            ctx.fill();
 
-                // Draw Target
-                this.ctx.fillStyle = t.isInside ? '#22c55e' : '#94a3b8';
-                this.ctx.beginPath();
-                this.ctx.arc(x, y, 6, 0, Math.PI * 2);
-                this.ctx.fill();
+            // Draw Zone Center
+            ctx.fillStyle = zone.isInside ? '#10b981' : '#94a3b8';
+            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
 
-                // Draw Name
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.font = '10px sans-serif';
-                this.ctx.fillText(t.name, x + 8, y + 3);
-            });
+            // Label
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px sans-serif';
+            ctx.fillText(zone.name, x + 8, y + 4);
+        });
 
-            // Update Overlay Text
-            const overlay = document.getElementById('radar-dist');
-            if(closest) {
-                overlay.innerText = `TARGET: ${closest} (${Math.round(closestDist)}m)`;
-                overlay.style.color = closestDist <= 10 ? '#22c55e' : '#3b82f6';
-            } else {
-                overlay.innerText = "NO TARGETS";
-                overlay.style.color = '#64748b';
-            }
-        }
+        // 7. Scanning Line Animation
+        const time = Date.now() / 1000;
+        const scanAngle = (time % 2) * Math.PI; // Full circle every 2s
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(scanAngle);
+        const grad = ctx.createLinearGradient(0, 0, w/2, 0);
+        grad.addColorStop(0, 'rgba(99, 102, 241, 0)');
+        grad.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.arc(0, 0, w, -0.2, 0.2);
+        ctx.fill();
+        ctx.restore();
     }
 }
 
-/* --- 6. GEOLOCATION ENGINE --- */
-class GeoEngine extends EventEmitter {
+/* --- 7. APP CONTROLLER (MAIN) --- */
+class AppController {
     constructor() {
-        super();
-        this.watchId = null;
-        this.isSimulating = false;
-        this.currentPos = { lat: 0, lng: 0, acc: 0 };
-        this.options = {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 0
-        };
-        
-        // Hysteresis Settings
-        this.ENTER_THRESHOLD = 10; // Meters
-        this.EXIT_THRESHOLD = 15;  // Meters (Buffer to prevent flip-flopping)
-    }
-
-    start() {
-        if (!navigator.geolocation) {
-            this.emit('error', 'Geolocation not supported');
-            return;
-        }
-
-        // Wake Lock (Keep screen alive)
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').catch(e => console.log('Wake Lock failed'));
-        }
-
-        this.watchId = navigator.geolocation.watchPosition(
-            (pos) => this.handleUpdate(pos),
-            (err) => this.handleError(err),
-            this.options
-        );
-        this.emit('status', 'Initializing GPS...');
-    }
-
-    handleUpdate(pos) {
-        if (this.isSimulating) return; // Ignore real GPS during sim
-
-        const { latitude, longitude, accuracy } = pos.coords;
-        
-        // Simple Noise Filter: Ignore jumps > 100m in 1 second (impossible speed)
-        // (Omitted for brevity, but this is where Kalman filter logic sits in full app)
-
-        this.currentPos = { lat: latitude, lng: longitude, acc: accuracy };
-        this.emit('update', this.currentPos);
-    }
-
-    handleError(err) {
-        let msg = '';
-        switch(err.code) {
-            case 1: msg = 'Permission Denied'; break;
-            case 2: msg = 'Position Unavailable'; break;
-            case 3: msg = 'Connection Timeout'; break;
-        }
-        this.emit('error', msg);
-    }
-
-    // Process Geofences against current location
-    checkFences(locations) {
-        const events = [];
-        const now = Date.now();
-
-        locations.forEach(loc => {
-            const dist = Utils.getDistance(this.currentPos.lat, this.currentPos.lng, loc.lat, loc.lng);
-            
-            // LOGIC: ENTRY
-            // Uses strict threshold (10m)
-            if (!loc.isInside && dist <= this.ENTER_THRESHOLD) {
-                loc.isInside = true;
-                loc.entryTime = now;
-                events.push({ type: 'entry', loc: loc, dist: dist });
-            }
-
-            // LOGIC: EXIT
-            // Uses Hysteresis threshold (15m) to prevent flickering
-            else if (loc.isInside && dist > this.EXIT_THRESHOLD) {
-                loc.isInside = false;
-                const exitTime = now;
-                const duration = exitTime - loc.entryTime;
-                
-                // Only log if duration > 5 seconds (ignore glitches)
-                if (duration > 5000) {
-                    events.push({ 
-                        type: 'exit', 
-                        loc: loc, 
-                        entry: loc.entryTime, 
-                        exit: exitTime, 
-                        duration: duration 
-                    });
-                }
-                loc.entryTime = null;
-            }
-        });
-
-        return events;
-    }
-
-    // Simulation Tool
-    simulate(startLat, startLng) {
-        this.isSimulating = true;
-        this.emit('status', '🧪 SIMULATION MODE');
-        
-        let step = 0;
-        const simInterval = setInterval(() => {
-            step++;
-            
-            // Move 2 meters per step roughly North
-            const newLat = startLat + (step * 0.00002); 
-            
-            this.currentPos = { lat: newLat, lng: startLng, acc: 5 };
-            this.emit('update', this.currentPos);
-
-            if (step > 20) { // After 20 steps, stop
-                clearInterval(simInterval);
-                this.isSimulating = false;
-                this.emit('status', 'Simulation Ended');
-            }
-        }, 1000);
-    }
-}
-
-/* --- 7. UI MANAGER --- */
-class UIManager {
-    constructor(store, logs) {
-        this.els = {
-            acc: document.getElementById('ui-accuracy'),
-            move: document.getElementById('ui-movement'),
-            zones: document.getElementById('ui-zones'),
-            conn: document.getElementById('connectionStatus'),
-            locList: document.getElementById('locationsList'),
-            logTable: document.getElementById('logsTable').querySelector('tbody'),
-            console: document.getElementById('console-log')
-        };
-        this.logToConsole('System UI Initialized');
-    }
-
-    updateStats(acc, speed, zoneCount) {
-        this.els.acc.innerText = `± ${Math.round(acc)} m`;
-        this.els.acc.style.color = acc < 20 ? 'var(--success)' : 'var(--danger)';
-        this.els.move.innerText = 'Active'; 
-        this.els.zones.innerText = zoneCount;
-        this.els.conn.innerText = "ONLINE";
-        this.els.conn.className = "status-value text-success";
-    }
-
-    logToConsole(msg) {
-        const time = new Date().toLocaleTimeString();
-        this.els.console.innerHTML = `<div style="border-bottom:1px solid #333; padding:2px;">[${time}] ${msg}</div>` + this.els.console.innerHTML;
-    }
-
-    renderLocations(locations, onDelete) {
-        this.els.locList.innerHTML = '';
-        if (locations.length === 0) {
-            this.els.locList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">No active geofences</div>';
-            return;
-        }
-
-        locations.forEach(loc => {
-            const div = document.createElement('div');
-            div.className = 'loc-item';
-            div.innerHTML = `
-                <div>
-                    <div style="font-weight:600; display:flex; align-items:center;">
-                        <span class="loc-badge ${loc.isInside ? 'active' : ''}"></span>
-                        ${loc.name}
-                    </div>
-                    <small class="mono">${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}</small>
-                </div>
-                <button class="btn btn-danger" style="padding:5px 10px; font-size:0.8rem;">Remove</button>
-            `;
-            div.querySelector('button').addEventListener('click', () => onDelete(loc.id));
-            this.els.locList.appendChild(div);
-        });
-    }
-
-    renderLogs(logs) {
-        this.els.logTable.innerHTML = '';
-        if (logs.length === 0) {
-            this.els.logTable.innerHTML = '<tr><td colspan="4" style="text-align:center;">No history available</td></tr>';
-            return;
-        }
-
-        logs.forEach(log => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><strong>${log.locationName}</strong></td>
-                <td>${Utils.formatTime(log.entryTime)}</td>
-                <td>${Utils.formatTime(log.exitTime)}</td>
-                <td><span style="background:rgba(59,130,246,0.1); color:#3b82f6; padding:2px 6px; borderRadius:4px;">${log.duration}</span></td>
-            `;
-            this.els.logTable.appendChild(row);
-        });
-    }
-}
-
-/* --- 8. MAIN APP CONTROLLER --- */
-class App {
-    constructor() {
-        // Initialize Modules
-        this.store = new StorageService();
-        this.geo = new GeoEngine();
-        this.ui = new UIManager();
-        this.radar = new Visualizer();
+        this.storage = new StorageManager();
         this.notify = new NotificationService();
-
-        // Load Data
-        this.locations = this.store.getLocations();
-        this.logs = this.store.getLogs();
-
-        // Initial Render
-        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
-        this.ui.renderLogs(this.logs);
-
-        // Bind Events
-        this.bindEvents();
+        this.radar = new RadarRenderer('radar-canvas');
+        this.engine = new GeofenceEngine((t, d) => this.handleEngineEvent(t, d));
         
-        // Start System
-        this.geo.start();
-        this.ui.logToConsole('Application Started v2.0');
+        this.locations = this.storage.getLocations();
+        this.currentPos = null;
+
+        this.initUI();
+        this.engine.start();
+
+        this.log("System Started. Enable Wi-Fi for better accuracy.");
+        this.notify.show("Tip", "Ensure Wi-Fi is ON for indoor precision.", "warn");
     }
 
-    bindEvents() {
-        // GPS Updates
-        this.geo.on('update', (pos) => this.onGPSUpdate(pos));
-        this.geo.on('error', (msg) => {
-            this.ui.logToConsole(`ERROR: ${msg}`);
-            this.notify.show(msg, 'error');
-        });
-        this.geo.on('status', (msg) => this.ui.logToConsole(msg));
+    initUI() {
+        // Buttons
+        document.getElementById('btn-save').onclick = () => this.actionSave();
+        document.getElementById('btn-sim').onclick = () => this.actionSim();
+        document.getElementById('btn-clear').onclick = () => this.actionClear();
+        document.getElementById('btn-export').onclick = () => this.actionExport();
 
-        // UI Buttons
-        document.getElementById('btnSave').onclick = () => this.saveCurrentLocation();
-        document.getElementById('btnSim').onclick = () => this.startSimulation();
-        document.getElementById('btnClear').onclick = () => {
-            if(confirm('Delete all logs?')) {
-                this.logs = this.store.clearLogs();
-                this.ui.renderLogs(this.logs);
-                this.notify.show('Logs Cleared', 'success');
+        this.renderLocations();
+        this.renderLogs();
+    }
+
+    handleEngineEvent(type, data) {
+        if (type === 'error') {
+            document.getElementById('connection-status').innerText = "● Error";
+            document.getElementById('connection-status').style.color = "var(--danger)";
+            this.log(`Error: ${data}`);
+            this.notify.show("GPS Error", data, "error");
+            return;
+        }
+
+        if (type === 'log') {
+            this.log(data);
+            return;
+        }
+
+        if (type === 'update') {
+            this.currentPos = data;
+            
+            // 1. Process Geofencing Logic
+            const events = this.engine.checkZones(data, this.locations);
+            
+            // 2. Handle Events
+            if (events.length > 0) {
+                this.handleZoneEvents(events);
             }
-        };
-        document.getElementById('btnExport').onclick = () => this.exportCSV();
-    }
 
-    onGPSUpdate(pos) {
-        // 1. Update UI Stats
-        this.ui.updateStats(pos.acc, 0, this.locations.length);
-
-        // 2. Update Radar
-        this.radar.draw(pos.lat, pos.lng, this.locations);
-
-        // 3. Check Geofences
-        const events = this.geo.checkFences(this.locations);
-
-        // 4. Handle Events
-        if (events.length > 0) {
-            events.forEach(e => {
-                if (e.type === 'entry') {
-                    this.notify.show(`Entered ${e.loc.name}`, 'entry');
-                    this.ui.logToConsole(`-> ENTER: ${e.loc.name}`);
-                    // Save state so if page reloads we know we are inside
-                    this.store.saveLocation(e.loc); // Update logic needed here ideally
-                    this.refreshLocations(); // Persist "isInside" state
-                } 
-                else if (e.type === 'exit') {
-                    const durStr = Utils.formatDuration(e.duration);
-                    this.notify.show(`Exited ${e.loc.name} (${durStr})`, 'exit');
-                    this.ui.logToConsole(`<- EXIT: ${e.loc.name} after ${durStr}`);
-                    
-                    // Create Log
-                    const logEntry = {
-                        id: Utils.generateUUID(),
-                        locationName: e.loc.name,
-                        entryTime: e.entry,
-                        exitTime: e.exit,
-                        duration: durStr
-                    };
-                    
-                    this.logs = this.store.addLog(logEntry);
-                    this.ui.renderLogs(this.logs);
-                    this.refreshLocations();
-                }
-            });
+            // 3. Update UI
+            this.updateDashboard(data);
+            this.radar.draw(data, this.locations);
+            this.renderLocations(); // Update distances
         }
     }
 
-    saveCurrentLocation() {
-        const input = document.getElementById('locInput');
-        const name = input.value.trim();
+    handleZoneEvents(events) {
+        events.forEach(e => {
+            if (e.type === 'entry') {
+                this.notify.show("Entered Zone", e.zone.name, "success");
+                this.log(`🟢 ENTER: ${e.zone.name}`);
+                
+                // Save state to storage
+                this.storage.updateLocation(e.zone);
+            }
+            else if (e.type === 'exit') {
+                const dur = e.time - e.zone.entryTime;
+                const durStr = Utils.formatDuration(dur);
+                
+                this.notify.show("Exited Zone", `${e.zone.name} (${durStr})`, "warn");
+                this.log(`🔴 EXIT: ${e.zone.name} after ${durStr}`);
+
+                // Log it
+                const logEntry = {
+                    zone: e.zone.name,
+                    entry: e.zone.entryTime,
+                    exit: e.time,
+                    duration: durStr
+                };
+                this.storage.addLog(logEntry);
+                this.storage.updateLocation(e.zone);
+                this.renderLogs();
+            }
+        });
+    }
+
+    // --- ACTIONS ---
+
+    actionSave() {
+        if (!this.currentPos) return this.notify.show("Error", "Waiting for GPS signal...", "error");
         
-        if (!name) return this.notify.show('Please enter a name', 'error');
-        if (this.geo.currentPos.lat === 0) return this.notify.show('Waiting for GPS signal...', 'error');
-        if (this.geo.currentPos.acc > 30) return this.notify.show('GPS accuracy too low to save', 'error');
+        const nameInput = document.getElementById('input-name');
+        const name = nameInput.value.trim();
+        if (!name) return this.notify.show("Error", "Please enter a name", "error");
 
         const newLoc = {
-            id: Utils.generateUUID(),
+            id: Utils.uuid(),
             name: name,
-            lat: this.geo.currentPos.lat,
-            lng: this.geo.currentPos.lng,
-            radius: 10,
-            isInside: true, // Auto-enter upon creation
+            lat: this.currentPos.lat,
+            lng: this.currentPos.lng,
+            isInside: true, // Auto-assume inside on creation
             entryTime: Date.now()
         };
 
-        this.locations = this.store.saveLocation(newLoc);
-        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
-        input.value = '';
-        this.notify.show(`Geofence "${name}" Created`, 'success');
-        this.ui.logToConsole(`New Fence: ${name} @ ${newLoc.lat.toFixed(5)}, ${newLoc.lng.toFixed(5)}`);
+        this.locations = this.storage.saveLocation(newLoc);
+        this.renderLocations();
+        nameInput.value = "";
+        this.notify.show("Success", "Location saved with Indoor Buffer", "success");
     }
 
-    deleteLocation(id) {
-        if (!confirm('Remove this geofence?')) return;
-        this.locations = this.store.removeLocation(id);
-        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
-        this.notify.show('Geofence Removed', 'info');
+    actionSim() {
+        if (this.locations.length === 0) return this.notify.show("Error", "Save a location first", "error");
+        const center = this.locations[0];
+        this.engine.simulate(center.lat, center.lng);
     }
 
-    // A helper to update the array in storage because objects changed (isInside flags)
-    refreshLocations() {
-        localStorage.setItem(this.store.KEYS.LOCATIONS, JSON.stringify(this.locations));
-        this.ui.renderLocations(this.locations, (id) => this.deleteLocation(id));
+    actionClear() {
+        if (confirm("Delete all data?")) {
+            this.storage.clearAll();
+            window.location.reload();
+        }
     }
 
-    startSimulation() {
-        if (this.locations.length === 0) return this.notify.show('Create a zone first!', 'error');
-        // Teleport to the first location, then walk away
-        const start = this.locations[0];
-        this.geo.simulate(start.lat, start.lng);
-    }
-
-    exportCSV() {
-        if (this.logs.length === 0) return this.notify.show('No logs to export', 'error');
-        let csv = 'Location,Entry ISO,Exit ISO,Duration String\n';
-        this.logs.forEach(l => {
-            csv += `"${l.locationName}","${new Date(l.entryTime).toISOString()}","${new Date(l.exitTime).toISOString()}","${l.duration}"\n`;
+    actionExport() {
+        const logs = this.storage.getLogs();
+        if (logs.length === 0) return this.notify.show("Info", "No logs to export", "warn");
+        
+        let csv = "Zone,Entry Time,Exit Time,Duration\n";
+        logs.forEach(l => {
+            csv += `"${l.zone}","${new Date(l.entry).toISOString()}","${new Date(l.exit).toISOString()}","${l.duration}"\n`;
         });
+        
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `geofence_export_${Date.now()}.csv`;
+        a.download = `geoguard_export_${Date.now()}.csv`;
         a.click();
+    }
+
+    actionDelete(id) {
+        if (confirm("Remove this zone?")) {
+            this.locations = this.storage.deleteLocation(id);
+            this.renderLocations();
+        }
+    }
+
+    // --- UI UPDATERS ---
+
+    updateDashboard(pos) {
+        document.getElementById('connection-status').innerText = "● Live";
+        document.getElementById('connection-status').style.color = "var(--success)";
+        
+        // Accuracy
+        const accEl = document.getElementById('val-acc');
+        const accBox = document.getElementById('box-acc');
+        accEl.innerText = `±${Math.round(pos.acc)}m`;
+        accBox.className = pos.acc < 20 ? 'status-box active' : 'status-box poor';
+
+        // Filter Status
+        document.getElementById('val-filter').innerText = "ACTIVE";
+        document.getElementById('val-filter').style.color = "#10b981";
+
+        // Zone status
+        const inside = this.locations.find(l => l.isInside);
+        document.getElementById('val-zone').innerText = inside ? inside.name : "OUTSIDE";
+        document.getElementById('val-zone').className = inside ? "status-value text-success" : "status-value text-muted";
+        
+        // Update overlay text
+        document.getElementById('radar-status').innerText = inside ? `MONITORING: ${inside.name}` : "SCANNING SECTOR...";
+    }
+
+    renderLocations() {
+        const list = document.getElementById('list-locations');
+        list.innerHTML = "";
+        
+        if (this.locations.length === 0) {
+            list.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted)">No zones active. Save one above.</div>`;
+            return;
+        }
+
+        this.locations.forEach(loc => {
+            const dist = loc._liveDist ? Math.round(loc._liveDist) : "?";
+            const el = document.createElement('div');
+            el.className = 'list-item';
+            el.innerHTML = `
+                <div>
+                    <div style="font-weight:700; color:${loc.isInside ? 'var(--success)' : 'var(--text-primary)'}">
+                        ${loc.name}
+                    </div>
+                    <div class="text-xs text-mono" style="color:var(--text-muted)">
+                        Dist: ${dist}m | ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}
+                    </div>
+                </div>
+                <button class="btn btn-outline" style="width:auto; padding:8px 12px; font-size:0.75rem" onclick="app.actionDelete('${loc.id}')">Remove</button>
+            `;
+            list.appendChild(el);
+        });
+    }
+
+    renderLogs() {
+        const list = document.getElementById('list-logs');
+        const logs = this.storage.getLogs();
+        list.innerHTML = "";
+        
+        if (logs.length === 0) {
+            list.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px;">No history recorded yet.</td></tr>`;
+            return;
+        }
+
+        logs.forEach(log => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${log.zone}</strong></td>
+                <td>${Utils.formatTime(log.entry)}</td>
+                <td>${Utils.formatTime(log.exit)}</td>
+                <td><span style="background:var(--bg-body); padding:2px 6px; border-radius:4px; font-family:var(--font-mono)">${log.duration}</span></td>
+            `;
+            list.appendChild(tr);
+        });
+    }
+
+    log(msg) {
+        const consoleEl = document.getElementById('console-output');
+        const time = new Date().toLocaleTimeString();
+        consoleEl.innerHTML = `<div><span style="opacity:0.5">[${time}]</span> ${msg}</div>` + consoleEl.innerHTML;
     }
 }
 
 // --- BOOTSTRAP ---
-window.onload = () => {
-    // Check protocol security
-    if (window.location.protocol === 'file:') {
-        alert("SECURITY BLOCK: Browser Geolocation requires HTTPS or Localhost. You are running via file://. Please use a local server.");
-    }
-    const app = new App();
-};
+const app = new AppController();
+
+// Expose to window for inline HTML onclick handlers
+window.app = app;
 
 </script>
 </body>
