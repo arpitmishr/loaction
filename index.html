@@ -4,13 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#ffffff">
-    <meta name="description" content="GeoGuard Logistics - Shop Management Module">
-    <title>GeoGuard | Shop Management</title>
+    <title>GeoGuard | Smart Navigation</title>
 
-    <!-- ==================================================================================
-         LIBRARIES
-         ================================================================================== -->
-    
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -18,118 +13,66 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#2563eb',   
-                        secondary: '#64748b', 
-                        success: '#16a34a',   
-                        warning: '#f59e0b',
-                        danger: '#dc2626',    
-                        bg: '#f8fafc',        
+                        primary: '#2563eb', secondary: '#64748b', success: '#16a34a', warning: '#f59e0b', danger: '#dc2626',
                     },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['monospace']
-                    },
-                    zIndex: {
-                        'map-ui': '2000',
-                        'modal': '3000'
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['monospace'] },
+                    zIndex: { 'map-ui': '2000', 'modal': '3000' }
                 }
             }
         }
     </script>
 
-    <!-- ICONS -->
+    <!-- ICONS & MAP LIBRARIES -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <!-- LEAFLET MAPS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- ROUTING -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-
-    <!-- GOOGLE API -->
+    <!-- GOOGLE IDENTITY SERVICES -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
-    <!-- ==================================================================================
-         STYLES
-         ================================================================================== -->
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { height: 100%; width: 100%; overflow: hidden; }
-        body { background-color: #f8fafc; color: #1e293b; }
-        
+        body { background-color: #f8fafc; color: #1e293b; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* Tab Transitions */
-        .tab-content { 
-            display: none; 
-            height: 100%; 
-            overflow-y: auto; 
-            padding-bottom: 90px; 
-            animation: fadeIn 0.2s ease-in-out;
-        }
+        .tab-content { display: none; height: 100%; overflow-y: auto; padding-bottom: 90px; animation: fadeIn 0.2s ease-in-out; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Map Setup */
-        #map-wrapper {
-            position: relative;
-            width: 100%;
-            height: 55vh;
-            min-height: 350px;
-            background: #e2e8f0;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-        }
+        #map-wrapper { position: relative; width: 100%; height: 50vh; background: #e2e8f0; border-radius: 1rem; overflow: hidden; margin-bottom: 1rem; }
         #osm-map { width: 100%; height: 100%; z-index: 1; }
-        
-        /* Floating Controls */
-        .map-overlay {
-            position: absolute;
-            z-index: 2000 !important;
-        }
+        .map-overlay { position: absolute; z-index: 2000 !important; }
 
-        /* Modal Styles */
+        /* Modal */
         .modal-backdrop {
-            position: fixed; inset: 0; 
-            background: rgba(15, 23, 42, 0.7); 
-            backdrop-filter: blur(4px);
-            z-index: 3000;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.2s ease;
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);
+            z-index: 3000; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
         }
         .modal-backdrop.open { opacity: 1; pointer-events: auto; }
-        
         .modal-content {
-            background: white; width: 95%; max-width: 420px;
-            max-height: 85vh; overflow-y: auto;
-            border-radius: 1rem; padding: 1.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            transform: scale(0.95); transition: transform 0.2s ease;
+            background: white; width: 95%; max-width: 400px; max-height: 85vh; overflow-y: auto;
+            border-radius: 1rem; padding: 1.5rem; transform: scale(0.95); transition: transform 0.2s ease;
         }
         .modal-backdrop.open .modal-content { transform: scale(1); }
-        
-        /* Leaflet Cleanup */
-        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
-<body class="flex flex-col">
+<body>
 
     <!-- HEADER -->
-    <header class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur border-b border-slate-200 h-16 flex-none">
+    <header class="bg-white/95 backdrop-blur border-b border-slate-200 h-16 flex-none z-50">
         <div class="max-w-md mx-auto px-4 h-full flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-                    <i class="ph-bold ph-storefront text-xl"></i>
+                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i class="ph-bold ph-path text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold text-slate-800 leading-tight">GEO<span class="text-blue-600">GUARD</span></h1>
-                    <div class="text-[10px] font-medium text-slate-400 font-mono">SHOP MANAGER PRO</div>
+                    <h1 class="text-sm font-bold text-slate-800">GEO<span class="text-blue-600">PATH</span></h1>
+                    <div id="recording-indicator" class="hidden flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span class="text-[10px] text-red-500 font-bold uppercase">Recording Path</span>
+                    </div>
                 </div>
             </div>
             <div id="gps-indicator" class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-full">
@@ -139,94 +82,102 @@
         </div>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 w-full max-w-md mx-auto pt-16 relative bg-slate-50">
+    <!-- MAIN -->
+    <main class="flex-1 w-full max-w-md mx-auto pt-4 relative">
 
-        <!-- TAB 1: MAP -->
-        <div id="view-map" class="tab-content active px-4 py-4 space-y-4">
+        <!-- TAB: MAP -->
+        <div id="view-map" class="tab-content active px-4">
             
-            <!-- KNOWN ISSUE NOTIFICATION -->
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2 flex items-center gap-2 text-[10px] text-yellow-700">
-                <i class="ph-fill ph-warning-circle text-lg"></i>
-                <span><b>Notice:</b> Auto-map rotation is currently disabled. Map orientation is static (North-Up).</span>
-            </div>
-
             <div id="map-wrapper">
                 <div id="osm-map"></div>
-
                 <!-- HUD -->
-                <div class="map-overlay top-4 left-4 bg-white/95 px-3 py-1.5 rounded-full border border-slate-200 shadow-md flex items-center gap-2">
+                <div class="map-overlay top-4 left-4 bg-white/90 px-3 py-1.5 rounded-full border shadow-md flex items-center gap-2">
                     <i class="ph-fill ph-compass text-blue-600"></i>
-                    <span id="hud-heading" class="text-xs font-bold font-mono text-slate-700">0</span>°
+                    <span id="hud-heading" class="text-xs font-bold font-mono">0</span>°
                 </div>
-
-                <!-- Controls -->
-                <button onclick="App.map.recenter()" class="map-overlay bottom-4 right-4 w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700">
+                <!-- Recenter -->
+                <button onclick="App.map.recenter()" class="map-overlay bottom-4 right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-700">
                     <i class="ph-bold ph-crosshair text-xl"></i>
                 </button>
             </div>
 
-            <!-- Action Card -->
-            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase">Current Zone</div>
-                        <div id="lbl-zone" class="text-sm font-bold text-slate-500">Outside Zone</div>
+            <!-- Shop Selector / Navigation Bar -->
+            <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <select id="sel-target" onchange="App.nav.previewTarget()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none">
+                            <option value="">Select Destination...</option>
+                        </select>
+                        <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
-                    <button id="btn-take-order" onclick="App.ui.modal('order')" disabled class="px-4 py-2 rounded-lg bg-slate-100 text-slate-300 text-xs font-bold transition-all">
-                        TAKE ORDER
+                </div>
+
+                <!-- Intelligent Nav Preview -->
+                <div id="nav-preview" class="hidden space-y-3 pt-2 border-t border-slate-100">
+                    <div class="flex justify-between items-center">
+                        <div class="text-xs text-slate-500">History: <b id="hist-count">0 visits</b></div>
+                        <div class="text-xs text-slate-500">Best Time: <b id="hist-time">-- min</b></div>
+                    </div>
+                    
+                    <button onclick="App.ui.openNavModal()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-navigation-arrow text-lg"></i> START NAVIGATION
                     </button>
                 </div>
                 
-                <button onclick="App.ui.modal('add')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20">
-                    <i class="ph-bold ph-plus-circle text-lg"></i> ADD NEW SHOP / STORE
-                </button>
+                <!-- If No Target Selected -->
+                <div id="nav-placeholder" class="pt-2">
+                    <button onclick="App.ui.modal('add')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-plus-circle text-lg"></i> ADD NEW STORE
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Active Navigation Info (Hidden by default) -->
+            <div id="active-nav-card" class="hidden mt-4 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">Navigating via Smart Path</span>
+                    <button onclick="App.nav.stopNav()" class="text-xs text-red-500 font-bold">EXIT</button>
+                </div>
+                <div class="text-2xl font-mono font-bold text-slate-800" id="nav-dist-rem">0 m</div>
+                <div class="text-xs text-slate-500">Remaining along saved path</div>
             </div>
         </div>
 
-        <!-- TAB 2: STORES (New Requirements) -->
-        <div id="view-stores" class="tab-content px-4 py-6 space-y-4">
-            <h2 class="text-lg font-bold text-slate-800 px-1 flex items-center justify-between">
-                <span>My Stores</span>
-                <span class="text-[10px] font-normal text-slate-400 bg-slate-100 px-2 py-1 rounded">Read Only</span>
-            </h2>
-            <div id="list-stores" class="space-y-3">
-                <!-- Injected via JS -->
-            </div>
+        <!-- TAB: STORES -->
+        <div id="view-stores" class="tab-content px-4 py-4">
+            <h2 class="text-lg font-bold mb-4">My Stores</h2>
+            <div id="list-stores" class="space-y-3"></div>
         </div>
 
-        <!-- TAB 3: ORDERS -->
-        <div id="view-orders" class="tab-content px-4 py-6 space-y-4">
-            <h2 class="text-lg font-bold text-slate-800 px-1">Order History</h2>
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[200px]">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
-                        <tr>
-                            <th class="px-4 py-3">Shop</th>
-                            <th class="px-4 py-3">Details</th>
-                            <th class="px-4 py-3 text-right">Amt</th>
-                        </tr>
-                    </thead>
-                    <tbody id="list-orders" class="divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- TAB 4: SETTINGS -->
-        <div id="view-settings" class="tab-content px-4 py-6 space-y-4">
-            <h2 class="text-lg font-bold text-slate-800 px-1">Settings</h2>
+        <!-- TAB: SETTINGS -->
+        <div id="view-settings" class="tab-content px-4 py-4 space-y-4">
+            <h2 class="text-lg font-bold">Data & Sync</h2>
+            
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-bold text-slate-700">Route Learning</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="chk-learning" checked class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <p class="text-[10px] text-slate-400">Automatically record GPS path when visiting shops.</p>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <div id="g-drive-status" class="text-xs text-center text-slate-500 mb-2">Not Connected</div>
                 <button onclick="Cloud.login()" class="w-full py-2 border border-slate-300 rounded text-xs font-bold flex justify-center gap-2 items-center">
                     <i class="ph-bold ph-google-logo"></i> Google Login
                 </button>
                 <button onclick="Cloud.sync()" class="w-full py-2 bg-blue-50 text-blue-600 rounded text-xs font-bold">
-                    Sync Data
+                    Sync to Drive
                 </button>
-                <div id="sync-status" class="text-center text-[10px] text-slate-400">Offline</div>
+                <div class="text-[9px] text-red-400 text-center mt-1">Note: Must run on localhost or https for Login</div>
             </div>
-            <button onclick="App.data.exportCSV()" class="w-full py-3 bg-white border border-emerald-200 text-emerald-600 font-bold rounded-xl shadow-sm">
-                Export Data CSV
-            </button>
+            
+            <div class="p-4 rounded-xl border border-red-100 bg-red-50">
+                 <button onclick="App.data.resetRoutes()" class="w-full py-2 text-red-600 font-bold text-xs">Reset All Learned Routes (Admin)</button>
+            </div>
         </div>
 
     </main>
@@ -234,423 +185,391 @@
     <!-- BOTTOM NAV -->
     <nav class="fixed bottom-0 w-full bg-white border-t border-slate-200 z-40 h-16 pb-safe">
         <div class="flex justify-around items-center h-full max-w-md mx-auto">
-            <button onclick="App.ui.switchTab('map')" class="nav-btn active group flex flex-col items-center w-full" data-target="map">
+            <button onclick="App.ui.tab('map')" class="nav-btn active group flex flex-col items-center w-full" data-target="map">
                 <i class="ph-fill ph-map-trifold text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
                 <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-blue-600">Map</span>
             </button>
-            <button onclick="App.ui.switchTab('stores')" class="nav-btn group flex flex-col items-center w-full" data-target="stores">
+            <button onclick="App.ui.tab('stores')" class="nav-btn group flex flex-col items-center w-full" data-target="stores">
                 <i class="ph-bold ph-storefront text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
                 <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Stores</span>
             </button>
-            <button onclick="App.ui.switchTab('orders')" class="nav-btn group flex flex-col items-center w-full" data-target="orders">
-                <i class="ph-bold ph-receipt text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
-                <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Orders</span>
-            </button>
-            <button onclick="App.ui.switchTab('settings')" class="nav-btn group flex flex-col items-center w-full" data-target="settings">
+            <button onclick="App.ui.tab('settings')" class="nav-btn group flex flex-col items-center w-full" data-target="settings">
                 <i class="ph-bold ph-gear text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
                 <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Settings</span>
             </button>
         </div>
     </nav>
 
-    <!-- ==================================================================================
-         MODALS (UPDATED WITH NEW REQUIREMENTS)
-         ================================================================================== -->
-
-    <!-- Modal: Add Shop -->
+    <!-- MODAL: ADD SHOP -->
     <div id="modal-add" class="modal-backdrop">
         <div class="modal-content">
-            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
-                <h3 class="font-bold text-slate-800 text-lg">Add New Shop</h3>
-                <button onclick="App.ui.closeModals()" class="text-slate-400 hover:text-red-500"><i class="ph-bold ph-x text-lg"></i></button>
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="font-bold text-lg">Add Shop</h3>
+                <button onclick="App.ui.closeModals()"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
-            
             <div class="space-y-3">
-                <!-- Location Read-Only -->
-                <div class="bg-blue-50 p-2 rounded border border-blue-100 text-[10px] text-blue-700 font-mono text-center">
-                    GPS: <span id="lbl-gps-coords">WAITING...</span>
-                </div>
-
-                <!-- Basic Details -->
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Shop Name <span class="text-red-500">*</span></label>
-                    <input id="inp-name" type="text" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none">
-                </div>
-
-                <!-- Type & Phone -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase">Type <span class="text-red-500">*</span></label>
-                        <select id="inp-type" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
-                            <option value="Shop">Shop</option>
-                            <option value="Dhaba">Dhaba</option>
-                            <option value="Hotel">Hotel</option>
-                            <option value="Cafe">Cafe</option>
-                            <option value="Resort">Resort</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase">Phone</label>
-                        <input id="inp-phone" type="tel" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
-                    </div>
-                </div>
-
-                <!-- Address & Remarks -->
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Full Address</label>
-                    <input id="inp-address" type="text" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Remarks / Notes</label>
-                    <textarea id="inp-remarks" rows="2" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none"></textarea>
-                </div>
-
-                <!-- Payment Configuration -->
-                <div class="pt-2 border-t border-slate-100">
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Customer / Payment Type <span class="text-red-500">*</span></label>
-                    <select id="inp-pay-type" onchange="App.ui.toggleCreditFields()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none font-bold text-slate-700">
-                        <option value="Cash">Cash</option>
-                        <option value="Online">Online / UPI</option>
-                        <option value="Credit">Credit (Udhaar)</option>
+                <input id="inp-name" placeholder="Shop Name *" class="w-full p-2 border rounded text-sm">
+                <select id="inp-type" class="w-full p-2 border rounded text-sm">
+                    <option value="Shop">Shop</option><option value="Dhaba">Dhaba</option><option value="Hotel">Hotel</option>
+                </select>
+                <input id="inp-address" placeholder="Address" class="w-full p-2 border rounded text-sm">
+                
+                <div class="pt-2 border-t">
+                    <label class="text-[10px] font-bold text-slate-500">PAYMENT TYPE</label>
+                    <select id="inp-pay" onchange="App.ui.toggleCredit()" class="w-full p-2 border rounded text-sm mt-1">
+                        <option value="Cash">Cash</option><option value="Online">Online</option><option value="Credit">Credit</option>
                     </select>
                 </div>
-
-                <!-- Credit Fields (Conditional) -->
-                <div id="section-credit" class="hidden bg-orange-50 p-3 rounded-lg border border-orange-200 space-y-3">
-                    <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wide border-b border-orange-200 pb-1">Credit Configuration</div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500">Credit Limit (₹)</label>
-                            <input id="inp-cred-limit" type="number" class="w-full p-2 bg-white border border-slate-300 rounded text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500">Cycle (Days)</label>
-                            <input id="inp-cred-days" type="number" class="w-full p-2 bg-white border border-slate-300 rounded text-sm">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500">GST Number</label>
-                        <input id="inp-gst" type="text" class="w-full p-2 bg-white border border-slate-300 rounded text-sm uppercase">
-                    </div>
+                
+                <div id="sec-credit" class="hidden bg-orange-50 p-2 rounded border border-orange-200 grid grid-cols-2 gap-2">
+                    <input id="inp-lim" placeholder="Limit (₹)" type="number" class="p-2 border rounded text-xs">
+                    <input id="inp-day" placeholder="Days" type="number" class="p-2 border rounded text-xs">
                 </div>
 
-                <button onclick="App.data.addLocation()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm shadow hover:bg-blue-700 mt-2">
-                    SAVE SHOP
+                <button onclick="App.data.addShop()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm mt-2">SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NAVIGATION SELECTOR -->
+    <div id="modal-nav" class="modal-backdrop">
+        <div class="modal-content">
+            <div class="text-center mb-4">
+                <h3 class="font-bold text-lg text-slate-800">Choose Navigation</h3>
+                <p class="text-xs text-slate-500">How do you want to reach <span id="lbl-nav-target" class="font-bold text-blue-600">--</span>?</p>
+            </div>
+
+            <div class="space-y-3">
+                <!-- Option 1: Smart Path -->
+                <button id="btn-nav-internal" onclick="App.nav.startInternal()" class="w-full p-4 rounded-xl border-2 border-slate-100 hover:border-blue-500 bg-slate-50 flex items-center justify-between group transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-600 shadow-sm">
+                            <i class="ph-fill ph-footprints text-xl"></i>
+                        </div>
+                        <div class="text-left">
+                            <div class="font-bold text-slate-700 text-sm">My Saved Path</div>
+                            <div class="text-[10px] text-slate-400">Based on <span id="lbl-path-stats">0 visits</span></div>
+                        </div>
+                    </div>
+                    <i class="ph-bold ph-caret-right text-slate-300 group-hover:text-blue-500"></i>
+                </button>
+
+                <!-- Option 2: Google Maps -->
+                <button onclick="App.nav.startGoogle()" class="w-full p-4 rounded-xl border-2 border-slate-100 hover:border-green-500 bg-slate-50 flex items-center justify-between group transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-green-600 shadow-sm">
+                            <i class="ph-fill ph-google-logo text-xl"></i>
+                        </div>
+                        <div class="text-left">
+                            <div class="font-bold text-slate-700 text-sm">Google Maps</div>
+                            <div class="text-[10px] text-slate-400">Live Traffic & Roads</div>
+                        </div>
+                    </div>
+                    <i class="ph-bold ph-arrow-square-out text-slate-300 group-hover:text-green-500"></i>
                 </button>
             </div>
+            
+            <button onclick="App.ui.closeModals()" class="w-full mt-4 py-2 text-slate-400 font-bold text-xs">Cancel</button>
         </div>
     </div>
 
-    <!-- Modal: Order -->
-    <div id="modal-order" class="modal-backdrop">
-        <div class="modal-content">
-            <h3 class="font-bold text-slate-800 text-lg mb-2">Take Order</h3>
-            <div class="bg-slate-100 p-2 rounded mb-3 text-xs text-slate-500">Shop: <b id="lbl-ord-shop" class="text-slate-800">--</b></div>
-            <div class="space-y-3">
-                <input id="inp-ord-desc" placeholder="Items..." class="w-full p-2 border rounded text-sm">
-                <input id="inp-ord-amt" type="number" placeholder="Amount (₹)" class="w-full p-2 border rounded text-sm">
-                <div class="flex gap-2">
-                    <button onclick="App.ui.closeModals()" class="flex-1 py-2 text-slate-500 font-bold text-sm">Cancel</button>
-                    <button onclick="App.data.addOrder()" class="flex-1 py-2 bg-emerald-600 text-white rounded font-bold text-sm">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==================================================================================
-         JAVASCRIPT
-         ================================================================================== -->
+    <!-- LOGIC -->
     <script>
-        const CONFIG = {
-            DB: 'geoguard_v5_db',
+        // CONFIG
+        const CFG = { 
+            DB: 'geoguard_v6', 
             GPS: { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 },
-            GAPI: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE' // Demo Key
+            GAPI_KEY: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE', // Demo Key
+            GCLIENT_ID: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
+            GEO_RAD: 15 // Geofence Radius (meters)
         };
 
-        const Utils = {
+        // HELPERS
+        const U = {
             id: () => Date.now().toString(36),
-            dist: (l1, n1, l2, n2) => {
-                const R=6371e3, r=Math.PI/180, a=Math.sin((l2-l1)*r/2)**2+Math.cos(l1*r)*Math.cos(l2*r)*Math.sin((n2-n1)*r/2)**2;
+            dist: (lat1, lon1, lat2, lon2) => {
+                const R=6371e3, r=Math.PI/180, a=Math.sin((lat2-lat1)*r/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin((lon2-lon1)*r/2)**2;
                 return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
             },
-            fmtMoney: (n) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR'}).format(n),
-            date: (ts) => new Date(ts).toLocaleDateString()
+            // Simplify Path (Douglas-Peucker-ish: only save point if > 5m from last)
+            simplify: (path) => {
+                if(path.length < 2) return path;
+                const res = [path[0]];
+                for(let i=1; i<path.length; i++){
+                    if(U.dist(path[i][0], path[i][1], res[res.length-1][0], res[res.length-1][1]) > 5) res.push(path[i]);
+                }
+                return res;
+            }
         };
 
-        // --- CLOUD SYNC ---
+        // CLOUD (Google Identity Services)
         const Cloud = {
             token: null,
-            init: function() {
-                const i = setInterval(() => { if(window.google) { clearInterval(i); this.load(); } }, 500);
-            },
-            load: function() {
-                gapi.load('client', async()=>{
-                    await gapi.client.init({apiKey:CONFIG.GAPI, discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']});
-                });
-            },
-            login: function() {
+            login: () => {
+                if(location.protocol === 'file:') return alert("Google Login requires a server (localhost/https). It will not work on file:// protocol.");
+                if(!window.google) return alert("Google Library Loading...");
                 google.accounts.oauth2.initTokenClient({
-                    client_id: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
-                    scope: 'https://www.googleapis.com/auth/drive.file',
-                    callback: (r)=>{ this.token=r.access_token; document.getElementById('sync-status').innerText="Logged In"; }
+                    client_id: CFG.GCLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
+                    callback: (r) => { 
+                        if(r.error) alert("Login Failed: " + r.error);
+                        else { Cloud.token = r.access_token; document.getElementById('g-drive-status').innerText="Connected"; document.getElementById('g-drive-status').className="text-xs text-center text-emerald-600 font-bold mb-2"; }
+                    }
                 }).requestAccessToken();
             },
-            sync: async function() {
-                if(!this.token) return alert("Please Login First");
-                const blob = new Blob([JSON.stringify(App.data.dump())], {type:'application/json'});
+            sync: async () => {
+                if(!Cloud.token) return alert("Login First");
+                const file = new Blob([JSON.stringify(Store.db)], {type:'application/json'});
+                const meta = { name: 'geoguard_backup.json', mimeType: 'application/json' };
                 const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify({name:'geo_backup.json'})],{type:'application/json'}));
-                form.append('file', blob);
-                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method:'POST', headers:{'Authorization':`Bearer ${this.token}`}, body:form
-                });
-                document.getElementById('sync-status').innerText="Synced Now";
+                form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+                form.append('file', file);
+                try {
+                    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                        method: 'POST', headers: {'Authorization': `Bearer ${Cloud.token}`}, body: form
+                    });
+                    alert("Sync Successful!");
+                } catch(e) { alert("Sync Failed"); console.error(e); }
             }
         };
 
-        // --- DATA STORE ---
-        const Storage = {
-            state: { locs:[], orders:[], prof:{} },
-            init: function() {
-                const s = localStorage.getItem(CONFIG.DB);
-                if(s) this.state = JSON.parse(s);
+        // DATABASE
+        const Store = {
+            db: { shops:[], routes:{} }, // routes: { shopId: [ {path:[], date:ts, dur:sec} ] }
+            init: () => {
+                const s = localStorage.getItem(CFG.DB);
+                if(s) Store.db = JSON.parse(s);
+                if(!Store.db.routes) Store.db.routes = {}; 
             },
-            save: function() { localStorage.setItem(CONFIG.DB, JSON.stringify(this.state)); },
-            
-            // Updated to accept full data object
-            addLocation: function(data) {
-                this.state.locs.push(data);
-                this.save();
+            save: () => localStorage.setItem(CFG.DB, JSON.stringify(Store.db)),
+            addShop: (data) => { Store.db.shops.push(data); Store.save(); },
+            saveRoute: (shopId, path, duration) => {
+                if(!Store.db.routes[shopId]) Store.db.routes[shopId] = [];
+                // Simple path simplification
+                const cleanPath = U.simplify(path);
+                Store.db.routes[shopId].push({ path: cleanPath, date: Date.now(), dur: duration });
+                // Keep only top 5 routes to save space
+                if(Store.db.routes[shopId].length > 5) Store.db.routes[shopId].shift();
+                Store.save();
             },
-            
-            // Protected: User cannot delete
-            // removeLocation: function(id) { ... } // Disabled per requirements
-
-            addOrder: function(s, d, a) {
-                this.state.orders.unshift({id:Utils.id(), shop:s, desc:d, amt:a, date:Date.now()});
-                this.save();
+            getBestRoute: (shopId) => {
+                const r = Store.db.routes[shopId];
+                if(!r || r.length === 0) return null;
+                // Logic: Sort by frequency isn't easy without grouping, so we sort by Shortest Duration + Recency bias
+                // Simple: Return the most recent one that has decent length
+                return r[r.length-1]; 
             }
         };
 
-        // --- MAP ENGINE ---
-        const MapEngine = {
-            map: null,
-            userMk: null,
-            markers: {},
-            init: function() {
-                this.map = L.map('osm-map', {zoomControl:false}).setView([20,78],5);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(this.map);
-                
-                const icon = L.divIcon({className:'bg-transparent', html:'<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>'});
-                this.userMk = L.marker([0,0],{icon, zIndexOffset:1000}).addTo(this.map);
+        // MAP & NAVIGATION ENGINE
+        const Map = {
+            lmap: null, user: null, markers: {}, pathLine: null,
+            init: () => {
+                Map.lmap = L.map('osm-map', {zoomControl:false}).setView([20,78], 5);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(Map.lmap);
+                Map.user = L.marker([0,0], { icon: L.divIcon({className:'bg-transparent', html:'<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg pulse"></div>'}) }).addTo(Map.lmap);
             },
-            updatePos: function(lat, lng, first) {
-                this.userMk.setLatLng([lat,lng]);
-                if(first) this.map.setView([lat,lng], 16);
-            },
-            render: function() {
-                for(let k in this.markers) this.map.removeLayer(this.markers[k]);
-                this.markers={};
-                Storage.state.locs.forEach(l => {
-                    const col = l.isInside ? '#16a34a' : '#2563eb';
+            renderShops: () => {
+                for(let k in Map.markers) Map.lmap.removeLayer(Map.markers[k]);
+                Map.markers = {};
+                Store.db.shops.forEach(s => {
+                    const col = s.pay.type==='Credit' ? '#f97316' : '#2563eb';
                     const icon = L.divIcon({className:'bg-transparent', html:`<div class="w-3 h-3 rounded-full border border-white shadow" style="background:${col}"></div>`});
-                    this.markers[l.id] = L.marker([l.lat, l.lng], {icon}).addTo(this.map).bindPopup(l.name);
+                    Map.markers[s.id] = L.marker([s.lat, s.lng], {icon}).addTo(Map.lmap);
                 });
             },
-            recenter: function() { if(App.pos) this.map.setView([App.pos.lat, App.pos.lng], 16); }
+            drawPath: (coords) => {
+                if(Map.pathLine) Map.lmap.removeLayer(Map.pathLine);
+                if(!coords) return;
+                Map.pathLine = L.polyline(coords, {color:'#2563eb', weight:4, dashArray:'10,10', opacity:0.7}).addTo(Map.lmap);
+                Map.lmap.fitBounds(Map.pathLine.getBounds(), {padding:[50,50]});
+            }
         };
 
-        // --- MAIN APP ---
+        // APPLICATION LOGIC
         const App = {
             pos: null,
-            init: function() {
-                Storage.init();
-                Cloud.init();
-                MapEngine.init();
-                this.startGPS();
-                this.ui.renderStores();
-                this.ui.renderOrders();
-                
-                // Compass
-                window.addEventListener('deviceorientation', e=>{
-                    const h = e.webkitCompassHeading || Math.abs(e.alpha-360);
-                    if(h) document.getElementById('hud-heading').innerText = Math.round(h);
-                }, true);
+            target: null,
+            recording: { active: false, path: [], startTime: 0, shopId: null },
+            
+            init: () => {
+                Store.init();
+                Map.init();
+                App.gps();
+                App.ui.renderList();
+                App.ui.updateSelect();
             },
-            startGPS: function() {
+
+            gps: () => {
                 navigator.geolocation.watchPosition(p => {
                     const {latitude:lat, longitude:lng, accuracy:acc} = p.coords;
-                    const f = !this.pos;
-                    this.pos = {lat, lng};
+                    App.pos = {lat, lng};
                     
                     // UI Update
-                    const ind = document.getElementById('gps-indicator');
-                    ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <span class="text-emerald-700 font-bold text-[10px]">±${Math.round(acc)}m</span>`;
-                    ind.className = "flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full";
-                    
-                    MapEngine.updatePos(lat, lng, f);
-                    this.checkZone();
-                }, e=>console.log(e), CONFIG.GPS);
-            },
-            checkZone: function() {
-                if(!this.pos) return;
-                let inside = false;
-                Storage.state.locs.forEach(l => {
-                    const d = Utils.dist(this.pos.lat, this.pos.lng, l.lat, l.lng);
-                    if(!l.isInside && d<=5) { l.isInside=true; Storage.save(); MapEngine.render(); }
-                    else if(l.isInside && d>10) { l.isInside=false; Storage.save(); MapEngine.render(); }
-                    
-                    if(l.isInside) {
-                        inside=true;
-                        document.getElementById('lbl-zone').innerText = l.name;
-                        document.getElementById('lbl-zone').className = "text-sm font-bold text-emerald-600";
-                        document.getElementById('lbl-ord-shop').innerText = l.name;
-                        document.getElementById('btn-take-order').disabled=false;
-                        document.getElementById('btn-take-order').className = "px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow";
+                    document.getElementById('gps-indicator').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <span class="text-emerald-700 font-bold text-[10px]">±${Math.round(acc)}m</span>`;
+                    Map.user.setLatLng([lat,lng]);
+                    if(!App.target) Map.lmap.setView([lat,lng], 16);
+
+                    // RECORDING LOGIC
+                    if(App.recording.active) {
+                        App.recording.path.push([lat, lng]);
+                        // Check Geofence Arrival
+                        const d = U.dist(lat, lng, App.target.lat, App.target.lng);
+                        if(d < CFG.GEO_RAD) App.nav.stopRecording(true);
                     }
-                });
-                if(!inside) {
-                    document.getElementById('lbl-zone').innerText = "Outside Zone";
-                    document.getElementById('lbl-zone').className = "text-sm font-bold text-slate-500";
-                    document.getElementById('btn-take-order').disabled=true;
-                    document.getElementById('btn-take-order').className = "px-4 py-2 rounded-lg bg-slate-100 text-slate-300 text-xs font-bold";
+
+                    // INTERNAL NAV LOGIC
+                    if(App.nav.active && App.nav.route) {
+                        // Calc distance to end of path
+                        const last = App.nav.route.path[App.nav.route.path.length-1];
+                        const d = U.dist(lat, lng, last[0], last[1]);
+                        document.getElementById('nav-dist-rem').innerText = Math.round(d) + " m";
+                        if(d < CFG.GEO_RAD) { alert("You have arrived!"); App.nav.stopNav(); }
+                    }
+
+                }, e=>console.log(e), CFG.GPS);
+            },
+
+            nav: {
+                active: false, route: null,
+                
+                previewTarget: () => {
+                    const id = document.getElementById('sel-target').value;
+                    if(!id) { 
+                        App.target = null; 
+                        document.getElementById('nav-preview').classList.add('hidden');
+                        document.getElementById('nav-placeholder').classList.remove('hidden');
+                        if(Map.pathLine) Map.lmap.removeLayer(Map.pathLine);
+                        return;
+                    }
+                    
+                    App.target = Store.db.shops.find(s=>s.id===id);
+                    document.getElementById('nav-preview').classList.remove('hidden');
+                    document.getElementById('nav-placeholder').classList.add('hidden');
+                    
+                    // Check History
+                    const routes = Store.db.routes[id] || [];
+                    const best = Store.getBestRoute(id);
+                    document.getElementById('hist-count').innerText = `${routes.length} recorded`;
+                    document.getElementById('hist-time').innerText = best ? `${Math.round(best.dur/60)} min` : "No Data";
+                    document.getElementById('lbl-path-stats').innerText = best ? `Last: ${new Date(best.date).toLocaleDateString()}` : "No history yet";
+                    
+                    // Setup Modal State
+                    const btnInternal = document.getElementById('btn-nav-internal');
+                    if(!best) {
+                        btnInternal.classList.add('opacity-50', 'cursor-not-allowed');
+                        btnInternal.onclick = null;
+                        btnInternal.querySelector('div.text-sm').innerText = "No Saved Path (Use Google Maps)";
+                    } else {
+                        btnInternal.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btnInternal.onclick = App.nav.startInternal;
+                        btnInternal.querySelector('div.text-sm').innerText = "My Saved Path";
+                    }
+                },
+
+                startRecording: (shopId) => {
+                    if(!document.getElementById('chk-learning').checked) return;
+                    App.recording = { active: true, path: [], startTime: Date.now(), shopId: shopId };
+                    document.getElementById('recording-indicator').classList.remove('hidden');
+                },
+
+                stopRecording: (arrived) => {
+                    if(!App.recording.active) return;
+                    App.recording.active = false;
+                    document.getElementById('recording-indicator').classList.add('hidden');
+                    
+                    if(arrived && App.recording.path.length > 5) {
+                        const dur = (Date.now() - App.recording.startTime) / 1000;
+                        Store.saveRoute(App.recording.shopId, App.recording.path, dur);
+                        // alert("Route pattern learned!");
+                    }
+                },
+
+                startGoogle: () => {
+                    if(!App.target) return;
+                    App.nav.startRecording(App.target.id); // Start recording logic even if using Google
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${App.target.lat},${App.target.lng}`;
+                    window.open(url, '_blank');
+                    App.ui.closeModals();
+                },
+
+                startInternal: () => {
+                    const best = Store.getBestRoute(App.target.id);
+                    if(!best) return alert("No route history found.");
+                    
+                    App.nav.active = true;
+                    App.nav.route = best;
+                    Map.drawPath(best.path);
+                    
+                    document.getElementById('active-nav-card').classList.remove('hidden');
+                    App.ui.closeModals();
+                    
+                    // Also record this new trip to improve data
+                    App.nav.startRecording(App.target.id);
+                },
+
+                stopNav: () => {
+                    App.nav.active = false;
+                    App.nav.stopRecording(false); // Stop but don't save incomplete
+                    document.getElementById('active-nav-card').classList.add('hidden');
+                    Map.drawPath(null);
+                    App.map.recenter();
                 }
             },
+
             data: {
-                dump: () => Storage.state,
-                addLocation: function() {
+                addShop: () => {
                     const name = document.getElementById('inp-name').value;
                     if(!name || !App.pos) return alert("Name & GPS required");
+                    const ptype = document.getElementById('inp-pay').value;
                     
-                    const payType = document.getElementById('inp-pay-type').value;
-                    const isCredit = payType === 'Credit';
-
-                    const payload = {
-                        id: Utils.id(),
-                        name: name,
-                        lat: App.pos.lat,
-                        lng: App.pos.lng,
+                    Store.addShop({
+                        id: U.id(), name: name, lat: App.pos.lat, lng: App.pos.lng,
                         type: document.getElementById('inp-type').value,
-                        phone: document.getElementById('inp-phone').value || '',
-                        address: document.getElementById('inp-address').value || '',
-                        remarks: document.getElementById('inp-remarks').value || '',
-                        payment: {
-                            type: payType,
-                            limit: isCredit ? document.getElementById('inp-cred-limit').value : null,
-                            cycle: isCredit ? document.getElementById('inp-cred-days').value : null,
-                            gst: isCredit ? document.getElementById('inp-gst').value : null
-                        },
-                        isInside: false,
-                        created: Date.now()
-                    };
-
-                    Storage.addLocation(payload);
-                    App.ui.closeModals();
-                    App.ui.renderStores();
-                    MapEngine.render();
+                        addr: document.getElementById('inp-address').value,
+                        pay: { type: ptype, limit: document.getElementById('inp-lim').value, day: document.getElementById('inp-day').value }
+                    });
                     
-                    // Reset Form
-                    document.getElementById('inp-name').value = '';
-                    document.getElementById('inp-address').value = '';
+                    App.ui.closeModals();
+                    App.ui.updateSelect();
+                    App.ui.renderList();
+                    Map.renderShops();
                 },
-                addOrder: function() {
-                    const d = document.getElementById('inp-ord-desc').value;
-                    const a = document.getElementById('inp-ord-amt').value;
-                    const s = document.getElementById('lbl-ord-shop').innerText;
-                    if(d && a) {
-                        Storage.addOrder(s, d, a);
-                        App.ui.closeModals();
-                        App.ui.renderOrders();
-                        document.getElementById('inp-ord-desc').value = '';
-                        document.getElementById('inp-ord-amt').value = '';
+                resetRoutes: () => {
+                    if(confirm("Admin Action: Reset all learned patterns?")) {
+                        Store.db.routes = {}; Store.save(); alert("Reset Complete");
                     }
-                },
-                exportCSV: function() {
-                    let c = "TYPE,SHOP,DETAILS,AMT,DATE\n";
-                    Storage.state.orders.forEach(o=> c+=`ORDER,${o.shop},"${o.desc}",${o.amt},${Utils.date(o.date)}\n`);
-                    Storage.state.locs.forEach(l=> c+=`SHOP,${l.name},"${l.address} - ${l.payment.type}",0,${Utils.date(l.created)}\n`);
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(new Blob([c],{type:'text/csv'}));
-                    a.download = 'geo_export.csv';
-                    a.click();
                 }
             },
+
             ui: {
-                switchTab: function(t) {
+                tab: (t) => {
                     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
                     document.getElementById('view-'+t).classList.add('active');
-                    document.querySelectorAll('.nav-btn').forEach(b => {
-                        b.classList.toggle('active', b.dataset.target === t);
-                        // Update Icon Colors
-                        const icon = b.querySelector('i');
-                        const txt = b.querySelector('span');
-                        if(b.dataset.target === t) {
-                            icon.classList.remove('text-slate-400'); icon.classList.add('text-blue-600');
-                            txt.classList.remove('text-slate-400'); txt.classList.add('text-blue-600');
-                        } else {
-                            icon.classList.add('text-slate-400'); icon.classList.remove('text-blue-600');
-                            txt.classList.add('text-slate-400'); txt.classList.remove('text-blue-600');
-                        }
-                    });
-                    if(t==='map') setTimeout(()=>MapEngine.map.invalidateSize(), 100);
+                    if(t==='map') setTimeout(()=>Map.lmap.invalidateSize(), 200);
                 },
-                modal: function(id) {
-                    document.getElementById('modal-'+id).classList.add('open');
-                    if(id==='add' && App.pos) {
-                        document.getElementById('lbl-gps-coords').innerText = `${App.pos.lat.toFixed(6)}, ${App.pos.lng.toFixed(6)}`;
-                    }
+                modal: (id) => document.getElementById('modal-'+id).classList.add('open'),
+                openNavModal: () => App.ui.modal('nav'),
+                closeModals: () => document.querySelectorAll('.modal-backdrop').forEach(e=>e.classList.remove('open')),
+                toggleCredit: () => {
+                    const el = document.getElementById('sec-credit');
+                    document.getElementById('inp-pay').value === 'Credit' ? el.classList.remove('hidden') : el.classList.add('hidden');
                 },
-                closeModals: function() {
-                    document.querySelectorAll('.modal-backdrop').forEach(e=>e.classList.remove('open'));
+                updateSelect: () => {
+                    const s = document.getElementById('sel-target');
+                    s.innerHTML = '<option value="">Select Destination...</option>' + Store.db.shops.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
                 },
-                toggleCreditFields: function() {
-                    const val = document.getElementById('inp-pay-type').value;
-                    const div = document.getElementById('section-credit');
-                    if(val === 'Credit') div.classList.remove('hidden'); else div.classList.add('hidden');
-                },
-                renderStores: function() {
-                    const list = document.getElementById('list-stores');
-                    const stores = Storage.state.locs;
-                    if(!stores.length) { list.innerHTML='<div class="text-center text-slate-400 p-4">No shops saved.</div>'; return; }
-                    
-                    list.innerHTML = stores.map(s => {
-                        let badges = `<span class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] border border-slate-200">${s.type}</span>`;
-                        if(s.payment.type === 'Credit') badges += `<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] border border-orange-200">Credit</span>`;
-                        else if(s.payment.type === 'Cash') badges += `<span class="ml-1 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-[10px] border border-green-200">Cash</span>`;
-                        else badges += `<span class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] border border-blue-200">Online</span>`;
-
-                        return `
-                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <div class="font-bold text-slate-800">${s.name}</div>
-                                    <div class="mt-1 flex flex-wrap gap-1">${badges}</div>
-                                    <div class="mt-2 text-xs text-slate-500 flex items-center gap-1"><i class="ph-bold ph-map-pin"></i> ${s.address || 'No Address'}</div>
-                                    ${s.phone ? `<div class="mt-1 text-xs text-slate-500 flex items-center gap-1"><i class="ph-bold ph-phone"></i> ${s.phone}</div>` : ''}
-                                </div>
-                                <div class="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 rounded">
-                                    ${s.lat.toFixed(3)}, ${s.lng.toFixed(3)}
-                                </div>
-                            </div>
-                            <!-- Note: Delete button removed per requirements -->
-                        </div>`;
-                    }).join('');
-                },
-                renderOrders: function() {
-                    const list = document.getElementById('list-orders');
-                    let html = '';
-                    Storage.state.orders.forEach(o => {
-                        html += `<tr><td class="px-4 py-3 font-bold text-slate-700">${o.shop}</td><td class="px-4 py-3 text-slate-500">${o.desc}</td><td class="px-4 py-3 text-right font-bold text-emerald-600 font-mono">${Utils.fmtMoney(o.amt)}</td></tr>`;
-                    });
-                    list.innerHTML = html || '<tr><td colspan="3" class="p-4 text-center text-slate-400">No orders.</td></tr>';
+                renderList: () => {
+                    document.getElementById('list-stores').innerHTML = Store.db.shops.map(s => `
+                        <div class="bg-white p-4 rounded-xl border shadow-sm">
+                            <div class="font-bold text-slate-800">${s.name}</div>
+                            <div class="text-xs text-slate-500">${s.type} • ${s.pay.type}</div>
+                        </div>
+                    `).join('');
                 }
             }
         };
 
-        // --- START ---
-        window.App = App;
-        window.onload = () => App.init();
+        window.onload = App.init;
     </script>
 </body>
 </html>
