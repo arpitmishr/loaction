@@ -1,12 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
-    <title>GeoGuard Logistics | Cloud Sync</title>
+    <title>GeoGuard Logistics Pro | 7m Radar System</title>
+
+    <!-- ================================================================================== -->
+    <!-- EXTERNAL DEPENDENCIES -->
+    <!-- ================================================================================== -->
     
-    <!-- TAILWIND CSS -->
+    <!-- 1. Tailwind CSS (Styling Framework) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -14,753 +18,891 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: { 850: '#1e293b', 950: '#020617' },
-                        primary: '#3b82f6',
-                        success: '#10b981',
-                        danger: '#ef4444',
-                        warning: '#f59e0b'
+                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' },
+                        radar: { on: '#10b981', off: '#ef4444', warn: '#f59e0b' }
                     },
                     animation: {
-                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'radar-ping': 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+                        'spin-slow': 'spin 3s linear infinite',
                     }
                 }
             }
         }
     </script>
 
-    <!-- ICONS -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <!-- GOOGLE API SCRIPTS -->
+    <!-- 2. Leaflet JS (OpenStreetMap Renderer) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- 3. Google Material Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
+
+    <!-- 4. Google Identity Services & API Client -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
+    <!-- ================================================================================== -->
+    <!-- INTERNAL STYLES -->
+    <!-- ================================================================================== -->
     <style>
-        body { -webkit-tap-highlight-color: transparent; user-select: none; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .modal { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0; pointer-events: none; transform: scale(0.95); }
-        .modal.open { opacity: 1; pointer-events: auto; transform: scale(1); }
+        /* Base Resets */
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden; /* Prevent scrolling, app-like feel */
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* Map Container */
+        #map-view {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0;
+            background: #0f172a;
+        }
+
+        /* Leaflet Overrides for Dark Mode */
+        .leaflet-container { background: #0f172a; }
+        .leaflet-control-attribution { display: none; } /* Clean look */
         
-        /* Tab Transitions */
-        .tab-content { display: none; animation: fadeIn 0.2s ease-in-out; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom Radar Marker */
+        .radar-icon-pulse {
+            position: relative;
+            width: 20px;
+            height: 20px;
+        }
+        .radar-icon-pulse::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.5);
+            transform: translate(-50%, -50%);
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        .radar-icon-dot {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 12px; height: 12px;
+            background: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Scrollbars */
+        .scroller::-webkit-scrollbar { width: 4px; }
+        .scroller::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        
+        /* Modal Transition */
+        .modal-backdrop {
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-backdrop.active {
+            opacity: 1; pointer-events: auto;
+        }
+        .modal-content {
+            transform: scale(0.95); transition: transform 0.3s ease;
+        }
+        .modal-backdrop.active .modal-content {
+            transform: scale(1);
+        }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
+<body>
 
-    <!-- HEADER -->
-    <header class="fixed top-0 w-full z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
-        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+    <!-- ================================================================================== -->
+    <!-- DOM STRUCTURE -->
+    <!-- ================================================================================== -->
+
+    <!-- 1. The Map -->
+    <div id="map-view"></div>
+
+    <!-- 2. Header / Status Bar -->
+    <header class="fixed top-0 left-0 w-full z-20 p-4 pointer-events-none">
+        <div class="glass-panel rounded-2xl p-3 flex justify-between items-center pointer-events-auto">
+            
+            <!-- Branding & Status -->
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <i class="ph-fill ph-moped text-white text-lg"></i>
+                <div class="relative w-10 h-10 flex items-center justify-center bg-slate-800 rounded-xl border border-slate-700">
+                    <span class="material-symbols-rounded text-blue-500">radar</span>
+                    <div id="status-indicator" class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900"></div>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold text-white leading-tight">LOGISTICS <span class="text-blue-500">CLOUD</span></h1>
-                    <div class="flex items-center gap-1">
-                        <span id="cloud-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-                        <span class="text-[10px] text-slate-400 font-mono tracking-wide" id="cloud-status">OFFLINE</span>
-                    </div>
+                    <h1 class="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">GEOGUARD</h1>
+                    <div id="connection-status" class="text-xs font-bold text-white">System Offline</div>
                 </div>
             </div>
-            <div id="gps-badge" class="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-yellow-500 flex items-center gap-1">
-                <i class="ph-bold ph-spinner animate-spin"></i> GPS
+
+            <!-- Global Actions -->
+            <div class="flex gap-2">
+                <button id="btn-drive-auth" onclick="GoogleDrive.authenticate()" class="flex items-center gap-2 px-3 py-2 bg-white text-slate-900 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-200 transition">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" class="w-4 h-4" alt="Drive">
+                    LOGIN
+                </button>
+                <button id="btn-sync" onclick="GoogleDrive.syncLogs()" disabled class="hidden items-center justify-center w-9 h-9 bg-slate-800 text-slate-400 rounded-lg border border-slate-700 disabled:opacity-50">
+                    <span class="material-symbols-rounded text-lg">cloud_upload</span>
+                </button>
             </div>
+        </div>
+
+        <!-- GPS Warning Banner (Conditional) -->
+        <div id="gps-warning" class="hidden mt-2 glass-panel bg-red-500/10 border-red-500/50 text-red-200 p-2 rounded-lg text-xs flex items-center justify-center gap-2">
+            <span class="material-symbols-rounded text-sm">satellite_alt</span>
+            <span>Weak GPS Signal (<span id="acc-reading">0</span>m). Accuracy required: < 10m</span>
         </div>
     </header>
 
-    <!-- MAIN CONTENT AREA -->
-    <main class="flex-1 max-w-md mx-auto w-full pt-20 pb-24 px-4 overflow-y-auto no-scrollbar">
-
-        <!-- === TAB 1: MAP & HOME === -->
-        <div id="tab-home" class="tab-content active space-y-5">
-            
-            <!-- RADAR MAP -->
-            <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden group">
-                <canvas id="radar-canvas" class="absolute inset-0 w-full h-full z-10 block"></canvas>
-                
-                <!-- HUD -->
-                <div class="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-black/60 backdrop-blur px-3 py-1 rounded-full border border-slate-700 text-xs font-mono text-cyan-400 flex items-center gap-2">
-                    <i class="ph-fill ph-compass"></i> <span id="val-heading">0</span>°
-                </div>
-                
-                <!-- Controls -->
-                <div class="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
-                    <button onclick="app.zoom(1)" class="w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center active:scale-95 shadow-lg"><i class="ph-bold ph-plus"></i></button>
-                    <button onclick="app.zoom(-1)" class="w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center active:scale-95 shadow-lg"><i class="ph-bold ph-minus"></i></button>
-                </div>
-                
-                <!-- Center User -->
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                    <div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
-                    <div class="absolute -top-16 -left-10 w-0 h-0 border-l-[40px] border-l-transparent border-r-[40px] border-r-transparent border-t-[80px] border-t-blue-500/10"></div>
-                </div>
-            </div>
-
-            <!-- ROUTING -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                <label class="text-[10px] uppercase text-slate-500 font-bold mb-2 block">Navigation</label>
-                <div class="flex gap-2">
-                    <select id="select-target" onchange="app.setTarget()" class="flex-1 bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-white">
-                        <option value="">-- Select Shop --</option>
-                    </select>
-                    <button onclick="app.openMaps()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"><i class="ph-bold ph-google-logo text-blue-400"></i></button>
-                </div>
-                <div id="nav-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-800 rounded-lg flex justify-between items-center">
-                    <div><div class="text-xs text-blue-400">Distance</div><div class="text-lg font-bold text-white font-mono"><span id="nav-dist">0</span>m</div></div>
-                    <div class="text-right"><div class="text-xs text-blue-400">Bearing</div><div class="text-lg font-bold text-white font-mono"><span id="nav-bear">0</span>°</div></div>
-                </div>
-            </div>
-
-            <!-- ACTION CARD -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-                <div class="bg-slate-800/50 p-4 border-b border-slate-800 flex justify-between items-center">
-                    <span class="text-xs font-bold text-slate-400 uppercase">Current Status</span>
-                    <span id="zone-status" class="px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500">OUTSIDE</span>
-                </div>
-                <div class="p-4 space-y-3">
-                    <div>
-                        <div class="text-[10px] text-slate-500 mb-1">LOCATION</div>
-                        <div id="current-loc-name" class="text-lg font-bold text-white truncate">Moving...</div>
-                        <div id="current-coords" class="text-xs font-mono text-slate-500">Waiting for GPS...</div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3 pt-2">
-                        <button onclick="app.openAddModal()" class="py-3 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700">SAVE SHOP</button>
-                        <button id="btn-order" onclick="app.openOrderModal()" disabled class="py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50">
-                            <i class="ph-bold ph-shopping-cart"></i> TAKE ORDER
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- === TAB 2: ORDER HISTORY === -->
-        <div id="tab-orders" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-blue-500 pl-3">Order History</h2>
-            
-            <!-- Filters -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Date</label>
-                        <input type="date" id="filter-date" onchange="app.renderOrders()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Shop</label>
-                        <select id="filter-shop" onchange="app.renderOrders()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
-                            <option value="all">All Shops</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- List -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden min-h-[300px]">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-950 text-slate-500">
-                        <tr><th class="px-4 py-2">Shop</th><th class="px-4 py-2">Items</th><th class="px-4 py-2 text-right">Amt</th></tr>
-                    </thead>
-                    <tbody id="order-list" class="divide-y divide-slate-800 text-slate-300">
-                        <!-- Injected -->
-                    </tbody>
-                    <tfoot class="bg-slate-950 text-white font-bold">
-                        <tr><td class="px-4 py-2" colspan="2">Total</td><td class="px-4 py-2 text-right text-emerald-400" id="order-total">₹0</td></tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-
-        <!-- === TAB 3: STORE MANAGEMENT === -->
-        <div id="tab-store" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">My Stores</h2>
-            <div id="store-list" class="space-y-3">
-                <!-- Injected Stores -->
-            </div>
-        </div>
-
-        <!-- === TAB 4: PROFILE === -->
-        <div id="tab-profile" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-purple-500 pl-3">Rider Profile</h2>
-            
-            <!-- Profile Card -->
-            <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 text-center">
-                <div class="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center border-2 border-slate-700">
-                    <i class="ph-fill ph-user text-4xl text-slate-500"></i>
-                </div>
-                <div class="space-y-3 text-left">
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Full Name</label>
-                        <input type="text" id="prof-name" placeholder="Enter Name" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Rider ID / Phone</label>
-                        <input type="text" id="prof-id" placeholder="ID12345" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">
-                    </div>
-                    <button onclick="app.saveProfile()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm">Update Profile</button>
-                </div>
-            </div>
-
-            <!-- Cloud Sync Control -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <h3 class="font-bold text-white mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-google-logo text-white"></i> Google Drive Backup
-                </h3>
-                <p class="text-xs text-slate-400 mb-4">Sync orders and locations to your Google Drive.</p>
-                
-                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded font-bold text-sm flex items-center justify-center gap-2 mb-2">
-                    <i class="ph-bold ph-sign-in"></i> Sign in with Google
-                </button>
-                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded font-bold text-sm flex items-center justify-center gap-2 border border-slate-700">
-                    <i class="ph-bold ph-arrows-clockwise"></i> Sync Now
-                </button>
-                <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500">Not connected</div>
-            </div>
-
-            <!-- Export -->
-            <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
-                <i class="ph-bold ph-file-csv"></i> EXPORT ALL DATA
-            </button>
-        </div>
-
-    </main>
-
-    <!-- BOTTOM NAVIGATION -->
-    <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-50 pb-safe">
-        <div class="max-w-md mx-auto flex justify-around items-center h-16">
-            <button onclick="app.switchTab('home')" class="nav-btn active flex flex-col items-center gap-1 text-slate-500 w-full" data-target="home">
-                <i class="ph-bold ph-map-trifold text-xl"></i><span class="text-[10px]">Map</span>
-            </button>
-            <button onclick="app.switchTab('orders')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="orders">
-                <i class="ph-bold ph-receipt text-xl"></i><span class="text-[10px]">Orders</span>
-            </button>
-            <button onclick="app.switchTab('store')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="store">
-                <i class="ph-bold ph-storefront text-xl"></i><span class="text-[10px]">Store</span>
-            </button>
-            <button onclick="app.switchTab('profile')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="profile">
-                <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- MODALS (Hidden) -->
-    <div id="modal-add" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-4">
-            <h3 class="font-bold text-white">Save Shop Location</h3>
-            <input type="text" id="input-loc-name" placeholder="Shop Name" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white">
-            <div class="flex gap-3"><button onclick="app.closeModals()" class="flex-1 py-2 border border-slate-700 text-slate-400 rounded">Cancel</button><button onclick="app.saveLocation()" class="flex-1 py-2 bg-blue-600 text-white rounded font-bold">Save</button></div>
-        </div>
-    </div>
-
-    <div id="modal-order" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-4">
-            <div class="border-b border-slate-800 pb-2"><div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div></div>
-            <textarea id="input-order-details" rows="3" placeholder="Order Items..." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white"></textarea>
-            <input type="number" id="input-order-amt" placeholder="Amount (₹)" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white">
-            <div class="flex gap-3"><button onclick="app.closeModals()" class="flex-1 py-2 border border-slate-700 text-slate-400 rounded">Cancel</button><button onclick="app.submitOrder()" class="flex-1 py-2 bg-emerald-600 text-white rounded font-bold">Confirm</button></div>
-        </div>
-    </div>
-
-    <div id="modal-wifi" class="modal fixed inset-0 z-[70] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6 text-center">
-        <div class="bg-slate-900 p-6 rounded-2xl border border-red-500 shadow-2xl max-w-xs">
-            <i class="ph-fill ph-wifi-slash text-4xl text-red-500 mb-4"></i>
-            <h2 class="text-lg font-bold text-white">Weak Signal</h2>
-            <p class="text-sm text-slate-300 mt-2 mb-4">Turn on Wi-Fi for location accuracy.</p>
-        </div>
-    </div>
-
-<script>
-/**
- * ==========================================================================================
- * GEOGUARD LOGISTICS PRO - CLOUD EDITION
- * ==========================================================================================
- */
-
-// --- CONFIGURATION ---
-const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
-const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-const DB_FILE_NAME = 'geoguard_db.json';
-
-// --- UTILS ---
-const Utils = {
-    getDist: (lat1, lon1, lat2, lon2) => {
-        const R = 6371e3; const rad = Math.PI/180;
-        const a = Math.sin((lat2-lat1)*rad/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin((lon2-lon1)*rad/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    },
-    getBearing: (lat1, lon1, lat2, lon2) => {
-        const rad = Math.PI/180; const deg = 180/Math.PI;
-        const y = Math.sin((lon2-lon1)*rad) * Math.cos(lat2*rad);
-        const x = Math.cos(lat1*rad)*Math.sin(lat2*rad) - Math.sin(lat1*rad)*Math.cos(lat2*rad)*Math.cos((lon2-lon1)*rad);
-        return (Math.atan2(y, x) * deg + 360) % 360;
-    },
-    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
-    fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
-};
-
-// --- GOOGLE DRIVE SERVICE ---
-class GoogleCloud {
-    constructor(storeInstance) {
-        this.store = storeInstance;
-        this.tokenClient = null;
-        this.accessToken = null;
-        this.isReady = false;
-        this.init();
-    }
-
-    init() {
-        // Load GIS
-        const check = setInterval(() => {
-            if (window.google && window.gapi) {
-                clearInterval(check);
-                this.initGapi();
-            }
-        }, 500);
-    }
-
-    initGapi() {
-        gapi.load('client', async () => {
-            await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-            this.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID, scope: SCOPES,
-                callback: (resp) => {
-                    if (resp.error) throw resp;
-                    this.accessToken = resp.access_token;
-                    this.updateUI(true);
-                    this.sync();
-                },
-            });
-            this.isReady = true;
-        });
-    }
-
-    login() {
-        if(!this.isReady) return alert("Google API loading...");
-        this.tokenClient.requestAccessToken({prompt: 'consent'});
-    }
-
-    updateUI(isLoggedIn) {
-        const btnLogin = document.getElementById('btn-glogin');
-        const btnSync = document.getElementById('btn-gsync');
-        const status = document.getElementById('cloud-status');
-        const dot = document.getElementById('cloud-dot');
-        const msg = document.getElementById('drive-msg');
-
-        if(isLoggedIn) {
-            btnLogin.classList.add('hidden');
-            btnSync.disabled = false;
-            btnSync.classList.replace('text-slate-500', 'text-white');
-            status.innerText = "CONNECTED";
-            dot.classList.replace('bg-slate-500', 'bg-emerald-500');
-            msg.innerText = "Ready to Sync";
-        }
-    }
-
-    async sync() {
-        const msg = document.getElementById('drive-msg');
-        msg.innerText = "Syncing...";
+    <!-- 3. Bottom HUD (Heads Up Display) -->
+    <footer class="fixed bottom-0 left-0 w-full z-20 p-4 pb-6 pointer-events-none">
         
-        try {
-            // 1. Search for DB file
-            const q = `name = '${DB_FILE_NAME}' and trashed = false`;
-            const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-            const files = res.result.files;
-
-            const localData = this.store.dump();
-
-            if (files && files.length > 0) {
-                // 2. File Exists - Update
-                const fileId = files[0].id;
-                await gapi.client.request({
-                    path: `/upload/drive/v3/files/${fileId}`,
-                    method: 'PATCH',
-                    params: { uploadType: 'media' },
-                    body: JSON.stringify(localData)
-                });
-                msg.innerText = "Sync Complete (Updated)";
-            } else {
-                // 3. Create New File
-                const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', new Blob([JSON.stringify(localData)], { type: 'application/json' }));
-
-                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + this.accessToken },
-                    body: form
-                });
-                msg.innerText = "Sync Complete (Created)";
-            }
-        } catch (e) {
-            console.error(e);
-            msg.innerText = "Sync Failed";
-        }
-    }
-}
-
-// --- DATA STORE ---
-class Store {
-    constructor() {
-        this.LOCS = 'geo_shops';
-        this.LOGS = 'geo_activity';
-        this.PROF = 'geo_profile';
-    }
-    getLocs() { return JSON.parse(localStorage.getItem(this.LOCS)) || []; }
-    saveLoc(l) { const d = this.getLocs(); d.push(l); localStorage.setItem(this.LOCS, JSON.stringify(d)); return d; }
-    updateLoc(l) { const d = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
-    deleteLoc(id) { const d = this.getLocs().filter(x => x.id !== id); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
-    
-    getLogs() { return JSON.parse(localStorage.getItem(this.LOGS)) || []; }
-    log(type, locName, details, amt=0) {
-        const l = { id: Utils.uuid(), type, loc: locName, desc: details, amt: amt, ts: Date.now(), date: Utils.fmtDate(Date.now()) };
-        const d = this.getLogs(); d.unshift(l); localStorage.setItem(this.LOGS, JSON.stringify(d));
-        return l;
-    }
-
-    getProfile() { return JSON.parse(localStorage.getItem(this.PROF)) || { name: '', id: '' }; }
-    saveProfile(p) { localStorage.setItem(this.PROF, JSON.stringify(p)); }
-
-    dump() {
-        return {
-            profile: this.getProfile(),
-            locations: this.getLocs(),
-            logs: this.getLogs(),
-            lastSync: Date.now()
-        };
-    }
-}
-
-// --- APP CONTROLLER ---
-class App {
-    constructor() {
-        this.store = new Store();
-        this.drive = new GoogleCloud(this.store);
-        window.drive = this.drive; // expose
-
-        // Geo Engine
-        this.latK = {x:NaN,p:1,q:0.001,r:0.01}; this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
-        this.pos = null; this.heading = 0; this.targetLoc = null; this.zoomLevel = 1;
-        this.locs = this.store.getLocs();
-
-        // Bind UI
-        this.initUI();
-        this.startGeo();
-        this.startCompass();
-    }
-
-    kalman(k, z) { if(isNaN(k.x)){k.x=z;return z} k.p+=k.q; const kg=k.p/(k.p+k.r); k.x+=kg*(z-k.x); k.p=(1-kg)*k.p; return k.x; }
-
-    initUI() {
-        // Render Profile
-        const p = this.store.getProfile();
-        document.getElementById('prof-name').value = p.name;
-        document.getElementById('prof-id').value = p.id;
-        
-        // Setup Date Filter
-        document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
-        
-        this.renderStores();
-        this.populateDropdowns();
-        this.resizeCanvas();
-        window.onresize = () => this.resizeCanvas();
-    }
-
-    // --- GEO LOGIC ---
-    startGeo() {
-        if(!navigator.geolocation) return alert("GPS Required");
-        navigator.geolocation.watchPosition(p => {
-            const {latitude, longitude, accuracy} = p.coords;
-            const lat = this.kalman(this.latK, latitude); const lng = this.kalman(this.lngK, longitude);
-            this.onGeo({lat, lng, acc: accuracy});
-        }, e => console.error(e), {enableHighAccuracy:true, timeout:15000});
-    }
-
-    startCompass() {
-        window.addEventListener('deviceorientation', e => {
-            this.heading = e.webkitCompassHeading || (e.alpha ? 360-e.alpha : 0);
-            document.getElementById('val-heading').innerText = Math.round(this.heading);
-            if(this.pos) this.drawRadar();
-        }, true);
-    }
-
-    onGeo(pos) {
-        this.pos = pos;
-        document.getElementById('current-coords').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
-        
-        // Wi-Fi Check
-        const wifiModal = document.getElementById('modal-wifi');
-        if(pos.acc > 40) wifiModal.classList.add('open'); else wifiModal.classList.remove('open');
-
-        // Check Geofences
-        this.checkGeofences(pos);
-        this.drawRadar();
-        
-        // Nav Info
-        if(this.targetLoc) {
-            const d = Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng);
-            document.getElementById('nav-dist').innerText = Math.round(d);
-            document.getElementById('nav-bear').innerText = Math.round(Utils.getBearing(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
-        }
-    }
-
-    checkGeofences(pos) {
-        let inside = false;
-        const radius = 20; // m
-        
-        this.locs.forEach(l => {
-            const dist = Utils.getDist(pos.lat, pos.lng, l.lat, l.lng);
-            const buff = pos.acc / 2;
-            const adj = Math.max(0, dist - buff);
-
-            if(!l.isInside && dist <= radius) {
-                l.isInside = true; l.entryTime = Date.now();
-                this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
-                this.store.updateLoc(l);
-            } else if(l.isInside && adj > (radius+10)) {
-                if(!l._exitT) l._exitT = Date.now();
-                if(Date.now() - l._exitT > 10000) { // 10s hysteresis
-                    l.isInside = false; l._exitT = null;
-                    const min = Math.round((Date.now()-l.entryTime)/60000);
-                    this.store.log('VISIT_OUT', l.name, `Duration: ${min}m`);
-                    this.store.updateLoc(l);
-                }
-            } else { l._exitT = null; }
-
-            if(l.isInside) {
-                inside = true;
-                document.getElementById('current-loc-name').innerText = l.name;
-                document.getElementById('zone-status').innerText = "INSIDE";
-                document.getElementById('zone-status').className = "px-2 py-1 bg-emerald-900/50 border border-emerald-500 rounded text-[10px] font-bold text-emerald-400";
-                document.getElementById('btn-order').disabled = false;
-                document.getElementById('btn-order').className = "py-3 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2";
-                document.getElementById('order-shop-name').innerText = l.name;
-            }
-        });
-
-        if(!inside) {
-            document.getElementById('current-loc-name').innerText = "In Transit";
-            document.getElementById('zone-status').innerText = "OUTSIDE";
-            document.getElementById('zone-status').className = "px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500";
-            document.getElementById('btn-order').disabled = true;
-            document.getElementById('btn-order').className = "py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2";
-        }
-    }
-
-    // --- TABS & UI ---
-    switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + tabId).classList.add('active');
-        
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            if(btn.dataset.target === tabId) {
-                btn.classList.add('text-blue-500'); btn.classList.remove('text-slate-500');
-            } else {
-                btn.classList.remove('text-blue-500'); btn.classList.add('text-slate-500');
-            }
-        });
-
-        if(tabId === 'orders') this.renderOrders();
-        if(tabId === 'store') this.renderStores();
-    }
-
-    populateDropdowns() {
-        const sel = document.getElementById('select-target');
-        const filter = document.getElementById('filter-shop');
-        let html = '<option value="">-- Select Shop --</option>';
-        let filterHtml = '<option value="all">All Shops</option>';
-        
-        this.locs.forEach(l => {
-            html += `<option value="${l.id}">${l.name}</option>`;
-            filterHtml += `<option value="${l.name}">${l.name}</option>`;
-        });
-        
-        sel.innerHTML = html;
-        filter.innerHTML = filterHtml;
-    }
-
-    // --- ORDER LOGIC ---
-    renderOrders() {
-        const date = document.getElementById('filter-date').value;
-        const shop = document.getElementById('filter-shop').value;
-        
-        const logs = this.store.getLogs();
-        const tbody = document.getElementById('order-list');
-        let total = 0;
-        
-        const filtered = logs.filter(l => {
-            if(l.type !== 'ORDER') return false;
-            if(l.date !== date) return false;
-            if(shop !== 'all' && l.loc !== shop) return false;
-            return true;
-        });
-
-        tbody.innerHTML = filtered.map(l => {
-            total += parseFloat(l.amt || 0);
-            return `
-                <tr class="border-b border-slate-800">
-                    <td class="px-4 py-3 font-bold text-white">${l.loc}</td>
-                    <td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${l.desc}</td>
-                    <td class="px-4 py-3 text-right text-emerald-400 font-mono">₹${l.amt}</td>
-                </tr>
-            `;
-        }).join('') || '<tr><td colspan="3" class="px-4 py-4 text-center text-slate-500">No Orders Found</td></tr>';
-
-        document.getElementById('order-total').innerText = `₹${total}`;
-    }
-
-    // --- STORE LOGIC ---
-    renderStores() {
-        const list = document.getElementById('store-list');
-        list.innerHTML = this.locs.map(l => `
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+        <!-- Active Shop Card (slides up when in range) -->
+        <div id="shop-card" class="translate-y-[120%] transition-transform duration-500 glass-panel rounded-2xl p-4 mb-3 border-l-4 border-emerald-500 pointer-events-auto shadow-2xl shadow-emerald-900/20">
+            <div class="flex justify-between items-start mb-2">
                 <div>
-                    <div class="font-bold text-white">${l.name}</div>
-                    <div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">Inside Zone</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Radar: &lt; 7m</span>
+                    </div>
+                    <h2 id="active-shop-name" class="text-xl font-bold text-white leading-tight">--</h2>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="app.navTo('${l.id}')" class="w-8 h-8 rounded bg-slate-800 border border-slate-700 text-blue-400"><i class="ph-bold ph-navigation-arrow"></i></button>
-                    <button onclick="app.delStore('${l.id}')" class="w-8 h-8 rounded bg-slate-800 border border-slate-700 text-red-400"><i class="ph-bold ph-trash"></i></button>
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400 uppercase">Time Spent</div>
+                    <div id="visit-timer" class="text-xl font-mono text-white font-bold">00:00</div>
                 </div>
             </div>
-        `).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores Saved</div>';
-    }
+            
+            <div class="grid grid-cols-2 gap-3 mt-4">
+                <button onclick="App.openOrderModal()" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
+                    <span class="material-symbols-rounded text-lg">shopping_cart</span> TAKE ORDER
+                </button>
+                <button onclick="App.ignoreStop()" class="py-3 bg-slate-800 border border-slate-700 text-slate-300 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+                    <span class="material-symbols-rounded text-lg">close</span> IGNORE
+                </button>
+            </div>
+        </div>
 
-    navTo(id) {
-        this.switchTab('home');
-        document.getElementById('select-target').value = id;
-        this.setTarget();
-    }
+        <!-- Navigation Info -->
+        <div class="glass-panel rounded-2xl p-4 pointer-events-auto">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
+                    <span class="material-symbols-rounded text-sm">near_me</span>
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <div id="geo-address" class="text-sm font-medium text-white truncate">Locating...</div>
+                    <div class="flex gap-3 text-[10px] text-slate-500 font-mono mt-0.5">
+                        <span id="geo-latlng">0.0000, 0.0000</span>
+                        <span class="text-slate-700">|</span>
+                        <span id="geo-speed">0 km/h</span>
+                    </div>
+                </div>
+                <button onclick="App.openAddShopModal()" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-white flex items-center justify-center active:scale-95 transition">
+                    <span class="material-symbols-rounded">add_location_alt</span>
+                </button>
+            </div>
+        </div>
+    </footer>
 
-    delStore(id) {
-        if(!confirm("Delete this store?")) return;
-        this.store.deleteLoc(id);
-        this.locs = this.store.getLocs();
-        this.populateDropdowns();
-        this.renderStores();
-    }
+    <!-- 4. Modals -->
+    
+    <!-- Order Modal -->
+    <div id="modal-order" class="modal-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="modal-content w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <span class="material-symbols-rounded text-emerald-500">receipt_long</span> New Order
+                </h3>
+                <button onclick="App.closeModals()" class="text-slate-500 hover:text-white"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Shop Name</label>
+                    <input type="text" id="order-shop-name" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-400 select-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Order Details</label>
+                    <textarea id="order-notes" rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 placeholder-slate-600" placeholder="List items here..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Total Amount</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-3 text-slate-500">₹</span>
+                        <input type="number" id="order-amount" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 pl-7 text-white focus:outline-none focus:border-blue-500 placeholder-slate-600" placeholder="0.00">
+                    </div>
+                </div>
+                <button onclick="App.submitOrder()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white mt-2">CONFIRM ORDER</button>
+            </div>
+        </div>
+    </div>
 
-    // --- CANVAS ---
-    resizeCanvas() {
-        const c = document.getElementById('radar-canvas');
-        c.width = c.parentElement.clientWidth; c.height = c.parentElement.clientHeight;
-        if(this.pos) this.drawRadar();
-    }
-    zoom(d) { this.zoomLevel = Math.max(0.5, Math.min(3, this.zoomLevel + d * 0.25)); this.drawRadar(); }
+    <!-- Add Shop Modal -->
+    <div id="modal-add-shop" class="modal-backdrop fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="modal-content w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-bold text-white">Add New Location</h3>
+                <button onclick="App.closeModals()" class="text-slate-500 hover:text-white"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4 bg-blue-900/20 p-3 rounded border border-blue-900/50">
+                You are about to save your current GPS location as a new shop node in the route file.
+            </p>
+            <input type="text" id="new-shop-name" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white mb-4 focus:outline-none focus:border-blue-500" placeholder="Enter Shop Name">
+            <button onclick="App.saveNewShop()" class="w-full py-3 bg-blue-600 rounded-xl font-bold text-white">SAVE LOCATION</button>
+        </div>
+    </div>
 
-    drawRadar() {
-        if(!this.pos) return;
-        const c = document.getElementById('radar-canvas'); const ctx = c.getContext('2d');
-        const w=c.width, h=c.height, cx=w/2, cy=h/2, sc = 2 * this.zoomLevel;
-        
-        ctx.clearRect(0,0,w,h);
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(-this.heading * Math.PI/180);
+    <!-- ================================================================================== -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ================================================================================== -->
+    <script>
+        /**
+         * --------------------------------------------------------------------------------
+         * CONFIGURATION & CONSTANTS
+         * --------------------------------------------------------------------------------
+         */
+        const CONFIG = {
+            // GOOGLE API KEYS (User must replace these for production)
+            // For Demo purposes, the simulated mode will run if these are invalid.
+            CLIENT_ID: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com', 
+            API_KEY: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE', 
+            SCOPES: 'https://www.googleapis.com/auth/drive.file',
 
-        // Grid
-        ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
-        [20,50,100].forEach(r => { ctx.beginPath(); ctx.arc(0,0,r*sc,0,Math.PI*2); ctx.stroke(); });
-        
-        // North
-        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-100*sc); ctx.strokeStyle='#ef4444'; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
 
-        // Locations
-        this.locs.forEach(l => {
-            const d = Utils.getDist(this.pos.lat, this.pos.lng, l.lat, l.lng);
-            const b = Utils.getBearing(this.pos.lat, this.pos.lng, l.lat, l.lng);
-            const rad = (b-90)*Math.PI/180;
-            const x = Math.cos(rad)*d*sc; const y = Math.sin(rad)*d*sc;
 
-            ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2);
-            ctx.fillStyle = l.isInside ? '#10b981' : (l.id === this.targetLoc?.id ? '#f59e0b' : '#3b82f6');
-            ctx.fill();
 
-            ctx.save(); ctx.translate(x,y); ctx.rotate(this.heading*Math.PI/180);
-            ctx.fillStyle='#fff'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-            ctx.fillText(l.name, 0, 15); ctx.restore();
-        });
 
-        // Route
-        if(this.targetLoc) {
-            const d = Utils.getDist(this.pos.lat, this.pos.lng, this.targetLoc.lat, this.targetLoc.lng);
-            const b = Utils.getBearing(this.pos.lat, this.pos.lng, this.targetLoc.lat, this.targetLoc.lng);
-            const rad = (b-90)*Math.PI/180;
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(rad)*d*sc, Math.sin(rad)*d*sc);
-            ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.stroke();
-        }
-        ctx.restore();
-    }
 
-    // --- ACTIONS ---
-    saveLocation() {
-        const n = document.getElementById('input-loc-name').value;
-        if(n && this.pos) {
-            this.store.saveLoc({id:Utils.uuid(), name:n, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now()});
-            this.locs = this.store.getLocs();
-            this.populateDropdowns();
-            this.closeModals();
-            document.getElementById('input-loc-name').value='';
-        }
-    }
 
-    submitOrder() {
-        const desc = document.getElementById('input-order-details').value;
-        const amt = document.getElementById('input-order-amt').value;
-        const shop = document.getElementById('order-shop-name').innerText;
-        if(desc && amt) {
-            this.store.log('ORDER', shop, desc, amt);
-            this.closeModals();
-            document.getElementById('input-order-details').value='';
-            document.getElementById('input-order-amt').value='';
-            this.renderOrders(); // if on orders tab
-        }
-    }
 
-    saveProfile() {
-        const p = {
-            name: document.getElementById('prof-name').value,
-            id: document.getElementById('prof-id').value
+
+            
+            
+            // GEOLOCATION SETTINGS
+            GPS_INTERVAL: 200,      // 200ms update rate
+            RADAR_RADIUS: 7,        // 7 meters strict
+            GPS_WARN_THRESHOLD: 15, // Warn if accuracy > 15m
+            HYSTERESIS: 3,          // Buffer to prevent flickering (7m + 3m exit buffer)
+            
+            // FILES
+            ROUTE_FILE_NAME: 'sales_route_sector_05.json',
+            LOG_FILE_PREFIX: 'sales_logs_'
         };
-        this.store.saveProfile(p);
-        alert("Profile Updated");
-    }
 
-    exportData() {
-        const logs = this.store.getLogs();
-        const prof = this.store.getProfile();
-        let csv = `RIDER PROFILE\nName,${prof.name}\nID,${prof.id}\n\nTYPE,LOCATION,DATE,DETAILS,AMOUNT\n`;
-        logs.forEach(l => {
-            csv += `${l.type},"${l.loc}",${new Date(l.ts).toISOString()},"${l.desc}",${l.amt||0}\n`;
-        });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-        a.download = `GeoLog_${prof.name || 'Export'}.csv`;
-        a.click();
-    }
+        /**
+         * --------------------------------------------------------------------------------
+         * UTILITY HELPERS
+         * --------------------------------------------------------------------------------
+         */
+        const Utils = {
+            /**
+             * Generates a unique ID
+             */
+            uuid: () => {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            },
 
-    setTarget() {
-        const id = document.getElementById('select-target').value;
-        this.targetLoc = id ? this.locs.find(l=>l.id===id) : null;
-        if(this.targetLoc) {
-            document.getElementById('nav-info').classList.remove('hidden');
-        } else {
-            document.getElementById('nav-info').classList.add('hidden');
-        }
-        this.drawRadar();
-    }
+            /**
+             * Haversine Formula for Distance (Meters)
+             */
+            getDistance: (lat1, lon1, lat2, lon2) => {
+                const R = 6371e3; // Earth radius in meters
+                const phi1 = lat1 * Math.PI/180;
+                const phi2 = lat2 * Math.PI/180;
+                const dPhi = (lat2-lat1) * Math.PI/180;
+                const dLambda = (lon2-lon1) * Math.PI/180;
 
-    openMaps() {
-        if(this.targetLoc) window.open(`https://www.google.com/maps/dir/?api=1&destination=${this.targetLoc.lat},${this.targetLoc.lng}`);
-        else alert("Select Shop");
-    }
+                const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) +
+                          Math.cos(phi1) * Math.cos(phi2) *
+                          Math.sin(dLambda/2) * Math.sin(dLambda/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; // Distance in meters
+            },
 
-    openAddModal(){document.getElementById('modal-add').classList.add('open')}
-    openOrderModal(){document.getElementById('modal-order').classList.add('open')}
-    closeModals(){document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'))}
-}
+            /**
+             * Debounce function to limit API calls (e.g., Reverse Geocoding)
+             */
+            debounce: (func, wait) => {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            },
 
-const app = new App();
-</script>
+            /**
+             * Date Formatter for Logs
+             */
+            timestamp: () => new Date().toISOString()
+        };
+
+        /**
+         * --------------------------------------------------------------------------------
+         * MODULE: GOOGLE DRIVE API (Storage)
+         * --------------------------------------------------------------------------------
+         */
+        const GoogleDrive = {
+            tokenClient: null,
+            accessToken: null,
+            isAuthenticated: false,
+            
+            init: () => {
+                // Initialize Google Identity Services
+                if(window.google) {
+                    try {
+                        GoogleDrive.tokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: CONFIG.CLIENT_ID,
+                            scope: CONFIG.SCOPES,
+                            callback: (tokenResponse) => {
+                                if (tokenResponse.error) {
+                                    console.error("Auth Error:", tokenResponse);
+                                    alert("Authentication failed.");
+                                    return;
+                                }
+                                GoogleDrive.accessToken = tokenResponse.access_token;
+                                GoogleDrive.isAuthenticated = true;
+                                GoogleDrive.onAuthSuccess();
+                            },
+                        });
+                        
+                        gapi.load('client', async () => {
+                            await gapi.client.init({
+                                apiKey: CONFIG.API_KEY,
+                                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                            });
+                        });
+                    } catch (e) {
+                        console.warn("Google API Init Failed (Running in Demo Mode)");
+                    }
+                }
+            },
+
+            authenticate: () => {
+                if(GoogleDrive.tokenClient) {
+                    GoogleDrive.tokenClient.requestAccessToken({prompt: 'consent'});
+                } else {
+                    // Fallback for Demo/Testing without keys
+                    const confirmDemo = confirm("Google API keys not configured or failed to load. Run in Offline/Demo mode?");
+                    if(confirmDemo) {
+                        GoogleDrive.isAuthenticated = true;
+                        GoogleDrive.onAuthSuccess();
+                    }
+                }
+            },
+
+            onAuthSuccess: () => {
+                // Update UI
+                const btn = document.getElementById('btn-drive-auth');
+                btn.innerHTML = `<span class="material-symbols-rounded text-green-600">check_circle</span> LINKED`;
+                btn.classList.add('bg-green-100', 'text-green-800');
+                
+                document.getElementById('btn-sync').classList.remove('hidden');
+                document.getElementById('connection-status').innerText = "Drive Connected";
+                document.getElementById('status-indicator').classList.replace('bg-red-500', 'bg-emerald-500');
+                
+                // Load Route
+                GoogleDrive.loadRoute();
+            },
+
+            /**
+             * Loads the JSON route file. 
+             * In production, this searches Drive. Here it mocks or fetches.
+             */
+            loadRoute: async () => {
+                // SIMULATION: If no real API, load mock data
+                if (!GoogleDrive.accessToken) {
+                    console.log("Loading Mock Route Data...");
+                    const mockRoute = {
+                        routeId: "R-101",
+                        routeName: "Sector 5 Demo Route",
+                        polyline: [
+                            {lat: 23.0210, lng: 72.5710}, {lat: 23.0215, lng: 72.5715},
+                            {lat: 23.0220, lng: 72.5720}, {lat: 23.0225, lng: 72.5725}
+                        ],
+                        shops: [
+                            { shopId: "S1", name: "Patel Super Mart", lat: 23.0220, lng: 72.5720, radius: 10 },
+                            { shopId: "S2", name: "Sharma General", lat: 23.0230, lng: 72.5730, radius: 10 }
+                        ]
+                    };
+                    App.loadRouteToMap(mockRoute);
+                    return;
+                }
+
+                // REAL API LOGIC
+                try {
+                    // 1. Search file
+                    const q = `name = '${CONFIG.ROUTE_FILE_NAME}' and trashed = false`;
+                    const response = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+                    const files = response.result.files;
+
+                    if (files && files.length > 0) {
+                        // 2. Get Content
+                        const fileId = files[0].id;
+                        const fileContent = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+                        App.loadRouteToMap(fileContent.result);
+                    } else {
+                        alert("Route file not found in Drive. Using empty state.");
+                    }
+                } catch (err) {
+                    console.error("Drive Load Error", err);
+                }
+            },
+
+            /**
+             * Appends logs to a file in Drive
+             */
+            syncLogs: async () => {
+                const logs = DataManager.getLogs();
+                if(logs.length === 0) return alert("No new logs to sync.");
+
+                const btn = document.getElementById('btn-sync');
+                btn.innerHTML = `<span class="material-symbols-rounded animate-spin">refresh</span>`;
+                
+                if (!GoogleDrive.accessToken) {
+                    // Demo Sync
+                    setTimeout(() => {
+                        alert(`Simulated Sync of ${logs.length} records.`);
+                        DataManager.clearLogs();
+                        btn.innerHTML = `<span class="material-symbols-rounded">cloud_upload</span>`;
+                    }, 1000);
+                    return;
+                }
+
+                // Real Sync: Create or Update Log File
+                try {
+                    const fileName = `${CONFIG.LOG_FILE_PREFIX}${new Date().toISOString().split('T')[0]}.json`;
+                    const content = JSON.stringify(logs, null, 2);
+                    
+                    const metadata = { name: fileName, mimeType: 'application/json' };
+                    const form = new FormData();
+                    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                    form.append('file', new Blob([content], { type: 'application/json' }));
+
+                    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + GoogleDrive.accessToken },
+                        body: form
+                    });
+
+                    DataManager.clearLogs();
+                    alert("Logs synced to Cloud successfully!");
+                } catch(e) {
+                    console.error(e);
+                    alert("Sync failed.");
+                } finally {
+                    btn.innerHTML = `<span class="material-symbols-rounded">cloud_upload</span>`;
+                }
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------------------
+         * MODULE: DATA MANAGER (Local State)
+         * --------------------------------------------------------------------------------
+         */
+        const DataManager = {
+            currentRoute: null,
+            logs: [],
+
+            init: () => {
+                // Recover logs from local storage if app crashed
+                const saved = localStorage.getItem('geo_unsynced_logs');
+                if(saved) DataManager.logs = JSON.parse(saved);
+            },
+
+            logActivity: (type, payload) => {
+                const entry = {
+                    id: Utils.uuid(),
+                    timestamp: Utils.timestamp(),
+                    type: type,
+                    data: payload,
+                    gps: GeoEngine.currentPos
+                };
+                console.log(`[LOG] ${type}`, entry);
+                DataManager.logs.push(entry);
+                localStorage.setItem('geo_unsynced_logs', JSON.stringify(DataManager.logs));
+            },
+
+            getLogs: () => DataManager.logs,
+            
+            clearLogs: () => {
+                DataManager.logs = [];
+                localStorage.removeItem('geo_unsynced_logs');
+            },
+
+            addShopLocally: (name, lat, lng) => {
+                // In a real app, this would append to the Route JSON in Drive.
+                // Here we add to local memory map.
+                const newShop = {
+                    shopId: "NEW_" + Date.now(),
+                    name: name,
+                    lat: lat,
+                    lng: lng,
+                    radius: 10
+                };
+                if(DataManager.currentRoute) {
+                    DataManager.currentRoute.shops.push(newShop);
+                }
+                MapRenderer.addShopMarker(newShop);
+                DataManager.logActivity('SHOP_CREATED', { name, lat, lng });
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------------------
+         * MODULE: MAP RENDERER (Leaflet Wrapper)
+         * --------------------------------------------------------------------------------
+         */
+        const MapRenderer = {
+            map: null,
+            userMarker: null,
+            routeLayer: null,
+            shopLayers: {},
+
+            init: () => {
+                // Initialize Map
+                MapRenderer.map = L.map('map-view', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([20.5937, 78.9629], 5); // Default India
+
+                // Dark Tile Layer (CartoDB Dark Matter)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    subdomains: 'abcd'
+                }).addTo(MapRenderer.map);
+
+                // Create User Marker (Custom HTML Pulse)
+                const pulseIcon = L.divIcon({
+                    className: 'radar-icon-pulse',
+                    html: '<div class="radar-icon-dot"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                MapRenderer.userMarker = L.marker([0, 0], { icon: pulseIcon }).addTo(MapRenderer.map);
+            },
+
+            updateUserPos: (lat, lng, accuracy) => {
+                const newLatLng = new L.LatLng(lat, lng);
+                MapRenderer.userMarker.setLatLng(newLatLng);
+                
+                // Only pan if we are tracking (optional logic, kept simple here)
+                // MapRenderer.map.panTo(newLatLng);
+            },
+
+            drawRoute: (routeData) => {
+                if(MapRenderer.routeLayer) MapRenderer.map.removeLayer(MapRenderer.routeLayer);
+                
+                // 1. Draw Polyline
+                const points = routeData.polyline.map(p => [p.lat, p.lng]);
+                MapRenderer.routeLayer = L.polyline(points, {
+                    color: '#3b82f6',
+                    weight: 3,
+                    opacity: 0.6,
+                    dashArray: '5, 10'
+                }).addTo(MapRenderer.map);
+
+                // 2. Draw Shops
+                routeData.shops.forEach(shop => MapRenderer.addShopMarker(shop));
+
+                // 3. Fit Bounds
+                if(points.length > 0) {
+                    MapRenderer.map.fitBounds(MapRenderer.routeLayer.getBounds(), { padding: [50, 50] });
+                }
+            },
+
+            addShopMarker: (shop) => {
+                // Radar Circle (7m Visual)
+                // Note: Leaflet meters usage
+                const circle = L.circle([shop.lat, shop.lng], {
+                    color: CONFIG.RADAR_RADIUS_COLOR_OFF || '#ef4444',
+                    fillColor: '#ef4444',
+                    fillOpacity: 0.2,
+                    radius: CONFIG.RADAR_RADIUS, 
+                    weight: 1
+                }).addTo(MapRenderer.map);
+
+                // Add Label
+                const label = L.marker([shop.lat, shop.lng], {
+                    icon: L.divIcon({
+                        className: 'text-label',
+                        html: `<div class="text-[10px] text-slate-400 bg-slate-900/80 px-1 rounded transform -translate-x-1/2 mt-2 border border-slate-700 whitespace-nowrap">${shop.name}</div>`
+                    })
+                }).addTo(MapRenderer.map);
+
+                MapRenderer.shopLayers[shop.shopId] = { circle, label, data: shop };
+            },
+
+            setShopStatus: (shopId, status) => {
+                const layer = MapRenderer.shopLayers[shopId];
+                if(!layer) return;
+                
+                if(status === 'INSIDE') {
+                    layer.circle.setStyle({ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.4 });
+                } else {
+                    layer.circle.setStyle({ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.2 });
+                }
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------------------
+         * MODULE: GEO ENGINE (Tracking Logic)
+         * --------------------------------------------------------------------------------
+         */
+        const GeoEngine = {
+            watchId: null,
+            currentPos: { lat: 0, lng: 0, acc: 0, speed: 0 },
+            activeShop: null,
+            visitStartTime: null,
+            timerInterval: null,
+
+            start: () => {
+                if (!navigator.geolocation) return alert("Geolocation not supported");
+
+                // 1. High Frequency Watcher
+                GeoEngine.watchId = navigator.geolocation.watchPosition(
+                    GeoEngine.onPosition,
+                    GeoEngine.onError,
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+
+                // 2. Logical Interval (Every 200ms)
+                setInterval(GeoEngine.processLogic, CONFIG.GPS_INTERVAL);
+            },
+
+            onPosition: (pos) => {
+                const { latitude, longitude, accuracy, speed } = pos.coords;
+                
+                GeoEngine.currentPos = { 
+                    lat: latitude, 
+                    lng: longitude, 
+                    acc: accuracy, 
+                    speed: speed || 0 
+                };
+
+                // UI Updates
+                MapRenderer.updateUserPos(latitude, longitude, accuracy);
+                App.updateHUD(GeoEngine.currentPos);
+
+                // GPS Warning
+                const warnEl = document.getElementById('gps-warning');
+                document.getElementById('acc-reading').innerText = Math.round(accuracy);
+                if(accuracy > CONFIG.GPS_WARN_THRESHOLD) {
+                    warnEl.classList.remove('hidden');
+                } else {
+                    warnEl.classList.add('hidden');
+                }
+
+                // Reverse Geocode (Debounced)
+                App.fetchAddress(latitude, longitude);
+            },
+
+            onError: (err) => {
+                console.warn("GPS Error", err);
+            },
+
+            /**
+             * The Core Logic Loop (200ms)
+             */
+            processLogic: () => {
+                const { lat, lng } = GeoEngine.currentPos;
+                if(lat === 0) return;
+
+                const shops = DataManager.currentRoute?.shops || [];
+                let insideAny = false;
+
+                for (let shop of shops) {
+                    const dist = Utils.getDistance(lat, lng, shop.lat, shop.lng);
+                    
+                    // RADAR CHECK
+                    if (dist <= CONFIG.RADAR_RADIUS) {
+                        insideAny = true;
+                        if (GeoEngine.activeShop?.shopId !== shop.shopId) {
+                            GeoEngine.handleEntry(shop);
+                        }
+                    }
+                }
+
+                // EXIT CHECK (With Hysteresis)
+                if (!insideAny && GeoEngine.activeShop) {
+                    const dist = Utils.getDistance(lat, lng, GeoEngine.activeShop.lat, GeoEngine.activeShop.lng);
+                    // Only exit if we are completely out (Radius + Buffer)
+                    if (dist > (CONFIG.RADAR_RADIUS + CONFIG.HYSTERESIS)) {
+                        GeoEngine.handleExit();
+                    }
+                }
+            },
+
+            handleEntry: (shop) => {
+                console.log(`ENTERED: ${shop.name}`);
+                GeoEngine.activeShop = shop;
+                GeoEngine.visitStartTime = Date.now();
+                
+                MapRenderer.setShopStatus(shop.shopId, 'INSIDE');
+                App.showShopCard(shop);
+                DataManager.logActivity('VISIT_ENTRY', { shopId: shop.shopId, name: shop.name });
+
+                // Start Timer
+                clearInterval(GeoEngine.timerInterval);
+                GeoEngine.timerInterval = setInterval(() => {
+                    const diff = Math.floor((Date.now() - GeoEngine.visitStartTime) / 1000);
+                    const m = Math.floor(diff / 60).toString().padStart(2, '0');
+                    const s = (diff % 60).toString().padStart(2, '0');
+                    document.getElementById('visit-timer').innerText = `${m}:${s}`;
+                }, 1000);
+            },
+
+            handleExit: () => {
+                if(!GeoEngine.activeShop) return;
+                console.log(`EXITED: ${GeoEngine.activeShop.name}`);
+                
+                const duration = (Date.now() - GeoEngine.visitStartTime) / 1000;
+                DataManager.logActivity('VISIT_EXIT', { 
+                    shopId: GeoEngine.activeShop.shopId, 
+                    durationSec: duration 
+                });
+
+                MapRenderer.setShopStatus(GeoEngine.activeShop.shopId, 'OUTSIDE');
+                App.hideShopCard();
+
+                GeoEngine.activeShop = null;
+                clearInterval(GeoEngine.timerInterval);
+            }
+        };
+
+        /**
+         * --------------------------------------------------------------------------------
+         * MODULE: APP CONTROLLER (Glue)
+         * --------------------------------------------------------------------------------
+         */
+        const App = {
+            init: () => {
+                DataManager.init();
+                GoogleDrive.init();
+                MapRenderer.init();
+                GeoEngine.start();
+                
+                // Initialize Address Fetcher
+                App.fetchAddress = Utils.debounce(App._fetchNominatim, 2000);
+            },
+
+            loadRouteToMap: (routeJson) => {
+                DataManager.currentRoute = routeJson;
+                MapRenderer.drawRoute(routeJson);
+            },
+
+            updateHUD: (pos) => {
+                document.getElementById('geo-latlng').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+                document.getElementById('geo-speed').innerText = `${Math.round(pos.speed * 3.6)} km/h`;
+            },
+
+            _fetchNominatim: async (lat, lng) => {
+                try {
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    const addr = data.address;
+                    const text = addr.road || addr.suburb || addr.village || "Unknown Road";
+                    document.getElementById('geo-address').innerText = text;
+                } catch(e) { /* Ignore network errors */ }
+            },
+
+            // --- UI ACTIONS ---
+
+            showShopCard: (shop) => {
+                const card = document.getElementById('shop-card');
+                document.getElementById('active-shop-name').innerText = shop.name;
+                card.classList.remove('translate-y-[120%]');
+            },
+
+            hideShopCard: () => {
+                document.getElementById('shop-card').classList.add('translate-y-[120%]');
+            },
+
+            ignoreStop: () => {
+                // Manually force exit
+                GeoEngine.handleExit();
+            },
+
+            // --- MODALS ---
+
+            openOrderModal: () => {
+                document.getElementById('modal-order').classList.add('active');
+                document.getElementById('order-shop-name').value = GeoEngine.activeShop?.name || "Unknown";
+            },
+
+            openAddShopModal: () => {
+                document.getElementById('modal-add-shop').classList.add('active');
+            },
+
+            closeModals: () => {
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.remove('active'));
+            },
+
+            submitOrder: () => {
+                const amount = document.getElementById('order-amount').value;
+                const notes = document.getElementById('order-notes').value;
+                
+                if(!amount) return alert("Please enter amount");
+
+                DataManager.logActivity('ORDER_TAKEN', {
+                    shop: GeoEngine.activeShop?.name,
+                    amount: amount,
+                    notes: notes
+                });
+
+                alert("Order Saved Locally (Sync pending)");
+                App.closeModals();
+                document.getElementById('order-amount').value = "";
+                document.getElementById('order-notes').value = "";
+            },
+
+            saveNewShop: () => {
+                const name = document.getElementById('new-shop-name').value;
+                if(!name) return alert("Name required");
+                
+                const { lat, lng } = GeoEngine.currentPos;
+                DataManager.addShopLocally(name, lat, lng);
+                
+                App.closeModals();
+                document.getElementById('new-shop-name').value = "";
+                alert("Location Saved. Added to current route.");
+            }
+        };
+
+        // Boot
+        window.addEventListener('load', App.init);
+
+    </script>
 </body>
 </html>
