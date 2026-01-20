@@ -592,48 +592,72 @@ class App {
         }
     }
 
-    checkGeofences(pos) {
+checkGeofences(pos) {
         let inside = false;
-        const radius = 20; 
         
+        // --- UPDATED CONFIGURATION ---
+        const radius = 5; // 5 meters radius (10m Diameter)
+        const exitBuffer = 5; // Must move 5m past the radius to exit (Total 10m distance)
+        // -----------------------------
+
         this.locs.forEach(l => {
             const dist = Utils.getDist(pos.lat, pos.lng, l.lat, l.lng);
+            
+            // Calculate buffer based on GPS accuracy to prevent false exits
             const buff = pos.acc / 2;
             const adj = Math.max(0, dist - buff);
 
+            // ENTRY LOGIC: Strict 5m radius
             if(!l.isInside && dist <= radius) {
-                l.isInside = true; l.entryTime = Date.now();
+                l.isInside = true; 
+                l.entryTime = Date.now();
                 this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
                 this.store.updateLoc(l);
-            } else if(l.isInside && adj > (radius+10)) {
+            } 
+            // EXIT LOGIC: Hysteresis (Radius + Buffer) to prevent flickering
+            else if(l.isInside && adj > (radius + exitBuffer)) {
                 if(!l._exitT) l._exitT = Date.now();
-                if(Date.now() - l._exitT > 10000) {
-                    l.isInside = false; l._exitT = null;
-                    const min = Math.round((Date.now()-l.entryTime)/60000);
+                
+                // Must be outside for 10 seconds to confirm exit
+                if(Date.now() - l._exitT > 10000) { 
+                    l.isInside = false; 
+                    l._exitT = null;
+                    const min = Math.round((Date.now() - l.entryTime)/60000);
                     this.store.log('VISIT_OUT', l.name, `Duration: ${min}m`);
                     this.store.updateLoc(l);
                 }
-            } else { l._exitT = null; }
+            } else { 
+                l._exitT = null; 
+            }
 
+            // UI UPDATES IF INSIDE
             if(l.isInside) {
                 inside = true;
                 document.getElementById('current-loc-name').innerText = l.name;
                 document.getElementById('zone-status').innerText = "INSIDE";
                 document.getElementById('zone-status').className = "px-2 py-1 bg-emerald-900/50 border border-emerald-500 rounded text-[10px] font-bold text-emerald-400";
-                document.getElementById('btn-order').disabled = false;
-                document.getElementById('btn-order').className = "py-3 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2";
+                
+                // Enable Order Button
+                const btn = document.getElementById('btn-order');
+                btn.disabled = false;
+                btn.className = "py-3 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse";
                 document.getElementById('order-shop-name').innerText = l.name;
             }
         });
 
+        // UI UPDATES IF OUTSIDE
         if(!inside) {
             document.getElementById('current-loc-name').innerText = "In Transit";
             document.getElementById('zone-status').innerText = "OUTSIDE";
             document.getElementById('zone-status').className = "px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500";
-            document.getElementById('btn-order').disabled = true;
-            document.getElementById('btn-order').className = "py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2";
+            
+            // Disable Order Button
+            const btn = document.getElementById('btn-order');
+            btn.disabled = true;
+            btn.className = "py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2";
         }
-        this.updateMapMarkers(); // Refresh colors on status change
+        
+        this.updateMapMarkers(); // Refresh map colors
     }
 
     // --- TABS & UI ---
