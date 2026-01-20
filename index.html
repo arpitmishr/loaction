@@ -2,669 +2,499 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#f9fafb">
-    <title>GeoGuard Logistics | Light Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ffffff">
+    <title>GeoGuard Logistics | Light</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#2563eb', // Blue 600
-                        secondary: '#475569', // Slate 600
-                        success: '#10b981', // Emerald 500
-                        danger: '#ef4444', // Red 500
-                        surface: '#ffffff',
-                        background: '#f9fafb' // Gray 50
-                    }
-                }
-            }
-        }
-    </script>
-
+    
     <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- LEAFLET MAPS CORE -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- LEAFLET MAPS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- LEAFLET ROUTING MACHINE (OSM Navigation) -->
+    <!-- ROUTING MACHINE -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
-    <!-- GOOGLE API SCRIPTS -->
+    <!-- GOOGLE API (Async) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <style>
-        /* BASE & RESET */
         body { -webkit-tap-highlight-color: transparent; user-select: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* TRANSITIONS */
-        .modal { transition: opacity 0.2s ease, transform 0.2s ease; opacity: 0; pointer-events: none; transform: scale(0.95); }
-        .modal.open { opacity: 1; pointer-events: auto; transform: scale(1); }
+        /* TAB ANIMATION */
         .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-content.active { display: block; animation: fadeEffect 0.2s; }
+        @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
 
-        /* MAP FIXES */
-        #osm-map { z-index: 1; background: #e5e7eb; width: 100%; height: 100%; }
+        /* MAP STYLES */
+        #map-container { position: relative; width: 100%; height: 65vh; background: #e5e7eb; border-radius: 1rem; overflow: hidden; z-index: 1; }
+        #osm-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
         
-        /* ROUTING MACHINE CUSTOMIZATION (LIGHT THEME) */
-        .leaflet-routing-container { 
-            background-color: white !important; 
-            color: #1f2937 !important; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 0.5rem !important;
-            margin-right: 10px !important;
-            display: none; /* Hide the text instructions to keep UI clean */
-        }
+        /* ROUTING HIDE TEXT */
+        .leaflet-routing-container { display: none !important; }
 
-        /* CUSTOM MARKER - DIRECTION ARROW */
-        .nav-arrow {
-            width: 0; 
-            height: 0; 
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 20px solid #2563eb;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-            position: relative;
-        }
-        .nav-arrow::after {
-            content: '';
-            position: absolute;
-            top: 20px; left: -8px;
-            width: 16px; height: 4px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 50%;
-        }
+        /* BUTTONS Z-INDEX FIX */
+        .map-control { z-index: 999 !important; position: absolute; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col">
 
     <!-- HEADER -->
-    <header class="fixed top-0 w-full z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+    <header class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
         <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <i class="ph-fill ph-navigation-arrow text-white text-xl"></i>
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                    <i class="ph-bold ph-map-pin"></i>
                 </div>
-                <div>
-                    <h1 class="text-sm font-bold text-gray-900 leading-tight">GEO<span class="text-blue-600">GUARD</span></h1>
-                    <div class="flex items-center gap-1.5">
-                        <span id="cloud-dot" class="w-2 h-2 rounded-full bg-gray-400"></span>
-                        <span class="text-[10px] text-gray-500 font-mono tracking-wide" id="cloud-status">OFFLINE</span>
-                    </div>
-                </div>
+                <h1 class="font-bold text-gray-900 text-sm">GEO<span class="text-blue-600">GUARD</span></h1>
             </div>
-            <div id="gps-badge" class="px-2 py-1 rounded bg-gray-100 border border-gray-200 text-[10px] font-mono text-orange-500 flex items-center gap-1">
-                <i class="ph-bold ph-spinner animate-spin"></i> GPS
+            <div class="flex items-center gap-2">
+                <span id="gps-status" class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded border border-orange-100">GPS..</span>
             </div>
         </div>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 max-w-md mx-auto w-full pt-20 pb-24 px-4 overflow-y-auto no-scrollbar">
+    <!-- MAIN -->
+    <main class="flex-1 w-full max-w-md mx-auto pt-16 pb-20 px-4 overflow-y-auto no-scrollbar">
 
-        <!-- === TAB 1: MAP === -->
+        <!-- === MAP TAB === -->
         <div id="tab-home" class="tab-content active space-y-4">
             
-            <!-- MAP CONTAINER -->
-            <!-- Explicit Height set to 60vh to prevent blank map -->
-            <div class="relative w-full h-[60vh] bg-gray-200 rounded-2xl border border-gray-300 shadow-md overflow-hidden">
+            <!-- MAP AREA -->
+            <div id="map-container" class="shadow-md border border-gray-300">
                 <div id="osm-map"></div>
-                
-                <!-- Map Controls -->
-                <button onclick="app.recenterMap()" class="absolute bottom-4 right-4 z-[400] w-12 h-12 bg-white border border-gray-200 rounded-full text-blue-600 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
-                    <i class="ph-bold ph-crosshair text-xl"></i>
-                </button>
-                
-                <!-- Zoom -->
-                <div class="absolute bottom-20 right-4 z-[400] flex flex-col gap-2">
-                    <button onclick="app.zoom(1)" class="w-10 h-10 bg-white border border-gray-200 rounded-full text-gray-700 flex items-center justify-center shadow-md"><i class="ph-bold ph-plus"></i></button>
-                    <button onclick="app.zoom(-1)" class="w-10 h-10 bg-white border border-gray-200 rounded-full text-gray-700 flex items-center justify-center shadow-md"><i class="ph-bold ph-minus"></i></button>
-                </div>
 
                 <!-- HUD -->
-                <div class="absolute top-4 left-4 z-[400] bg-white/90 backdrop-blur px-3 py-1 rounded-full border border-gray-200 text-xs font-bold text-gray-600 shadow-sm flex items-center gap-2">
-                    <i class="ph-fill ph-compass text-blue-500"></i> <span id="val-heading">0</span>°
+                <div class="map-control top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full border border-gray-200 text-xs font-bold shadow-sm">
+                    <i class="ph-bold ph-compass text-blue-600"></i> <span id="hud-heading">0</span>°
                 </div>
+
+                <!-- ZOOM BUTTONS -->
+                <div class="map-control bottom-20 right-3 flex flex-col gap-2">
+                    <button onclick="app.zoom(1)" class="w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 text-gray-700 flex items-center justify-center active:bg-gray-100">
+                        <i class="ph-bold ph-plus"></i>
+                    </button>
+                    <button onclick="app.zoom(-1)" class="w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 text-gray-700 flex items-center justify-center active:bg-gray-100">
+                        <i class="ph-bold ph-minus"></i>
+                    </button>
+                </div>
+
+                <!-- RECENTER BUTTON -->
+                <button onclick="app.recenter()" class="map-control bottom-4 right-3 w-12 h-12 bg-blue-600 rounded-full shadow-lg text-white flex items-center justify-center active:scale-95 transition-transform">
+                    <i class="ph-bold ph-crosshair text-xl"></i>
+                </button>
             </div>
 
-            <!-- NAVIGATION CARD -->
-            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                <div class="flex justify-between items-center mb-2">
-                    <label class="text-[10px] uppercase text-gray-500 font-bold tracking-wider">Navigate To</label>
-                    <span id="nav-status" class="text-[10px] text-gray-400">Select Shop</span>
-                </div>
+            <!-- CONTROLS -->
+            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                 
+                <!-- Target Select -->
                 <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <select id="select-target" onchange="app.setTarget()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none">
-                            <option value="">-- Select Destination --</option>
-                        </select>
-                        <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
-                    </div>
-                    <!-- External Link -->
-                    <button onclick="app.openExternalMaps()" class="bg-gray-100 hover:bg-gray-200 text-blue-600 px-3 py-2 rounded-lg border border-gray-300 transition-colors">
+                    <select id="sel-target" onchange="app.setRoute()" class="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-blue-500">
+                        <option value="">-- Select Destination --</option>
+                    </select>
+                    <button onclick="app.openExtMap()" class="bg-gray-100 text-blue-600 px-3 rounded-lg border border-gray-200">
                         <i class="ph-bold ph-arrow-square-out text-lg"></i>
                     </button>
                 </div>
 
-                <!-- Live Route Info -->
-                <div id="route-stats" class="hidden mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <div>
-                        <div class="text-[10px] text-gray-400 uppercase">Distance</div>
-                        <div class="text-lg font-bold text-blue-600 font-mono"><span id="dist-val">0</span> m</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-[10px] text-gray-400 uppercase">Est. Time</div>
-                        <div class="text-lg font-bold text-gray-800 font-mono"><span id="time-val">0</span> min</div>
-                    </div>
+                <!-- Route Info -->
+                <div id="route-info" class="hidden flex justify-between items-center text-sm pt-2 border-t border-gray-100">
+                    <span class="text-gray-500">Dist: <b class="text-gray-900" id="val-dist">0 m</b></span>
+                    <span class="text-gray-500">Time: <b class="text-gray-900" id="val-time">0 min</b></span>
                 </div>
-            </div>
 
-            <!-- LOCATION STATUS -->
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                <div class="bg-gray-50 p-3 border-b border-gray-200 flex justify-between items-center">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase">Geofence (5m Radius)</span>
-                    <span id="zone-status" class="px-2 py-0.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500">OUTSIDE</span>
-                </div>
-                <div class="p-4 space-y-3">
+                <!-- Status & Action -->
+                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                     <div>
-                        <div class="text-[10px] text-gray-400 font-bold">CURRENT LOCATION</div>
-                        <div id="curr-loc-name" class="text-lg font-bold text-gray-900 truncate">Locating...</div>
-                        <div class="flex items-center gap-2">
-                            <span id="curr-coords" class="text-xs font-mono text-gray-500 bg-gray-100 px-1 rounded">--.---, --.---</span>
-                            <span id="gps-acc" class="text-[10px] text-orange-500"></span>
-                        </div>
+                        <div class="text-[10px] text-gray-400 font-bold uppercase">Current Zone</div>
+                        <div id="zone-lbl" class="font-bold text-gray-800 text-sm">Outside</div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 pt-1">
-                        <button onclick="app.openModal('add')" class="py-3 rounded-lg border border-gray-300 bg-white text-gray-600 text-xs font-bold hover:bg-gray-50 shadow-sm">
-                            SAVE SPOT
-                        </button>
-                        <button id="btn-order" onclick="app.openModal('order')" disabled class="py-3 rounded-lg bg-gray-100 text-gray-400 border border-gray-200 text-xs font-bold flex items-center justify-center gap-2 shadow-inner disabled:cursor-not-allowed transition-all">
-                            <i class="ph-bold ph-shopping-cart"></i> ORDER
-                        </button>
-                    </div>
+                    <button id="btn-action" onclick="app.modal('order')" disabled class="px-4 py-2 bg-gray-200 text-gray-400 rounded-lg text-xs font-bold disabled:cursor-not-allowed transition-colors">
+                        TAKE ORDER
+                    </button>
                 </div>
+                
+                <button onclick="app.modal('add')" class="w-full py-3 border border-gray-300 rounded-lg text-gray-600 font-bold text-xs hover:bg-gray-50">
+                    + SAVE CURRENT LOCATION
+                </button>
             </div>
         </div>
 
-        <!-- === TAB 2: ORDERS === -->
-        <div id="tab-orders" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-gray-900 px-1">Order History</h2>
-            
-            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold">Date</label>
-                        <input type="date" id="filter-date" onchange="app.renderOrders()" class="w-full bg-gray-50 border border-gray-300 rounded p-2 text-xs text-gray-900">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold">Shop</label>
-                        <select id="filter-shop" onchange="app.renderOrders()" class="w-full bg-gray-50 border border-gray-300 rounded p-2 text-xs text-gray-900">
-                            <option value="all">All Shops</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm min-h-[300px]">
+        <!-- === ORDERS TAB === -->
+        <div id="tab-orders" class="tab-content space-y-3">
+            <h2 class="font-bold text-lg">Order History</h2>
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden min-h-[50vh]">
                 <table class="w-full text-left text-xs">
-                    <thead class="bg-gray-50 text-gray-500 border-b border-gray-200">
-                        <tr><th class="px-4 py-3">Shop</th><th class="px-4 py-3">Details</th><th class="px-4 py-3 text-right">Amt</th></tr>
+                    <thead class="bg-gray-50 border-b border-gray-200 text-gray-500">
+                        <tr><th class="p-3">Loc</th><th class="p-3">Desc</th><th class="p-3 text-right">₹</th></tr>
                     </thead>
-                    <tbody id="order-list" class="divide-y divide-gray-100 text-gray-700">
-                        <!-- JS Injected -->
-                    </tbody>
-                    <tfoot class="bg-gray-50 font-bold text-gray-900 border-t border-gray-200">
-                        <tr><td colspan="2" class="px-4 py-3">Total</td><td class="px-4 py-3 text-right text-emerald-600" id="order-total">₹0</td></tr>
-                    </tfoot>
+                    <tbody id="list-orders" class="divide-y divide-gray-100"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- === TAB 3: STORES === -->
-        <div id="tab-store" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-gray-900 px-1">Saved Stores</h2>
-            <div id="store-list" class="space-y-3">
-                <!-- JS Injected -->
-            </div>
+        <!-- === STORES TAB === -->
+        <div id="tab-stores" class="tab-content space-y-3">
+            <h2 class="font-bold text-lg">Saved Stores</h2>
+            <div id="list-stores" class="space-y-2 pb-4"></div>
         </div>
 
-        <!-- === TAB 4: PROFILE === -->
-        <div id="tab-profile" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-gray-900 px-1">Settings</h2>
+        <!-- === SETTINGS TAB === -->
+        <div id="tab-settings" class="tab-content space-y-4">
+            <h2 class="font-bold text-lg">Profile & Sync</h2>
             
-            <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm text-center">
-                <div class="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-3 flex items-center justify-center border border-gray-200">
-                    <i class="ph-fill ph-user text-3xl text-gray-400"></i>
+            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                <div>
+                    <label class="text-xs font-bold text-gray-500">Name</label>
+                    <input id="inp-pname" type="text" class="w-full p-2 border border-gray-300 rounded bg-gray-50 mt-1">
                 </div>
-                <div class="space-y-3 text-left">
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold">Name</label>
-                        <input type="text" id="prof-name" class="w-full bg-gray-50 border border-gray-300 rounded p-2 text-gray-900 text-sm">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-gray-500 uppercase font-bold">ID</label>
-                        <input type="text" id="prof-id" class="w-full bg-gray-50 border border-gray-300 rounded p-2 text-gray-900 text-sm">
-                    </div>
-                    <button onclick="app.saveProfile()" class="w-full py-2 bg-blue-600 text-white rounded font-bold text-sm shadow-sm hover:bg-blue-700">Save</button>
-                </div>
+                <button onclick="app.saveProf()" class="w-full py-2 bg-blue-600 text-white rounded font-bold text-sm">Save Profile</button>
             </div>
 
             <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <h3 class="font-bold text-gray-900 mb-2 flex items-center gap-2"><i class="ph-bold ph-google-logo"></i> Cloud Backup</h3>
-                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white border border-gray-300 text-gray-700 rounded font-bold text-sm mb-2 flex justify-center gap-2 hover:bg-gray-50">
-                    <img src="https://www.google.com/favicon.ico" class="w-4 h-4"> Sign In
+                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 border border-gray-300 rounded font-bold text-sm flex justify-center gap-2 mb-2">
+                    <i class="ph-bold ph-google-logo"></i> Login Google
                 </button>
-                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-gray-100 text-gray-400 border border-gray-200 rounded font-bold text-sm flex justify-center gap-2">
-                    <i class="ph-bold ph-arrows-clockwise"></i> Sync
+                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-gray-100 text-gray-400 rounded font-bold text-sm">
+                    Sync Data
                 </button>
-                <div id="drive-msg" class="text-[10px] text-center mt-2 text-gray-400">Disconnected</div>
+                <p id="sync-msg" class="text-center text-[10px] text-gray-400 mt-2">Offline</p>
             </div>
-
-            <button onclick="app.exportCSV()" class="w-full py-3 bg-white border border-gray-300 text-emerald-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50">
-                <i class="ph-bold ph-file-csv text-xl"></i> Export Data
+            
+             <button onclick="app.exportCSV()" class="w-full py-3 bg-white border border-gray-300 text-green-600 font-bold rounded-xl">
+                Export CSV
             </button>
         </div>
 
     </main>
 
-    <!-- BOTTOM NAV -->
+    <!-- NAV BAR -->
     <nav class="fixed bottom-0 w-full bg-white border-t border-gray-200 z-50 pb-safe">
-        <div class="max-w-md mx-auto flex justify-around h-16 items-center">
-            <button onclick="app.tab('home')" class="nav-btn active flex flex-col items-center gap-1 w-full text-gray-400 hover:text-blue-600 transition-colors" data-target="home">
+        <div class="flex justify-around items-center h-16 max-w-md mx-auto">
+            <button onclick="app.tab('home')" class="nav-btn text-blue-600 flex flex-col items-center w-full" data-t="home">
                 <i class="ph-fill ph-map-trifold text-2xl"></i><span class="text-[10px] font-bold">Map</span>
             </button>
-            <button onclick="app.tab('orders')" class="nav-btn flex flex-col items-center gap-1 w-full text-gray-400 hover:text-blue-600 transition-colors" data-target="orders">
+            <button onclick="app.tab('orders')" class="nav-btn text-gray-400 flex flex-col items-center w-full" data-t="orders">
                 <i class="ph-fill ph-receipt text-2xl"></i><span class="text-[10px] font-bold">Orders</span>
             </button>
-            <button onclick="app.tab('store')" class="nav-btn flex flex-col items-center gap-1 w-full text-gray-400 hover:text-blue-600 transition-colors" data-target="store">
+            <button onclick="app.tab('stores')" class="nav-btn text-gray-400 flex flex-col items-center w-full" data-t="stores">
                 <i class="ph-fill ph-storefront text-2xl"></i><span class="text-[10px] font-bold">Stores</span>
             </button>
-            <button onclick="app.tab('profile')" class="nav-btn flex flex-col items-center gap-1 w-full text-gray-400 hover:text-blue-600 transition-colors" data-target="profile">
-                <i class="ph-fill ph-user-circle text-2xl"></i><span class="text-[10px] font-bold">Profile</span>
+            <button onclick="app.tab('settings')" class="nav-btn text-gray-400 flex flex-col items-center w-full" data-t="settings">
+                <i class="ph-fill ph-user-circle text-2xl"></i><span class="text-[10px] font-bold">Settings</span>
             </button>
         </div>
     </nav>
 
     <!-- MODALS -->
-    <div id="modal-add" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
-            <h3 class="font-bold text-gray-900 mb-1">Save Location</h3>
-            <p class="text-xs text-gray-500 mb-4">Coords: <span id="save-coords" class="font-mono">--</span></p>
-            <input type="text" id="inp-name" placeholder="Shop Name" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-gray-900 mb-4 outline-none focus:border-blue-500">
-            <div class="flex gap-3">
-                <button onclick="app.closeModals()" class="flex-1 py-3 text-gray-500 font-bold">Cancel</button>
-                <button onclick="app.saveLoc()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">Save</button>
+    <div id="modal-add" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl">
+            <h3 class="font-bold mb-4">Save Location</h3>
+            <input id="add-name" type="text" placeholder="Shop Name" class="w-full p-3 border border-gray-300 rounded-lg mb-4 outline-none">
+            <div class="flex gap-2">
+                <button onclick="app.closeModal()" class="flex-1 py-3 text-gray-500 font-bold">Cancel</button>
+                <button onclick="app.saveLoc()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold">Save</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-order" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
-            <h3 class="font-bold text-gray-900 text-lg mb-4">New Order</h3>
-            <div class="bg-gray-50 p-2 rounded border border-gray-200 mb-3 text-xs text-gray-500">
-                Shop: <span id="ord-shop" class="font-bold text-gray-800">--</span>
-            </div>
-            <textarea id="ord-desc" rows="2" placeholder="Items..." class="w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 mb-3 outline-none focus:border-blue-500"></textarea>
-            <input type="number" id="ord-amt" placeholder="Amount (₹)" class="w-full bg-white border border-gray-300 rounded-lg p-3 text-gray-900 mb-4 outline-none focus:border-blue-500">
-            <div class="flex gap-3">
-                <button onclick="app.closeModals()" class="flex-1 py-3 text-gray-500 font-bold">Cancel</button>
-                <button onclick="app.saveOrder()" class="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold">Confirm</button>
+    <div id="modal-order" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-xl p-5 shadow-2xl">
+            <h3 class="font-bold mb-2">New Order</h3>
+            <div class="text-xs text-gray-500 mb-3">Shop: <span id="ord-shop" class="font-bold text-gray-800">--</span></div>
+            <textarea id="ord-desc" rows="2" placeholder="Details" class="w-full p-3 border border-gray-300 rounded-lg mb-3"></textarea>
+            <input id="ord-amt" type="number" placeholder="Amount" class="w-full p-3 border border-gray-300 rounded-lg mb-4">
+            <div class="flex gap-2">
+                <button onclick="app.closeModal()" class="flex-1 py-3 text-gray-500 font-bold">Cancel</button>
+                <button onclick="app.saveOrd()" class="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold">Confirm</button>
             </div>
         </div>
     </div>
 
 <script>
 /**
- * GEOGUARD LITE (Light Mode)
- * Fixes: Map Blank Issue, Rotation Stability, OSM Integration
+ * GEOGUARD LOGISTICS - FIXED VERSION
  */
 
-// CONFIG
-const CFG = {
-    GAPI_KEY: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE',
-    GCLIENT_ID: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
-    DB_NAME: 'geoguard_lite.json',
-    GEO_RAD: 5, // 5m radius (10m diam)
-    GPS_OPT: { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+// DATA & UTILS
+const DB = {
+    get: () => JSON.parse(localStorage.getItem('geo_db')) || { locs:[], logs:[], prof:{name:''} },
+    save: (d) => localStorage.setItem('geo_db', JSON.stringify(d)),
+    dist: (lat1,lon1,lat2,lon2) => {
+        const R=6371e3, r=Math.PI/180, a=Math.sin((lat2-lat1)*r/2)**2 + Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin((lon2-lon1)*r/2)**2;
+        return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+    }
 };
 
-// UTILS
-const U = {
-    id: () => Math.random().toString(36).substr(2, 9),
-    dist: (l1, n1, l2, n2) => {
-        const R = 6371e3, r = Math.PI/180, a = Math.sin((l2-l1)*r/2)**2 + Math.cos(l1*r)*Math.cos(l2*r)*Math.sin((n2-n1)*r/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    },
-    date: () => new Date().toISOString().split('T')[0]
-};
-
-// GOOGLE DRIVE
+// GOOGLE DRIVE (Safe Mode)
 const Drive = {
-    token: null,
-    init: function() {
-        const i = setInterval(() => {
-            if(window.google && window.gapi) { clearInterval(i); this.load(); }
-        }, 500);
+    inited: false, token: null,
+    login: function() { 
+        if(window.google) {
+            google.accounts.oauth2.initTokenClient({
+                client_id: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
+                scope: 'https://www.googleapis.com/auth/drive.file',
+                callback: (r)=>{ this.token=r.access_token; this.ui(true); }
+            }).requestAccessToken({prompt:'consent'});
+        } else { alert("Google Services Loading..."); }
     },
-    load: function() {
-        gapi.load('client', async () => {
-            await gapi.client.init({ apiKey: CFG.GAPI_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-            this.client = google.accounts.oauth2.initTokenClient({
-                client_id: CFG.GCLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file',
-                callback: (r) => { this.token = r.access_token; this.ui(true); this.sync(); }
-            });
-        });
-    },
-    login: function() { this.client.requestAccessToken({prompt:'consent'}); },
     ui: function(on) {
-        if(on) {
-            document.getElementById('btn-glogin').classList.add('hidden');
-            document.getElementById('btn-gsync').disabled = false;
-            document.getElementById('btn-gsync').classList.replace('bg-gray-100','bg-blue-600');
-            document.getElementById('btn-gsync').classList.replace('text-gray-400','text-white');
-            document.getElementById('cloud-status').innerText = "ONLINE";
-            document.getElementById('cloud-dot').classList.replace('bg-gray-400','bg-emerald-500');
-        }
+        document.getElementById('btn-glogin').classList.add('hidden');
+        const b = document.getElementById('btn-gsync');
+        b.disabled=false; b.classList.replace('bg-gray-100','bg-blue-600'); b.classList.replace('text-gray-400','text-white');
+        document.getElementById('sync-msg').innerText = "Ready";
     },
     sync: async function() {
-        document.getElementById('drive-msg').innerText = "Syncing...";
+        const msg = document.getElementById('sync-msg'); msg.innerText="Syncing...";
         try {
-            const list = await gapi.client.drive.files.list({ q: `name = '${CFG.DB_NAME}' and trashed = false` });
-            const data = app.dump();
-            const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
-            
-            if(list.result.files.length > 0) {
-                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${list.result.files[0].id}?uploadType=media`, {
-                    method: 'PATCH', headers: {'Authorization':`Bearer ${this.token}`}, body: blob
-                });
-            } else {
+            gapi.client.init({apiKey:'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE', discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']})
+            .then(async ()=>{
+                const file = new Blob([JSON.stringify(DB.get())], {type:'application/json'});
                 const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify({name: CFG.DB_NAME})], {type:'application/json'}));
-                form.append('file', blob);
+                form.append('metadata', new Blob([JSON.stringify({name:'geoguard_lite.json'})], {type:'application/json'}));
+                form.append('file', file);
                 await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST', headers: {'Authorization':`Bearer ${this.token}`}, body: form
+                    method:'POST', headers:{'Authorization':`Bearer ${this.token}`}, body:form
                 });
-            }
-            document.getElementById('drive-msg').innerText = "Synced: " + new Date().toLocaleTimeString();
-        } catch(e) { console.error(e); document.getElementById('drive-msg').innerText = "Error"; }
+                msg.innerText="Synced: "+new Date().toLocaleTimeString();
+            });
+        } catch(e) { msg.innerText="Sync Error"; console.error(e); }
     }
 };
 
-// MAIN APP
-class App {
+// APP LOGIC
+class Application {
     constructor() {
-        this.data = JSON.parse(localStorage.getItem('geo_data')) || { locs:[], logs:[], prof:{name:'',id:''} };
+        this.data = DB.get();
         this.pos = null;
-        this.head = 0;
         this.target = null;
         this.map = null;
-        this.userMk = null;
-        this.mks = {};
-        this.route = null;
-        
-        this.initUI();
+        this.userMark = null;
+        this.routeCtrl = null;
+        this.markers = {};
+
         this.initMap();
         this.startGPS();
-        this.startCompass();
-        Drive.init();
-    }
-
-    save() { localStorage.setItem('geo_data', JSON.stringify(this.data)); }
-    dump() { return this.data; }
-
-    initUI() {
-        document.getElementById('prof-name').value = this.data.prof.name;
-        document.getElementById('prof-id').value = this.data.prof.id;
-        document.getElementById('filter-date').value = U.date();
-        this.renderStores();
-        this.updateSelects();
+        this.renderLists();
+        
+        // Init Google silently
+        setTimeout(()=> { if(window.gapi) gapi.load('client', ()=>{}); }, 1000);
     }
 
     initMap() {
         // Init Leaflet
         this.map = L.map('osm-map', { zoomControl: false }).setView([20, 78], 5);
         
-        // CartoDB Positron (Light Theme)
+        // Add Tiles (CartoDB Light)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OSM &copy; CARTO', maxZoom: 20
+            maxZoom: 20, attribution: '©OSM'
         }).addTo(this.map);
 
-        // User Marker (Arrow)
-        const icon = L.divIcon({ className: 'bg-transparent', html: '<div id="user-arrow" class="nav-arrow"></div>', iconSize: [0,0] });
-        this.userMk = L.marker([0,0], {icon: icon, zIndexOffset: 1000}).addTo(this.map);
-
-        this.renderMks();
-    }
-
-    renderMks() {
-        Object.values(this.mks).forEach(m => this.map.removeLayer(m));
-        this.mks = {};
-        this.data.locs.forEach(l => {
-            const col = l.isInside ? '#10b981' : (this.target?.id===l.id ? '#f59e0b' : '#3b82f6');
-            const html = `<div class="w-3 h-3 rounded-full border border-white shadow-md" style="background:${col}"></div>`;
-            const icon = L.divIcon({ className:'bg-transparent', html:html, iconSize:[12,12] });
-            this.mks[l.id] = L.marker([l.lat, l.lng], {icon:icon}).addTo(this.map).bindPopup(l.name);
-        });
+        // User Marker
+        this.userMark = L.marker([0,0], {
+            icon: L.divIcon({className:'bg-transparent', html:'<div class="w-4 h-4 bg-blue-600 border-2 border-white rounded-full shadow-lg"></div>'})
+        }).addTo(this.map);
+        
+        this.drawMarkers();
     }
 
     startGPS() {
         if(navigator.geolocation) {
             navigator.geolocation.watchPosition(p => {
                 const {latitude:lat, longitude:lng, accuracy:acc} = p.coords;
-                const first = !this.pos;
-                this.pos = {lat, lng, acc};
+                const isFirst = !this.pos;
+                this.pos = {lat, lng};
                 
-                // UI Updates
-                document.getElementById('curr-coords').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                document.getElementById('gps-acc').innerText = `±${Math.round(acc)}m`;
-                document.getElementById('save-coords').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                // UI
+                document.getElementById('gps-status').innerText = `GPS: ±${Math.round(acc)}m`;
+                document.getElementById('gps-status').classList.replace('text-orange-500','text-green-600');
                 
-                // Map Updates
-                this.userMk.setLatLng([lat, lng]);
-                if(first) this.map.setView([lat, lng], 18);
+                // Map
+                this.userMark.setLatLng([lat,lng]);
+                if(isFirst) this.map.setView([lat,lng], 16);
                 
-                this.checkGeo();
-                this.updateRoute();
+                // Logic
+                this.checkZone();
+                if(this.routeCtrl && this.target) this.routeCtrl.setWaypoints([L.latLng(lat,lng), L.latLng(this.target.lat,this.target.lng)]);
 
-            }, e => console.log(e), CFG.GPS_OPT);
-        }
-    }
-
-    startCompass() {
-        window.addEventListener('deviceorientation', e => {
-            this.head = e.webkitCompassHeading || Math.abs(e.alpha - 360) || 0;
-            document.getElementById('val-heading').innerText = Math.round(this.head);
+            }, e => console.warn(e), {enableHighAccuracy:true});
             
-            // Rotate the Arrow Marker CSS, not the Map (More stable)
-            const arrow = document.getElementById('user-arrow');
-            if(arrow) arrow.style.transform = `rotate(${this.head}deg)`;
-        }, true);
-    }
-
-    checkGeo() {
-        if(!this.pos) return;
-        let inside = false;
-        
-        this.data.locs.forEach(l => {
-            const d = U.dist(this.pos.lat, this.pos.lng, l.lat, l.lng);
-            if(!l.isInside && d <= CFG.GEO_RAD) {
-                l.isInside = true; l.tIn = Date.now();
-                this.data.logs.unshift({type:'VISIT_IN', loc:l.name, desc:`Acc: ${Math.round(this.pos.acc)}m`, ts:Date.now(), date:U.date()});
-                this.save(); this.renderMks();
-            } else if(l.isInside && d > (CFG.GEO_RAD+5)) {
-                l.isInside = false;
-                const min = Math.round((Date.now()-l.tIn)/60000);
-                this.data.logs.unshift({type:'VISIT_OUT', loc:l.name, desc:`${min} mins`, ts:Date.now(), date:U.date()});
-                this.save(); this.renderMks();
-            }
-            if(l.isInside) {
-                inside = true;
-                this.updateZone(true, l.name);
-            }
-        });
-        
-        if(!inside) this.updateZone(false);
-    }
-
-    updateZone(is, name) {
-        const z = document.getElementById('zone-status');
-        const b = document.getElementById('btn-order');
-        if(is) {
-            z.innerText = "INSIDE"; z.className = "px-2 py-0.5 bg-emerald-100 border border-emerald-200 rounded text-[10px] font-bold text-emerald-600";
-            document.getElementById('curr-loc-name').innerText = name;
-            document.getElementById('ord-shop').innerText = name;
-            b.disabled = false; b.classList.replace('bg-gray-100','bg-emerald-600'); b.classList.replace('text-gray-400','text-white');
-        } else {
-            z.innerText = "OUTSIDE"; z.className = "px-2 py-0.5 bg-gray-200 rounded text-[10px] font-bold text-gray-500";
-            document.getElementById('curr-loc-name').innerText = "In Transit";
-            b.disabled = true; b.classList.replace('bg-emerald-600','bg-gray-100'); b.classList.replace('text-white','text-gray-400');
+            // Compass
+            window.addEventListener('deviceorientation', e => {
+                const h = e.webkitCompassHeading || Math.abs(e.alpha-360);
+                if(h) document.getElementById('hud-heading').innerText = Math.round(h);
+            }, true);
         }
     }
 
-    // ROUTING
-    setTarget() {
-        const id = document.getElementById('select-target').value;
-        this.target = this.data.locs.find(l => l.id === id);
+    drawMarkers() {
+        // Clear
+        for(let k in this.markers) this.map.removeLayer(this.markers[k]);
+        this.markers = {};
         
-        if(this.route) { this.map.removeControl(this.route); this.route = null; }
-        document.getElementById('route-stats').classList.add('hidden');
-        this.renderMks(); // Reset colors
+        // Add
+        this.data.locs.forEach(l => {
+            const col = l.isInside ? '#10b981' : (this.target?.id===l.id ? '#f59e0b' : '#3b82f6');
+            const icon = L.divIcon({className:'bg-transparent', html:`<div class="w-3 h-3 rounded-full border border-white shadow" style="background:${col}"></div>`});
+            const m = L.marker([l.lat,l.lng], {icon}).addTo(this.map).bindPopup(l.name);
+            this.markers[l.id] = m;
+        });
+    }
+
+    // MAP ACTIONS
+    zoom(d) { this.map.setZoom(this.map.getZoom()+d); }
+    recenter() { if(this.pos) this.map.setView([this.pos.lat,this.pos.lng], 16); }
+    
+    // NAVIGATION
+    setRoute() {
+        const id = document.getElementById('sel-target').value;
+        this.target = this.data.locs.find(l=>l.id===id);
+        
+        if(this.routeCtrl) { this.map.removeControl(this.routeCtrl); this.routeCtrl=null; }
+        document.getElementById('route-info').classList.add('hidden');
+        this.drawMarkers();
 
         if(this.target && this.pos) {
-            this.route = L.Routing.control({
-                waypoints: [L.latLng(this.pos.lat, this.pos.lng), L.latLng(this.target.lat, this.target.lng)],
-                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                lineOptions: { styles: [{color: '#2563eb', weight: 6}] },
-                show: false, addWaypoints: false
+            this.routeCtrl = L.Routing.control({
+                waypoints: [L.latLng(this.pos.lat,this.pos.lng), L.latLng(this.target.lat,this.target.lng)],
+                router: L.Routing.osrmv1({serviceUrl:'https://router.project-osrm.org/route/v1'}),
+                lineOptions: {styles:[{color:'#2563eb', weight:5}]},
+                addWaypoints:false, show:false
             }).addTo(this.map);
             
-            this.route.on('routesfound', e => {
+            this.routeCtrl.on('routesfound', e => {
                 const s = e.routes[0].summary;
-                document.getElementById('route-stats').classList.remove('hidden');
-                document.getElementById('dist-val').innerText = Math.round(s.totalDistance);
-                document.getElementById('time-val').innerText = Math.round(s.totalTime/60);
+                document.getElementById('route-info').classList.remove('hidden');
+                document.getElementById('val-dist').innerText = Math.round(s.totalDistance)+" m";
+                document.getElementById('val-time').innerText = Math.round(s.totalTime/60)+" min";
             });
         }
     }
 
-    updateRoute() {
-        if(this.route && this.target) {
-            this.route.setWaypoints([L.latLng(this.pos.lat, this.pos.lng), L.latLng(this.target.lat, this.target.lng)]);
+    openExtMap() {
+        if(this.target) window.open(`https://www.openstreetmap.org/directions?engine=graphhopper_car&route=${this.pos.lat}%2C${this.pos.lng}%3B${this.target.lat}%2C${this.target.lng}`);
+        else alert("Select destination");
+    }
+
+    // LOGIC
+    checkZone() {
+        if(!this.pos) return;
+        let inside = false;
+        
+        this.data.locs.forEach(l => {
+            const d = DB.dist(this.pos.lat, this.pos.lng, l.lat, l.lng);
+            if(!l.isInside && d <= 5) {
+                l.isInside = true; 
+                this.data.logs.unshift({l:l.name, d:'Entered', a:0, t:Date.now()});
+                DB.save(this.data); this.drawMarkers(); this.renderLists();
+            } else if(l.isInside && d > 10) {
+                l.isInside = false;
+                this.data.logs.unshift({l:l.name, d:'Exited', a:0, t:Date.now()});
+                DB.save(this.data); this.drawMarkers(); this.renderLists();
+            }
+            if(l.isInside) {
+                inside = true;
+                document.getElementById('zone-lbl').innerText = l.name;
+                document.getElementById('zone-lbl').className = "font-bold text-green-600 text-sm";
+                document.getElementById('btn-action').disabled = false;
+                document.getElementById('btn-action').className = "px-4 py-2 bg-green-600 text-white rounded-lg text-xs font-bold shadow-sm";
+                document.getElementById('ord-shop').innerText = l.name;
+            }
+        });
+
+        if(!inside) {
+            document.getElementById('zone-lbl').innerText = "Outside";
+            document.getElementById('zone-lbl').className = "font-bold text-gray-800 text-sm";
+            document.getElementById('btn-action').disabled = true;
+            document.getElementById('btn-action').className = "px-4 py-2 bg-gray-200 text-gray-400 rounded-lg text-xs font-bold disabled:cursor-not-allowed";
         }
     }
 
-    openExternalMaps() {
-        if(this.target) window.open(`https://www.openstreetmap.org/directions?engine=graphhopper_car&route=${this.pos.lat}%2C${this.pos.lng}%3B${this.target.lat}%2C${this.target.lng}`, '_blank');
-        else alert("Select destination first");
-    }
-
-    // UI TABS
+    // UI
     tab(t) {
-        document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
         document.getElementById('tab-'+t).classList.add('active');
         document.querySelectorAll('.nav-btn').forEach(b => {
-            b.classList.toggle('text-blue-600', b.dataset.target === t);
-            b.classList.toggle('text-gray-400', b.dataset.target !== t);
+            const active = b.dataset.t === t;
+            b.classList.toggle('text-blue-600', active);
+            b.classList.toggle('text-gray-400', !active);
         });
         
-        // FIX MAP BLANK ISSUE: Force render when tab opens
-        if(t === 'home') setTimeout(() => this.map.invalidateSize(), 200);
-        if(t === 'orders') this.renderOrders();
-        if(t === 'store') this.renderStoreList();
+        // FIX: Force Map Redraw
+        if(t==='home') setTimeout(() => this.map.invalidateSize(), 100);
+        if(t==='orders') this.renderLists();
     }
 
-    // ACTIONS
-    openModal(m) { document.getElementById('modal-'+m).classList.add('open'); }
-    closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
+    modal(id) { document.getElementById('modal-'+id).classList.remove('hidden'); }
+    closeModal() { document.querySelectorAll('[id^="modal-"]').forEach(e=>e.classList.add('hidden')); }
 
-    saveLoc() {
-        const n = document.getElementById('inp-name').value;
-        if(n && this.pos) {
-            this.data.locs.push({id:U.id(), name:n, lat:this.pos.lat, lng:this.pos.lng, isInside:true, tIn:Date.now()});
-            this.save(); this.updateSelects(); this.renderMks(); this.closeModals(); document.getElementById('inp-name').value='';
-        }
-    }
+    renderLists() {
+        // Orders
+        const ords = this.data.logs.filter(x=>x.a > 0).map(x => `
+            <tr><td class="p-3 font-bold">${x.l}</td><td class="p-3 text-gray-500">${x.d}</td><td class="p-3 text-right text-green-600">₹${x.a}</td></tr>
+        `).join('');
+        document.getElementById('list-orders').innerHTML = ords || '<tr><td colspan="3" class="p-4 text-center text-gray-400">No Orders</td></tr>';
 
-    saveOrder() {
-        const desc = document.getElementById('ord-desc').value;
-        const amt = document.getElementById('ord-amt').value;
-        const loc = document.getElementById('ord-shop').innerText;
-        if(desc && amt) {
-            this.data.logs.unshift({type:'ORDER', loc, desc, amt, ts:Date.now(), date:U.date()});
-            this.save(); this.closeModals(); document.getElementById('ord-desc').value=''; document.getElementById('ord-amt').value='';
-        }
-    }
-
-    saveProfile() {
-        this.data.prof = { name: document.getElementById('prof-name').value, id: document.getElementById('prof-id').value };
-        this.save(); alert("Saved");
-    }
-
-    deleteStore(id) {
-        if(confirm('Delete?')) {
-            this.data.locs = this.data.locs.filter(l => l.id !== id);
-            this.save(); this.renderStoreList(); this.renderMks(); this.updateSelects();
-        }
-    }
-
-    updateSelects() {
-        let h = '<option value="">-- Select Destination --</option>';
-        let f = '<option value="all">All Shops</option>';
-        this.data.locs.forEach(l => {
-            h += `<option value="${l.id}">${l.name}</option>`;
-            f += `<option value="${l.name}">${l.name}</option>`;
-        });
-        document.getElementById('select-target').innerHTML = h;
-        document.getElementById('filter-shop').innerHTML = f;
-    }
-
-    renderOrders() {
-        const d = document.getElementById('filter-date').value;
-        const s = document.getElementById('filter-shop').value;
-        let tot = 0;
-        const h = this.data.logs.filter(l => l.type==='ORDER' && (!d || l.date===d) && (s==='all' || l.loc===s))
-            .map(l => { tot+=Number(l.amt); return `<tr><td class="px-4 py-3 font-bold">${l.loc}</td><td class="px-4 py-3 text-gray-500">${l.desc}</td><td class="px-4 py-3 text-right text-emerald-600">₹${l.amt}</td></tr>`; })
-            .join('');
-        document.getElementById('order-list').innerHTML = h || '<tr><td colspan="3" class="p-4 text-center text-gray-400">Empty</td></tr>';
-        document.getElementById('order-total').innerText = '₹'+tot;
-    }
-
-    renderStoreList() {
-        document.getElementById('store-list').innerHTML = this.data.locs.map(l => `
-            <div class="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
-                <div><div class="font-bold text-gray-900">${l.name}</div><div class="text-xs text-gray-400">${l.lat.toFixed(4)}, ${l.lng.toFixed(4)}</div></div>
-                <div class="flex gap-2">
-                    <button onclick="app.tab('home');document.getElementById('select-target').value='${l.id}';app.setTarget()" class="w-8 h-8 rounded bg-blue-50 text-blue-600"><i class="ph-bold ph-navigation-arrow"></i></button>
-                    <button onclick="app.deleteStore('${l.id}')" class="w-8 h-8 rounded bg-red-50 text-red-500"><i class="ph-bold ph-trash"></i></button>
-                </div>
+        // Stores
+        const stores = this.data.locs.map(x => `
+            <div class="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm">
+                <div><div class="font-bold text-sm">${x.name}</div><div class="text-[10px] text-gray-400">${x.lat.toFixed(4)}, ${x.lng.toFixed(4)}</div></div>
+                <button onclick="app.delLoc('${x.id}')" class="text-red-500 bg-red-50 p-2 rounded"><i class="ph-bold ph-trash"></i></button>
             </div>
-        `).join('') || '<div class="p-4 text-center text-gray-400 text-sm">No Stores</div>';
+        `).join('');
+        document.getElementById('list-stores').innerHTML = stores;
+
+        // Select
+        let opts = '<option value="">-- Select Destination --</option>';
+        this.data.locs.forEach(l => opts += `<option value="${l.id}">${l.name}</option>`);
+        document.getElementById('sel-target').innerHTML = opts;
     }
 
-    exportCSV() {
-        let c = "TYPE,LOC,DATE,DESC,AMT\n";
-        this.data.logs.forEach(l => c += `${l.type},"${l.loc}",${new Date(l.ts).toLocaleString()},"${l.desc}",${l.amt||0}\n`);
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c],{type:'text/csv'})); a.download = 'export.csv'; a.click();
+    // DATA MOD
+    saveLoc() {
+        const n = document.getElementById('add-name').value;
+        if(n && this.pos) {
+            this.data.locs.push({id:Date.now().toString(), name:n, lat:this.pos.lat, lng:this.pos.lng, isInside:false});
+            DB.save(this.data); this.drawMarkers(); this.renderLists(); this.closeModal(); document.getElementById('add-name').value='';
+        }
     }
-    
-    recenterMap() { if(this.pos) this.map.setView([this.pos.lat, this.pos.lng], 18); }
-    zoom(d) { this.map.setZoom(this.map.getZoom()+d); }
+    saveOrd() {
+        const d = document.getElementById('ord-desc').value;
+        const a = document.getElementById('ord-amt').value;
+        const s = document.getElementById('ord-shop').innerText;
+        if(d && a) {
+            this.data.logs.unshift({l:s, d:d, a:a, t:Date.now()});
+            DB.save(this.data); this.renderLists(); this.closeModal(); document.getElementById('ord-desc').value=''; document.getElementById('ord-amt').value='';
+        }
+    }
+    delLoc(id) {
+        if(confirm('Delete?')) {
+            this.data.locs = this.data.locs.filter(l=>l.id!==id);
+            DB.save(this.data); this.drawMarkers(); this.renderLists();
+        }
+    }
+    saveProf() {
+        this.data.prof.name = document.getElementById('inp-pname').value;
+        DB.save(this.data); alert('Saved');
+    }
+    exportCSV() {
+        let c = "LOC,DESC,AMT,TIME\n";
+        this.data.logs.forEach(l => c+=`${l.l},${l.d},${l.a},${new Date(l.t).toLocaleString()}\n`);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([c],{type:'text/csv'})); a.download='data.csv'; a.click();
+    }
 }
 
-window.app = new App();
+// START
 window.drive = Drive;
+window.onload = () => { window.app = new Application(); };
 </script>
 </body>
 </html>
