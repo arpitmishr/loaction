@@ -242,11 +242,58 @@
     </nav>
 
     <!-- MODALS (Hidden) -->
+    <!-- UPDATED ADD MODAL -->
     <div id="modal-add" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-4">
-            <h3 class="font-bold text-white">Save Shop Location</h3>
-            <input type="text" id="input-loc-name" placeholder="Shop Name" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white">
-            <div class="flex gap-3"><button onclick="app.closeModals()" class="flex-1 py-2 border border-slate-700 text-slate-400 rounded">Cancel</button><button onclick="app.saveLocation()" class="flex-1 py-2 bg-blue-600 text-white rounded font-bold">Save</button></div>
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 flex flex-col max-h-[85vh]">
+            
+            <!-- Header -->
+            <div class="p-4 border-b border-slate-800">
+                <h3 class="font-bold text-white">Save Shop Location</h3>
+                <p class="text-[10px] text-slate-400">Current GPS: <span id="add-modal-gps" class="font-mono text-emerald-400">Waiting...</span></p>
+            </div>
+
+            <!-- Scrollable Form -->
+            <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                
+                <!-- Important Fields -->
+                <div class="space-y-3">
+                    <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Important (Mandatory)</div>
+                    
+                    <input type="text" id="inp-name" placeholder="Shop Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
+                    
+                    <input type="text" id="inp-auth" placeholder="Authorized Person Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
+                    
+                    <input type="tel" id="inp-contact" placeholder="Contact Number *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
+                    
+                    <textarea id="inp-addr" rows="2" placeholder="Full Address *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none"></textarea>
+                </div>
+
+                <!-- Optional Fields -->
+                <div class="space-y-3 pt-2 border-t border-slate-800">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Optional</div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="inp-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                            <option value="Cash">Type: Cash</option>
+                            <option value="Credit">Type: Credit</option>
+                        </select>
+                        <input type="text" id="inp-gst" placeholder="GST No." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <input type="number" id="inp-limit" placeholder="Credit Limit (₹)" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                        <input type="number" id="inp-days" placeholder="Credit Days" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                    </div>
+
+                    <textarea id="inp-remark" rows="1" placeholder="Remarks / Notes" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
+                </div>
+            </div>
+
+            <!-- Footer Buttons -->
+            <div class="p-4 border-t border-slate-800 flex gap-3 bg-slate-900 rounded-b-xl">
+                <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
+                <button onclick="app.saveLocation()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-900/20">Save Shop</button>
+            </div>
         </div>
     </div>
 
@@ -673,26 +720,89 @@ class App {
     }
 
     delStore(id) {
-        if(!confirm("Delete this store?")) return;
+        // 1. Ask for Password
+        const password = prompt("Restricted Action.\nEnter Admin Password to delete:");
+        
+        // 2. Validate Password
+        if (password !== "King3095@") {
+            alert("❌ Incorrect Password! Access Denied.");
+            return;
+        }
+
+        // 3. Delete Store
         this.store.deleteLoc(id);
         this.locs = this.store.getLocs();
+        
+        // 4. Update UI & Map
         this.populateDropdowns();
         this.renderStores();
         this.updateMapMarkers();
-        if(this.targetLoc?.id === id) { this.targetLoc = null; this.updateRouteLine(); }
+        
+        // 5. Clear route if the target was deleted
+        if(this.targetLoc?.id === id) { 
+            this.targetLoc = null; 
+            this.updateRouteLine(); 
+        }
+
+        alert("✅ Store Deleted Successfully.");
     }
 
     // --- ACTIONS ---
     saveLocation() {
-        const n = document.getElementById('input-loc-name').value;
-        if(n && this.pos) {
-            this.store.saveLoc({id:Utils.uuid(), name:n, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now()});
-            this.locs = this.store.getLocs();
-            this.populateDropdowns();
-            this.updateMapMarkers();
-            this.closeModals();
-            document.getElementById('input-loc-name').value='';
+        // 1. Get Important Values
+        const name = document.getElementById('inp-name').value.trim();
+        const auth = document.getElementById('inp-auth').value.trim();
+        const contact = document.getElementById('inp-contact').value.trim();
+        const addr = document.getElementById('inp-addr').value.trim();
+
+        // 2. Validation
+        if (!name || !auth || !contact || !addr) {
+            alert("⚠️ Please fill all IMPORTANT fields marked with *");
+            return;
         }
+        if (!this.pos) {
+            alert("❌ Waiting for GPS signal...");
+            return;
+        }
+
+        // 3. Get Optional Values
+        const details = {
+            authPerson: auth,
+            contact: contact,
+            address: addr,
+            storeType: document.getElementById('inp-type').value,
+            gst: document.getElementById('inp-gst').value.trim(),
+            creditLimit: document.getElementById('inp-limit').value.trim(),
+            creditDays: document.getElementById('inp-days').value.trim(),
+            remark: document.getElementById('inp-remark').value.trim()
+        };
+
+        // 4. Save to Store
+        const newLoc = {
+            id: Utils.uuid(),
+            name: name,
+            lat: this.pos.lat,
+            lng: this.pos.lng,
+            ...details, // Spread details into object
+            isInside: true,
+            entryTime: Date.now()
+        };
+
+        this.store.saveLoc(newLoc);
+        
+        // 5. Update UI
+        this.locs = this.store.getLocs();
+        this.populateDropdowns();
+        this.updateMapMarkers();
+        this.closeModals();
+
+        // 6. Reset Form
+        ['inp-name', 'inp-auth', 'inp-contact', 'inp-addr', 'inp-gst', 'inp-limit', 'inp-days', 'inp-remark'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('inp-type').value = 'Cash';
+
+        alert("✅ Shop Saved Successfully!");
     }
 
     setTarget() {
@@ -740,7 +850,13 @@ class App {
         else alert("Select Shop");
     }
 
-    openAddModal(){document.getElementById('modal-add').classList.add('open')}
+    openAddModal() {
+        document.getElementById('modal-add').classList.add('open');
+        // Update the GPS text in the modal header
+        if(this.pos) {
+            document.getElementById('add-modal-gps').innerText = `${this.pos.lat.toFixed(5)}, ${this.pos.lng.toFixed(5)}`;
+        }
+    }
     openOrderModal(){document.getElementById('modal-order').classList.add('open')}
     closeModals(){document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'))}
 }
