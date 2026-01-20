@@ -727,44 +727,56 @@ checkGeofences(pos) {
 
     // --- ORDER LOGIC ---
     renderOrders() {
-        const date = document.getElementById('filter-date').value;
+        // 1. Get the date selected by the user
+        const filterDate = document.getElementById('filter-date').value;
         const shop = document.getElementById('filter-shop').value;
         const logs = this.store.getLogs();
         let total = 0;
         
+        // 2. Filter logs based on Delivery Date (targetDate)
         const filtered = logs.filter(l => {
             if(l.type !== 'ORDER') return false;
-            if(l.date !== date) return false; // Filters by "Created Date" (Today)
+            
+            // USE TARGET DATE (Due Date)
+            // If l.targetDate doesn't exist (old data), fallback to l.date (creation date)
+            const dueOn = l.targetDate || l.date;
+            
+            if(dueOn !== filterDate) return false; // Show orders needed for THIS date
             if(shop !== 'all' && l.loc !== shop) return false;
+            
             return true;
         });
 
+        // 3. Render the list
         document.getElementById('order-list').innerHTML = filtered.map(l => {
+            total += parseFloat(l.amt || 0);
+            
             const amountDisplay = l.amt > 0 ? `₹${l.amt}` : `<span class="text-slate-600 text-[10px]">No Cash</span>`;
             
-            // Check if target date is different from created date to show "Due: XXX"
-            const isFuture = l.targetDate && l.targetDate !== l.date;
-            const dateBadge = isFuture ? `<div class="text-[10px] text-yellow-500 bg-yellow-900/20 px-1 rounded inline-block mt-1">Due: ${l.targetDate}</div>` : '';
+            // Show "Booked On" badge so we know when the order was taken
+            const bookedBadge = `<div class="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded inline-block mt-1 border border-blue-900/50">Booked: ${l.date}</div>`;
 
-            total += parseFloat(l.amt || 0);
             return `
-                <tr class="border-b border-slate-800">
+                <tr class="border-b border-slate-800 hover:bg-slate-900/50 transition-colors">
                     <td class="px-4 py-3 align-top">
-                        <div class="font-bold text-white">${l.loc}</div>
-                        ${dateBadge}
+                        <div class="font-bold text-white text-sm">${l.loc}</div>
+                        ${bookedBadge}
                     </td>
-                    <td class="px-4 py-3 text-slate-400 text-xs align-top">
+                    <td class="px-4 py-3 text-slate-400 text-xs align-top whitespace-pre-wrap">
                         ${l.desc}
                     </td>
-                    <td class="px-4 py-3 text-right text-emerald-400 font-mono align-top">
+                    <td class="px-4 py-3 text-right text-emerald-400 font-mono text-xs align-top font-bold">
                         ${amountDisplay}
                     </td>
                 </tr>
             `;
-        }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No Orders Recorded Today</td></tr>';
+        }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No deliveries scheduled for this date</td></tr>';
 
         document.getElementById('order-total').innerText = `₹${total}`;
     }
+
+
+    
     // --- STORE LOGIC ---
     renderStores() {
         document.getElementById('store-list').innerHTML = this.locs.map(l => `
