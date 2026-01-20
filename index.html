@@ -4,115 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#ffffff">
-    <meta name="description" content="GeoGuard Logistics - Professional Tracker">
-    <title>GeoGuard Logistics | Professional OSM</title>
+    <meta name="description" content="GeoGuard Logistics - Shop Management Module">
+    <title>GeoGuard | Shop Management</title>
 
     <!-- ==================================================================================
-         EXTERNAL LIBRARIES (CDN)
+         LIBRARIES
          ================================================================================== -->
     
-    <!-- TAILWIND CSS (Utility Framework) -->
+    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#2563eb',   /* Blue 600 */
-                        secondary: '#64748b', /* Slate 500 */
-                        success: '#16a34a',   /* Green 600 */
-                        danger: '#dc2626',    /* Red 600 */
-                        bg: '#f8fafc',        /* Slate 50 */
-                        surface: '#ffffff'
+                        primary: '#2563eb',   
+                        secondary: '#64748b', 
+                        success: '#16a34a',   
+                        warning: '#f59e0b',
+                        danger: '#dc2626',    
+                        bg: '#f8fafc',        
                     },
                     fontFamily: {
-                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['monospace']
                     },
                     zIndex: {
-                        'map-ui': '2000',     /* Ensures buttons are above map tiles */
-                        'modal': '3000',
-                        'toast': '4000'
+                        'map-ui': '2000',
+                        'modal': '3000'
                     }
                 }
             }
         }
     </script>
 
-    <!-- PHOSPHOR ICONS (Visual Assets) -->
+    <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- LEAFLET MAPS (Core Mapping Engine) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- LEAFLET MAPS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- LEAFLET ROUTING MACHINE (Navigation Logic) -->
+    <!-- ROUTING -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
-    <!-- GOOGLE IDENTITY SERVICES (Cloud Backup) -->
+    <!-- GOOGLE API -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- ==================================================================================
-         INTERNAL STYLES
+         STYLES
          ================================================================================== -->
     <style>
-        /* RESET & BASE */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { height: 100%; width: 100%; overflow: hidden; }
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
-
-        /* SCROLLBAR HIDING */
+        body { background-color: #f8fafc; color: #1e293b; }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* TAB SYSTEM TRANSITIONS */
+        
+        /* Tab Transitions */
         .tab-content { 
             display: none; 
             height: 100%; 
             overflow-y: auto; 
-            padding-bottom: 80px; /* Space for bottom nav */
+            padding-bottom: 90px; 
             animation: fadeIn 0.2s ease-in-out;
         }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* MAP CONTAINER CONFIGURATION */
+        /* Map Setup */
         #map-wrapper {
             position: relative;
             width: 100%;
-            height: 60vh; /* Fixed height for mobile stability */
-            min-height: 400px;
+            height: 55vh;
+            min-height: 350px;
             background: #e2e8f0;
             border-radius: 1rem;
             overflow: hidden;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 1rem;
         }
+        #osm-map { width: 100%; height: 100%; z-index: 1; }
         
-        #osm-map {
-            width: 100%;
-            height: 100%;
-            z-index: 1; /* Lowest level */
-        }
-
-        /* MAP OVERLAY CONTROLS (Floating Buttons) */
+        /* Floating Controls */
         .map-overlay {
             position: absolute;
-            z-index: 2000 !important; /* Crucial: Must be higher than Leaflet (400-1000) */
-            transition: all 0.2s ease;
+            z-index: 2000 !important;
         }
-        .map-overlay:active { transform: scale(0.95); }
 
-        /* ROUTING MACHINE CUSTOMIZATION */
-        /* Hide the default text itinerary box to keep UI clean */
-        .leaflet-routing-container { display: none !important; }
-
-        /* MODAL STYLES */
+        /* Modal Styles */
         .modal-backdrop {
             position: fixed; inset: 0; 
-            background: rgba(15, 23, 42, 0.6); 
+            background: rgba(15, 23, 42, 0.7); 
             backdrop-filter: blur(4px);
             z-index: 3000;
             display: flex; align-items: center; justify-content: center;
@@ -122,942 +106,551 @@
         .modal-backdrop.open { opacity: 1; pointer-events: auto; }
         
         .modal-content {
-            background: white; width: 90%; max-width: 360px;
+            background: white; width: 95%; max-width: 420px;
+            max-height: 85vh; overflow-y: auto;
             border-radius: 1rem; padding: 1.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
             transform: scale(0.95); transition: transform 0.2s ease;
         }
         .modal-backdrop.open .modal-content { transform: scale(1); }
-
+        
+        /* Leaflet Cleanup */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <!-- ==================================================================================
-         HEADER
-         ================================================================================== -->
-    <header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm h-16 flex-none">
+    <!-- HEADER -->
+    <header class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur border-b border-slate-200 h-16 flex-none">
         <div class="max-w-md mx-auto px-4 h-full flex justify-between items-center">
-            
-            <!-- Logo Section -->
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-                    <i class="ph-bold ph-navigation-arrow text-xl"></i>
+                    <i class="ph-bold ph-storefront text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold text-slate-800 leading-tight tracking-tight">
-                        GEO<span class="text-blue-600">GUARD</span>
-                    </h1>
-                    <div class="flex items-center gap-1.5">
-                        <span id="sync-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
-                        <span id="sync-text" class="text-[10px] font-medium text-slate-400 font-mono tracking-wide">LOCAL</span>
-                    </div>
+                    <h1 class="text-sm font-bold text-slate-800 leading-tight">GEO<span class="text-blue-600">GUARD</span></h1>
+                    <div class="text-[10px] font-medium text-slate-400 font-mono">SHOP MANAGER PRO</div>
                 </div>
             </div>
-
-            <!-- GPS Status Badge -->
             <div id="gps-indicator" class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-full">
                 <i class="ph-bold ph-spinner animate-spin text-orange-500 text-xs"></i>
-                <span class="text-[10px] font-bold text-slate-600 font-mono">WAITING</span>
+                <span class="text-[10px] font-bold text-slate-600">GPS...</span>
             </div>
         </div>
     </header>
 
-    <!-- ==================================================================================
-         MAIN CONTENT AREA
-         ================================================================================== -->
+    <!-- MAIN CONTENT -->
     <main class="flex-1 w-full max-w-md mx-auto pt-16 relative bg-slate-50">
 
-        <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-             TAB 1: MAP DASHBOARD
-             +++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+        <!-- TAB 1: MAP -->
         <div id="view-map" class="tab-content active px-4 py-4 space-y-4">
             
-            <!-- Map Card -->
+            <!-- KNOWN ISSUE NOTIFICATION -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2 flex items-center gap-2 text-[10px] text-yellow-700">
+                <i class="ph-fill ph-warning-circle text-lg"></i>
+                <span><b>Notice:</b> Auto-map rotation is currently disabled. Map orientation is static (North-Up).</span>
+            </div>
+
             <div id="map-wrapper">
                 <div id="osm-map"></div>
 
-                <!-- HUD: Compass/Heading -->
+                <!-- HUD -->
                 <div class="map-overlay top-4 left-4 bg-white/95 px-3 py-1.5 rounded-full border border-slate-200 shadow-md flex items-center gap-2">
                     <i class="ph-fill ph-compass text-blue-600"></i>
-                    <span id="hud-heading" class="text-xs font-bold font-mono text-slate-700">0</span>
-                    <span class="text-[10px] text-slate-400">deg</span>
+                    <span id="hud-heading" class="text-xs font-bold font-mono text-slate-700">0</span>°
                 </div>
 
-                <!-- Control: Recenter -->
-                <button onclick="App.map.recenter()" class="map-overlay bottom-4 right-4 w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-600/30 flex items-center justify-center hover:bg-blue-700 focus:outline-none">
+                <!-- Controls -->
+                <button onclick="App.map.recenter()" class="map-overlay bottom-4 right-4 w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700">
                     <i class="ph-bold ph-crosshair text-xl"></i>
                 </button>
-
-                <!-- Control: Zoom In/Out -->
-                <div class="map-overlay bottom-20 right-4 flex flex-col gap-2">
-                    <button onclick="App.map.zoom(1)" class="w-10 h-10 bg-white text-slate-700 rounded-full shadow-md border border-slate-100 flex items-center justify-center hover:bg-slate-50">
-                        <i class="ph-bold ph-plus"></i>
-                    </button>
-                    <button onclick="App.map.zoom(-1)" class="w-10 h-10 bg-white text-slate-700 rounded-full shadow-md border border-slate-100 flex items-center justify-center hover:bg-slate-50">
-                        <i class="ph-bold ph-minus"></i>
-                    </button>
-                </div>
             </div>
 
-            <!-- Dashboard Controls -->
+            <!-- Action Card -->
             <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-4">
-                
-                <!-- Navigation Selector -->
-                <div class="flex gap-2">
-                    <div class="relative flex-1">
-                        <select id="input-target" onchange="App.handleTargetChange()" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none">
-                            <option value="">Select Destination...</option>
-                        </select>
-                        <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                    </div>
-                    <button onclick="App.openExternalMap()" class="px-3 bg-slate-100 text-blue-600 rounded-lg border border-slate-200 hover:bg-slate-200 transition-colors" title="Open OSM Website">
-                        <i class="ph-bold ph-arrow-square-out text-lg"></i>
-                    </button>
-                </div>
-
-                <!-- Navigation Stats (Collapsible) -->
-                <div id="nav-stats" class="hidden flex items-center justify-between pt-3 border-t border-slate-100">
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><i class="ph-fill ph-path"></i></div>
-                        <div>
-                            <div class="text-[10px] text-slate-400 uppercase font-bold">Distance</div>
-                            <div class="text-sm font-bold text-slate-800 font-mono" id="val-dist">0 m</div>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-[10px] text-slate-400 uppercase font-bold">Est. Time</div>
-                        <div class="text-sm font-bold text-slate-800 font-mono" id="val-time">0 min</div>
-                    </div>
-                </div>
-
-                <!-- Zone Status & Actions -->
-                <div class="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                <div class="flex items-center justify-between">
                     <div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Status</div>
-                        <div id="lbl-zone" class="text-sm font-bold text-slate-500 flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-slate-400"></span> Outside Zone
-                        </div>
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">Current Zone</div>
+                        <div id="lbl-zone" class="text-sm font-bold text-slate-500">Outside Zone</div>
                     </div>
-                    <button id="btn-take-order" onclick="App.ui.modal('order')" disabled class="px-4 py-2 rounded-lg bg-slate-200 text-slate-400 text-xs font-bold transition-all disabled:cursor-not-allowed shadow-sm">
+                    <button id="btn-take-order" onclick="App.ui.modal('order')" disabled class="px-4 py-2 rounded-lg bg-slate-100 text-slate-300 text-xs font-bold transition-all">
                         TAKE ORDER
                     </button>
                 </div>
-
-                <!-- Primary Action -->
-                <button onclick="App.ui.modal('add')" class="w-full py-3 bg-white border-2 border-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2">
-                    <i class="ph-bold ph-map-pin-plus"></i> SAVE CURRENT LOCATION
+                
+                <button onclick="App.ui.modal('add')" class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20">
+                    <i class="ph-bold ph-plus-circle text-lg"></i> ADD NEW SHOP / STORE
                 </button>
             </div>
         </div>
 
-        <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-             TAB 2: ORDER HISTORY
-             +++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+        <!-- TAB 2: STORES (New Requirements) -->
+        <div id="view-stores" class="tab-content px-4 py-6 space-y-4">
+            <h2 class="text-lg font-bold text-slate-800 px-1 flex items-center justify-between">
+                <span>My Stores</span>
+                <span class="text-[10px] font-normal text-slate-400 bg-slate-100 px-2 py-1 rounded">Read Only</span>
+            </h2>
+            <div id="list-stores" class="space-y-3">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- TAB 3: ORDERS -->
         <div id="view-orders" class="tab-content px-4 py-6 space-y-4">
             <h2 class="text-lg font-bold text-slate-800 px-1">Order History</h2>
-            
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <table class="w-full text-left text-sm">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[200px]">
+                <table class="w-full text-left text-xs">
                     <thead class="bg-slate-50 text-slate-500 border-b border-slate-200">
                         <tr>
-                            <th class="px-4 py-3 font-semibold text-xs uppercase">Location</th>
-                            <th class="px-4 py-3 font-semibold text-xs uppercase">Items</th>
-                            <th class="px-4 py-3 font-semibold text-xs uppercase text-right">Amt</th>
+                            <th class="px-4 py-3">Shop</th>
+                            <th class="px-4 py-3">Details</th>
+                            <th class="px-4 py-3 text-right">Amt</th>
                         </tr>
                     </thead>
-                    <tbody id="list-orders" class="divide-y divide-slate-100">
-                        <!-- JS Injected Rows -->
-                    </tbody>
-                    <tfoot class="bg-slate-50 border-t border-slate-200">
-                        <tr>
-                            <td colspan="2" class="px-4 py-3 font-bold text-slate-600 text-xs uppercase">Total Revenue</td>
-                            <td class="px-4 py-3 text-right font-bold text-emerald-600 font-mono" id="val-total">₹0</td>
-                        </tr>
-                    </tfoot>
+                    <tbody id="list-orders" class="divide-y divide-slate-100"></tbody>
                 </table>
             </div>
-            
-            <div class="text-center">
-                <button onclick="App.data.clearLogs()" class="text-xs text-red-400 hover:text-red-600 font-medium">Clear History</button>
-            </div>
         </div>
 
-        <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-             TAB 3: STORES
-             +++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
-        <div id="view-stores" class="tab-content px-4 py-6 space-y-4">
-            <h2 class="text-lg font-bold text-slate-800 px-1">Saved Locations</h2>
-            <div id="list-stores" class="space-y-3 pb-6">
-                <!-- JS Injected Cards -->
-            </div>
-        </div>
-
-        <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++
-             TAB 4: SETTINGS / PROFILE
-             +++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
-        <div id="view-settings" class="tab-content px-4 py-6 space-y-6">
-            <h2 class="text-lg font-bold text-slate-800 px-1">Settings & Backup</h2>
-
-            <!-- Profile Card -->
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                <div class="flex items-center gap-4 border-b border-slate-100 pb-4">
-                    <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                        <i class="ph-fill ph-user text-2xl"></i>
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase">Rider Name</label>
-                        <input id="input-profile-name" type="text" placeholder="Enter Name" class="w-full bg-transparent font-bold text-slate-800 outline-none border-b border-transparent focus:border-blue-500 placeholder-slate-300 transition-colors">
-                    </div>
-                </div>
-                <button onclick="App.data.saveProfile()" class="w-full py-2 bg-slate-800 text-white rounded-lg font-bold text-xs hover:bg-slate-700 transition-colors">
-                    UPDATE PROFILE
+        <!-- TAB 4: SETTINGS -->
+        <div id="view-settings" class="tab-content px-4 py-6 space-y-4">
+            <h2 class="text-lg font-bold text-slate-800 px-1">Settings</h2>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <button onclick="Cloud.login()" class="w-full py-2 border border-slate-300 rounded text-xs font-bold flex justify-center gap-2 items-center">
+                    <i class="ph-bold ph-google-logo"></i> Google Login
                 </button>
+                <button onclick="Cloud.sync()" class="w-full py-2 bg-blue-50 text-blue-600 rounded text-xs font-bold">
+                    Sync Data
+                </button>
+                <div id="sync-status" class="text-center text-[10px] text-slate-400">Offline</div>
             </div>
-
-            <!-- Cloud Sync Card -->
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-bold text-slate-700 text-sm flex items-center gap-2">
-                        <i class="ph-bold ph-cloud-arrow-up text-blue-500"></i> Cloud Backup
-                    </h3>
-                    <span id="lbl-cloud-status" class="text-[10px] font-mono text-slate-400">DISCONNECTED</span>
-                </div>
-                
-                <div class="space-y-2">
-                    <button id="btn-google-login" onclick="Cloud.login()" class="w-full py-2.5 border border-slate-300 rounded-lg font-bold text-xs text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2 transition-colors">
-                        <i class="ph-bold ph-google-logo"></i> Sign In with Google
-                    </button>
-                    
-                    <button id="btn-google-sync" onclick="Cloud.sync()" disabled class="w-full py-2.5 bg-slate-100 text-slate-300 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed">
-                        <i class="ph-bold ph-arrows-clockwise"></i> Sync Now
-                    </button>
-                </div>
-                <p id="lbl-sync-msg" class="text-center text-[10px] text-slate-400 mt-3 h-4">Feature requires Google API Key</p>
-            </div>
-
-            <!-- Data Export -->
-            <button onclick="App.data.exportCSV()" class="w-full py-3 bg-white border border-slate-200 text-emerald-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors">
-                <i class="ph-bold ph-file-csv text-lg"></i> EXPORT ALL DATA
+            <button onclick="App.data.exportCSV()" class="w-full py-3 bg-white border border-emerald-200 text-emerald-600 font-bold rounded-xl shadow-sm">
+                Export Data CSV
             </button>
-            
-            <div class="text-center pt-4">
-                <p class="text-[10px] text-slate-400 font-mono">v4.2.0 | GeoGuard Systems</p>
-            </div>
         </div>
 
     </main>
 
-    <!-- ==================================================================================
-         BOTTOM NAVIGATION
-         ================================================================================== -->
-    <nav class="fixed bottom-0 w-full bg-white border-t border-slate-200 z-40 h-16 pb-safe shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
+    <!-- BOTTOM NAV -->
+    <nav class="fixed bottom-0 w-full bg-white border-t border-slate-200 z-40 h-16 pb-safe">
         <div class="flex justify-around items-center h-full max-w-md mx-auto">
-            <button onclick="App.ui.switchTab('map')" class="nav-btn active group flex flex-col items-center w-full h-full justify-center gap-1" data-target="map">
-                <i class="ph-fill ph-map-trifold text-2xl text-blue-600 transition-colors group-hover:scale-110"></i>
-                <span class="text-[10px] font-bold text-blue-600">Map</span>
+            <button onclick="App.ui.switchTab('map')" class="nav-btn active group flex flex-col items-center w-full" data-target="map">
+                <i class="ph-fill ph-map-trifold text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
+                <span class="text-[10px] font-bold text-slate-400 group-[.active]:text-blue-600">Map</span>
             </button>
-            
-            <button onclick="App.ui.switchTab('orders')" class="nav-btn group flex flex-col items-center w-full h-full justify-center gap-1" data-target="orders">
-                <i class="ph-bold ph-receipt text-2xl text-slate-400 transition-colors group-hover:text-slate-600"></i>
-                <span class="text-[10px] font-medium text-slate-400 group-hover:text-slate-600">Orders</span>
+            <button onclick="App.ui.switchTab('stores')" class="nav-btn group flex flex-col items-center w-full" data-target="stores">
+                <i class="ph-bold ph-storefront text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
+                <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Stores</span>
             </button>
-            
-            <button onclick="App.ui.switchTab('stores')" class="nav-btn group flex flex-col items-center w-full h-full justify-center gap-1" data-target="stores">
-                <i class="ph-bold ph-storefront text-2xl text-slate-400 transition-colors group-hover:text-slate-600"></i>
-                <span class="text-[10px] font-medium text-slate-400 group-hover:text-slate-600">Stores</span>
+            <button onclick="App.ui.switchTab('orders')" class="nav-btn group flex flex-col items-center w-full" data-target="orders">
+                <i class="ph-bold ph-receipt text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
+                <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Orders</span>
             </button>
-            
-            <button onclick="App.ui.switchTab('settings')" class="nav-btn group flex flex-col items-center w-full h-full justify-center gap-1" data-target="settings">
-                <i class="ph-bold ph-gear text-2xl text-slate-400 transition-colors group-hover:text-slate-600"></i>
-                <span class="text-[10px] font-medium text-slate-400 group-hover:text-slate-600">Settings</span>
+            <button onclick="App.ui.switchTab('settings')" class="nav-btn group flex flex-col items-center w-full" data-target="settings">
+                <i class="ph-bold ph-gear text-2xl text-slate-400 group-[.active]:text-blue-600"></i>
+                <span class="text-[10px] font-medium text-slate-400 group-[.active]:text-blue-600">Settings</span>
             </button>
         </div>
     </nav>
 
     <!-- ==================================================================================
-         MODALS
+         MODALS (UPDATED WITH NEW REQUIREMENTS)
          ================================================================================== -->
-    
-    <!-- Modal: Add Location -->
+
+    <!-- Modal: Add Shop -->
     <div id="modal-add" class="modal-backdrop">
         <div class="modal-content">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-slate-800 text-lg">Save Location</h3>
-                <button onclick="App.ui.closeModals()" class="text-slate-400 hover:text-slate-600"><i class="ph-bold ph-x text-lg"></i></button>
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-slate-800 text-lg">Add New Shop</h3>
+                <button onclick="App.ui.closeModals()" class="text-slate-400 hover:text-red-500"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
             
-            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
-                <div class="text-[10px] font-bold text-slate-400 uppercase">Coordinates</div>
-                <div class="font-mono text-sm text-slate-700" id="lbl-modal-coords">0.0000, 0.0000</div>
-            </div>
-
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Store Name</label>
-                    <input id="input-loc-name" type="text" placeholder="e.g., Domino's Pizza" class="w-full p-3 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            <div class="space-y-3">
+                <!-- Location Read-Only -->
+                <div class="bg-blue-50 p-2 rounded border border-blue-100 text-[10px] text-blue-700 font-mono text-center">
+                    GPS: <span id="lbl-gps-coords">WAITING...</span>
                 </div>
-                <button onclick="App.data.addLocation()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 shadow-md shadow-blue-600/20">
-                    SAVE LOCATION
+
+                <!-- Basic Details -->
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Shop Name <span class="text-red-500">*</span></label>
+                    <input id="inp-name" type="text" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none">
+                </div>
+
+                <!-- Type & Phone -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">Type <span class="text-red-500">*</span></label>
+                        <select id="inp-type" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
+                            <option value="Shop">Shop</option>
+                            <option value="Dhaba">Dhaba</option>
+                            <option value="Hotel">Hotel</option>
+                            <option value="Cafe">Cafe</option>
+                            <option value="Resort">Resort</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">Phone</label>
+                        <input id="inp-phone" type="tel" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
+                    </div>
+                </div>
+
+                <!-- Address & Remarks -->
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Full Address</label>
+                    <input id="inp-address" type="text" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Remarks / Notes</label>
+                    <textarea id="inp-remarks" rows="2" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none"></textarea>
+                </div>
+
+                <!-- Payment Configuration -->
+                <div class="pt-2 border-t border-slate-100">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Customer / Payment Type <span class="text-red-500">*</span></label>
+                    <select id="inp-pay-type" onchange="App.ui.toggleCreditFields()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none font-bold text-slate-700">
+                        <option value="Cash">Cash</option>
+                        <option value="Online">Online / UPI</option>
+                        <option value="Credit">Credit (Udhaar)</option>
+                    </select>
+                </div>
+
+                <!-- Credit Fields (Conditional) -->
+                <div id="section-credit" class="hidden bg-orange-50 p-3 rounded-lg border border-orange-200 space-y-3">
+                    <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wide border-b border-orange-200 pb-1">Credit Configuration</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500">Credit Limit (₹)</label>
+                            <input id="inp-cred-limit" type="number" class="w-full p-2 bg-white border border-slate-300 rounded text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500">Cycle (Days)</label>
+                            <input id="inp-cred-days" type="number" class="w-full p-2 bg-white border border-slate-300 rounded text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500">GST Number</label>
+                        <input id="inp-gst" type="text" class="w-full p-2 bg-white border border-slate-300 rounded text-sm uppercase">
+                    </div>
+                </div>
+
+                <button onclick="App.data.addLocation()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold text-sm shadow hover:bg-blue-700 mt-2">
+                    SAVE SHOP
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Modal: New Order -->
+    <!-- Modal: Order -->
     <div id="modal-order" class="modal-backdrop">
         <div class="modal-content">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-slate-800 text-lg">New Order</h3>
-                <button onclick="App.ui.closeModals()" class="text-slate-400 hover:text-slate-600"><i class="ph-bold ph-x text-lg"></i></button>
-            </div>
-
-            <div class="mb-4">
-                <div class="text-[10px] font-bold text-slate-400 uppercase mb-1">Store</div>
-                <div id="lbl-modal-shop" class="text-base font-bold text-blue-600">--</div>
-            </div>
-
+            <h3 class="font-bold text-slate-800 text-lg mb-2">Take Order</h3>
+            <div class="bg-slate-100 p-2 rounded mb-3 text-xs text-slate-500">Shop: <b id="lbl-ord-shop" class="text-slate-800">--</b></div>
             <div class="space-y-3">
-                <div>
-                    <input id="input-ord-desc" type="text" placeholder="Items (e.g. 2 Burgers)" class="w-full p-3 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500">
+                <input id="inp-ord-desc" placeholder="Items..." class="w-full p-2 border rounded text-sm">
+                <input id="inp-ord-amt" type="number" placeholder="Amount (₹)" class="w-full p-2 border rounded text-sm">
+                <div class="flex gap-2">
+                    <button onclick="App.ui.closeModals()" class="flex-1 py-2 text-slate-500 font-bold text-sm">Cancel</button>
+                    <button onclick="App.data.addOrder()" class="flex-1 py-2 bg-emerald-600 text-white rounded font-bold text-sm">Confirm</button>
                 </div>
-                <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
-                    <input id="input-ord-amt" type="number" placeholder="Amount" class="w-full p-3 pl-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 font-mono">
-                </div>
-                <button onclick="App.data.addOrder()" class="w-full py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 shadow-md shadow-emerald-600/20">
-                    CONFIRM ORDER
-                </button>
             </div>
         </div>
     </div>
 
     <!-- ==================================================================================
-         APPLICATION LOGIC
+         JAVASCRIPT
          ================================================================================== -->
     <script>
-        /**
-         * --------------------------------------------------------------------------------
-         * CONFIGURATION & CONSTANTS
-         * --------------------------------------------------------------------------------
-         */
         const CONFIG = {
-            DB_KEY: 'geoguard_v4_db',
-            GEOFENCE_ENTER: 5,   // Meters to trigger entry
-            GEOFENCE_EXIT: 10,   // Meters to trigger exit (hysteresis)
-            GPS_OPTIONS: {
-                enableHighAccuracy: true,
-                maximumAge: 1000,
-                timeout: 5000
-            },
-            GOOGLE: {
-                CLIENT_ID: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
-                API_KEY: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE', // Demo Key
-                SCOPES: 'https://www.googleapis.com/auth/drive.file'
-            }
+            DB: 'geoguard_v5_db',
+            GPS: { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 },
+            GAPI: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE' // Demo Key
         };
 
-        /**
-         * --------------------------------------------------------------------------------
-         * UTILITY FUNCTIONS
-         * --------------------------------------------------------------------------------
-         */
         const Utils = {
-            id: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-            
-            // Haversine Formula for Distance (Meters)
-            dist: (lat1, lon1, lat2, lon2) => {
-                const R = 6371e3; // Earth radius
-                const r = Math.PI / 180;
-                const dLat = (lat2 - lat1) * r;
-                const dLon = (lon2 - lon1) * r;
-                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                          Math.cos(lat1 * r) * Math.cos(lat2 * r) *
-                          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c;
+            id: () => Date.now().toString(36),
+            dist: (l1, n1, l2, n2) => {
+                const R=6371e3, r=Math.PI/180, a=Math.sin((l2-l1)*r/2)**2+Math.cos(l1*r)*Math.cos(l2*r)*Math.sin((n2-n1)*r/2)**2;
+                return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
             },
-            
-            fmtMoney: (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n),
-            
-            now: () => new Date().toLocaleString()
+            fmtMoney: (n) => new Intl.NumberFormat('en-IN', {style:'currency', currency:'INR'}).format(n),
+            date: (ts) => new Date(ts).toLocaleDateString()
         };
 
-        /**
-         * --------------------------------------------------------------------------------
-         * MODULE: CLOUD SYNC (Google Drive)
-         * --------------------------------------------------------------------------------
-         */
+        // --- CLOUD SYNC ---
         const Cloud = {
             token: null,
-            isReady: false,
-
             init: function() {
-                // Async wait for Google Script
-                const check = setInterval(() => {
-                    if (window.google && window.gapi) {
-                        clearInterval(check);
-                        this.loadGapi();
-                    }
-                }, 500);
+                const i = setInterval(() => { if(window.google) { clearInterval(i); this.load(); } }, 500);
             },
-
-            loadGapi: function() {
-                gapi.load('client', async () => {
-                    try {
-                        await gapi.client.init({
-                            apiKey: CONFIG.GOOGLE.API_KEY,
-                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                        });
-                        this.isReady = true;
-                    } catch (e) { console.error("GAPI Init Error", e); }
+            load: function() {
+                gapi.load('client', async()=>{
+                    await gapi.client.init({apiKey:CONFIG.GAPI, discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']});
                 });
             },
-
             login: function() {
-                if (!window.google) return alert("Google Services not loaded yet.");
-                
-                const client = google.accounts.oauth2.initTokenClient({
-                    client_id: CONFIG.GOOGLE.CLIENT_ID,
-                    scope: CONFIG.GOOGLE.SCOPES,
-                    callback: (resp) => {
-                        if (resp.error) return console.error(resp);
-                        this.token = resp.access_token;
-                        this.updateUI(true);
-                    },
-                });
-                client.requestAccessToken();
+                google.accounts.oauth2.initTokenClient({
+                    client_id: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/drive.file',
+                    callback: (r)=>{ this.token=r.access_token; document.getElementById('sync-status').innerText="Logged In"; }
+                }).requestAccessToken();
             },
-
-            updateUI: function(loggedIn) {
-                if (loggedIn) {
-                    document.getElementById('btn-google-login').classList.add('hidden');
-                    const btnSync = document.getElementById('btn-google-sync');
-                    btnSync.disabled = false;
-                    btnSync.classList.remove('bg-slate-100', 'text-slate-300');
-                    btnSync.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
-                    document.getElementById('lbl-cloud-status').innerText = "CONNECTED";
-                    document.getElementById('lbl-cloud-status').classList.add('text-emerald-500');
-                    document.getElementById('sync-dot').classList.replace('bg-slate-300', 'bg-emerald-500');
-                    document.getElementById('sync-text').innerText = "CLOUD READY";
-                }
-            },
-
             sync: async function() {
-                const msg = document.getElementById('lbl-sync-msg');
-                msg.innerText = "Syncing...";
-                
-                try {
-                    const data = App.data.dump();
-                    const fileContent = JSON.stringify(data);
-                    const file = new Blob([fileContent], { type: 'application/json' });
-                    const metadata = { name: 'geoguard_backup.json', mimeType: 'application/json' };
-
-                    const form = new FormData();
-                    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                    form.append('file', file);
-
-                    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + this.token },
-                        body: form
-                    });
-
-                    msg.innerText = "Sync Successful: " + Utils.now();
-                } catch (e) {
-                    console.error(e);
-                    msg.innerText = "Sync Failed.";
-                }
+                if(!this.token) return alert("Please Login First");
+                const blob = new Blob([JSON.stringify(App.data.dump())], {type:'application/json'});
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify({name:'geo_backup.json'})],{type:'application/json'}));
+                form.append('file', blob);
+                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method:'POST', headers:{'Authorization':`Bearer ${this.token}`}, body:form
+                });
+                document.getElementById('sync-status').innerText="Synced Now";
             }
         };
 
-        /**
-         * --------------------------------------------------------------------------------
-         * MODULE: LOCAL DATA STORAGE
-         * --------------------------------------------------------------------------------
-         */
+        // --- DATA STORE ---
         const Storage = {
-            state: {
-                locations: [],
-                orders: [],
-                profile: { name: '' }
-            },
-
+            state: { locs:[], orders:[], prof:{} },
             init: function() {
-                const saved = localStorage.getItem(CONFIG.DB_KEY);
-                if (saved) {
-                    try { this.state = JSON.parse(saved); } catch (e) { console.error("DB Corrupt"); }
-                }
+                const s = localStorage.getItem(CONFIG.DB);
+                if(s) this.state = JSON.parse(s);
             },
-
-            save: function() {
-                localStorage.setItem(CONFIG.DB_KEY, JSON.stringify(this.state));
-            },
-
-            addLocation: function(name, lat, lng) {
-                this.state.locations.push({
-                    id: Utils.id(), name, lat, lng,
-                    isInside: false, 
-                    created: Date.now()
-                });
-                this.save();
-            },
-
-            removeLocation: function(id) {
-                this.state.locations = this.state.locations.filter(l => l.id !== id);
-                this.save();
-            },
-
-            addOrder: function(locName, desc, amt) {
-                this.state.orders.unshift({
-                    id: Utils.id(), loc: locName, desc, amt, 
-                    date: Date.now()
-                });
-                this.save();
-            },
-
-            updateProfile: function(name) {
-                this.state.profile.name = name;
-                this.save();
-            },
-
-            dump: function() { return this.state; }
-        };
-
-        /**
-         * --------------------------------------------------------------------------------
-         * MODULE: MAP ENGINE (Leaflet + OSRM)
-         * --------------------------------------------------------------------------------
-         */
-        const MapEngine = {
-            instance: null,
-            userMarker: null,
-            markers: {},
-            routeControl: null,
-
-            init: function() {
-                // Initialize Leaflet
-                this.instance = L.map('osm-map', { 
-                    zoomControl: false, 
-                    attributionControl: false 
-                }).setView([20.59, 78.96], 5); // Default India
-
-                // Tiles: CartoDB Light (Fast, Clean)
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 19
-                }).addTo(this.instance);
-
-                // User Marker (Custom Pulse Dot)
-                const userIcon = L.divIcon({
-                    className: 'bg-transparent',
-                    html: '<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-[0_0_10px_rgba(37,99,235,0.5)]"></div>',
-                    iconSize: [16, 16],
-                    iconAnchor: [8, 8]
-                });
-                this.userMarker = L.marker([0, 0], { icon: userIcon, zIndexOffset: 1000 }).addTo(this.instance);
-            },
-
-            updateUserPos: function(lat, lng, isFirst) {
-                this.userMarker.setLatLng([lat, lng]);
-                if (isFirst) this.instance.setView([lat, lng], 17);
-                
-                // Update Route Start Point if active
-                if (this.routeControl && App.state.target) {
-                    this.routeControl.setWaypoints([
-                        L.latLng(lat, lng),
-                        L.latLng(App.state.target.lat, App.state.target.lng)
-                    ]);
-                }
-            },
-
-            renderMarkers: function() {
-                // Clean old
-                for (let id in this.markers) this.instance.removeLayer(this.markers[id]);
-                this.markers = {};
-
-                // Add new
-                Storage.state.locations.forEach(loc => {
-                    // Color logic: Green if inside, Orange if Target, Blue default
-                    let color = '#3b82f6'; // Blue
-                    if (loc.isInside) color = '#10b981'; // Green
-                    else if (App.state.target && App.state.target.id === loc.id) color = '#f59e0b'; // Orange
-
-                    const iconHtml = `<div class="w-3 h-3 rounded-full border border-white shadow-sm transition-colors duration-300" style="background-color: ${color}"></div>`;
-                    const icon = L.divIcon({ className: 'bg-transparent', html: iconHtml, iconSize: [12, 12] });
-
-                    const m = L.marker([loc.lat, loc.lng], { icon }).addTo(this.instance);
-                    m.bindPopup(`<b style="font-family:sans-serif">${loc.name}</b>`);
-                    this.markers[loc.id] = m;
-                });
-            },
-
-            calculateRoute: function(lat1, lng1, lat2, lng2) {
-                if (this.routeControl) {
-                    this.instance.removeControl(this.routeControl);
-                    this.routeControl = null;
-                }
-
-                // OSRM Routing via Leaflet Routing Machine
-                this.routeControl = L.Routing.control({
-                    waypoints: [L.latLng(lat1, lng1), L.latLng(lat2, lng2)],
-                    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
-                    lineOptions: { styles: [{ color: '#3b82f6', weight: 6, opacity: 0.7 }] },
-                    show: false, // Hide built-in text box
-                    addWaypoints: false,
-                    draggableWaypoints: false,
-                    fitSelectedRoutes: false
-                }).addTo(this.instance);
-
-                // Listen for data
-                this.routeControl.on('routesfound', function(e) {
-                    const r = e.routes[0];
-                    App.ui.updateRouteStats(r.summary.totalDistance, r.summary.totalTime);
-                });
-            },
-
-            clearRoute: function() {
-                if (this.routeControl) {
-                    this.instance.removeControl(this.routeControl);
-                    this.routeControl = null;
-                }
-            },
-
-            zoom: function(dir) { this.instance.setZoom(this.instance.getZoom() + dir); },
-            recenter: function() { if (App.state.pos) this.instance.setView([App.state.pos.lat, App.state.pos.lng], 17); },
+            save: function() { localStorage.setItem(CONFIG.DB, JSON.stringify(this.state)); },
             
-            // Critical Fix for Blank Map
-            invalidate: function() {
-                setTimeout(() => this.instance.invalidateSize(), 100);
+            // Updated to accept full data object
+            addLocation: function(data) {
+                this.state.locs.push(data);
+                this.save();
+            },
+            
+            // Protected: User cannot delete
+            // removeLocation: function(id) { ... } // Disabled per requirements
+
+            addOrder: function(s, d, a) {
+                this.state.orders.unshift({id:Utils.id(), shop:s, desc:d, amt:a, date:Date.now()});
+                this.save();
             }
         };
 
-        /**
-         * --------------------------------------------------------------------------------
-         * MODULE: MAIN CONTROLLER
-         * --------------------------------------------------------------------------------
-         */
-        const App = {
-            state: {
-                pos: null,
-                target: null,
-                heading: 0
+        // --- MAP ENGINE ---
+        const MapEngine = {
+            map: null,
+            userMk: null,
+            markers: {},
+            init: function() {
+                this.map = L.map('osm-map', {zoomControl:false}).setView([20,78],5);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(this.map);
+                
+                const icon = L.divIcon({className:'bg-transparent', html:'<div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>'});
+                this.userMk = L.marker([0,0],{icon, zIndexOffset:1000}).addTo(this.map);
             },
+            updatePos: function(lat, lng, first) {
+                this.userMk.setLatLng([lat,lng]);
+                if(first) this.map.setView([lat,lng], 16);
+            },
+            render: function() {
+                for(let k in this.markers) this.map.removeLayer(this.markers[k]);
+                this.markers={};
+                Storage.state.locs.forEach(l => {
+                    const col = l.isInside ? '#16a34a' : '#2563eb';
+                    const icon = L.divIcon({className:'bg-transparent', html:`<div class="w-3 h-3 rounded-full border border-white shadow" style="background:${col}"></div>`});
+                    this.markers[l.id] = L.marker([l.lat, l.lng], {icon}).addTo(this.map).bindPopup(l.name);
+                });
+            },
+            recenter: function() { if(App.pos) this.map.setView([App.pos.lat, App.pos.lng], 16); }
+        };
 
+        // --- MAIN APP ---
+        const App = {
+            pos: null,
             init: function() {
                 Storage.init();
-                MapEngine.init();
                 Cloud.init();
-
+                MapEngine.init();
                 this.startGPS();
-                this.startCompass();
-                
-                // Initial Renders
                 this.ui.renderStores();
                 this.ui.renderOrders();
-                this.ui.updateSelect();
-                document.getElementById('input-profile-name').value = Storage.state.profile.name;
-                MapEngine.renderMarkers();
-            },
-
-            startGPS: function() {
-                if (!navigator.geolocation) return alert("GPS not supported");
-
-                const onPos = (p) => {
-                    const { latitude: lat, longitude: lng, accuracy: acc } = p.coords;
-                    const isFirst = !this.state.pos;
-                    this.state.pos = { lat, lng, acc };
-
-                    // Update UI Badge
-                    const badge = document.getElementById('gps-indicator');
-                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <span class="text-emerald-700 font-bold">GPS: ±${Math.round(acc)}m</span>`;
-                    badge.classList.replace('bg-slate-100', 'bg-emerald-50');
-                    badge.classList.replace('border-slate-200', 'border-emerald-200');
-
-                    // Update Map
-                    MapEngine.updateUserPos(lat, lng, isFirst);
-
-                    // Logic
-                    this.checkGeofences();
-                };
-
-                const onError = (e) => console.warn("GPS Error", e);
-
-                navigator.geolocation.watchPosition(onPos, onError, CONFIG.GPS_OPTIONS);
-            },
-
-            startCompass: function() {
-                window.addEventListener('deviceorientation', (e) => {
-                    const h = e.webkitCompassHeading || Math.abs(e.alpha - 360);
-                    if (h) {
-                        this.state.heading = Math.round(h);
-                        document.getElementById('hud-heading').innerText = this.state.heading;
-                    }
+                
+                // Compass
+                window.addEventListener('deviceorientation', e=>{
+                    const h = e.webkitCompassHeading || Math.abs(e.alpha-360);
+                    if(h) document.getElementById('hud-heading').innerText = Math.round(h);
                 }, true);
             },
-
-            checkGeofences: function() {
-                if (!this.state.pos) return;
-                
-                let isInsideAny = false;
-                let currentZoneName = "";
-
-                Storage.state.locations.forEach(loc => {
-                    const dist = Utils.dist(this.state.pos.lat, this.state.pos.lng, loc.lat, loc.lng);
+            startGPS: function() {
+                navigator.geolocation.watchPosition(p => {
+                    const {latitude:lat, longitude:lng, accuracy:acc} = p.coords;
+                    const f = !this.pos;
+                    this.pos = {lat, lng};
                     
-                    // Logic: Enter at 5m, Exit at 10m (Hysteresis)
-                    if (!loc.isInside && dist <= CONFIG.GEOFENCE_ENTER) {
-                        loc.isInside = true;
-                        // Log Entry (Optional: auto-log visitation)
-                        Storage.save();
-                        MapEngine.renderMarkers();
-                    } else if (loc.isInside && dist > CONFIG.GEOFENCE_EXIT) {
-                        loc.isInside = false;
-                        Storage.save();
-                        MapEngine.renderMarkers();
-                    }
-
-                    if (loc.isInside) {
-                        isInsideAny = true;
-                        currentZoneName = loc.name;
+                    // UI Update
+                    const ind = document.getElementById('gps-indicator');
+                    ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <span class="text-emerald-700 font-bold text-[10px]">±${Math.round(acc)}m</span>`;
+                    ind.className = "flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full";
+                    
+                    MapEngine.updatePos(lat, lng, f);
+                    this.checkZone();
+                }, e=>console.log(e), CONFIG.GPS);
+            },
+            checkZone: function() {
+                if(!this.pos) return;
+                let inside = false;
+                Storage.state.locs.forEach(l => {
+                    const d = Utils.dist(this.pos.lat, this.pos.lng, l.lat, l.lng);
+                    if(!l.isInside && d<=5) { l.isInside=true; Storage.save(); MapEngine.render(); }
+                    else if(l.isInside && d>10) { l.isInside=false; Storage.save(); MapEngine.render(); }
+                    
+                    if(l.isInside) {
+                        inside=true;
+                        document.getElementById('lbl-zone').innerText = l.name;
+                        document.getElementById('lbl-zone').className = "text-sm font-bold text-emerald-600";
+                        document.getElementById('lbl-ord-shop').innerText = l.name;
+                        document.getElementById('btn-take-order').disabled=false;
+                        document.getElementById('btn-take-order').className = "px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow";
                     }
                 });
-
-                this.ui.updateZoneStatus(isInsideAny, currentZoneName);
-            },
-
-            handleTargetChange: function() {
-                const id = document.getElementById('input-target').value;
-                if (!id) {
-                    this.state.target = null;
-                    MapEngine.clearRoute();
-                    document.getElementById('nav-stats').classList.add('hidden');
-                    MapEngine.renderMarkers();
-                    return;
-                }
-
-                const loc = Storage.state.locations.find(l => l.id === id);
-                this.state.target = loc;
-                MapEngine.renderMarkers(); // Updates colors
-
-                if (this.state.pos) {
-                    document.getElementById('nav-stats').classList.remove('hidden');
-                    MapEngine.calculateRoute(this.state.pos.lat, this.state.pos.lng, loc.lat, loc.lng);
+                if(!inside) {
+                    document.getElementById('lbl-zone').innerText = "Outside Zone";
+                    document.getElementById('lbl-zone').className = "text-sm font-bold text-slate-500";
+                    document.getElementById('btn-take-order').disabled=true;
+                    document.getElementById('btn-take-order').className = "px-4 py-2 rounded-lg bg-slate-100 text-slate-300 text-xs font-bold";
                 }
             },
-
-            openExternalMap: function() {
-                if (this.state.target && this.state.pos) {
-                    const url = `https://www.openstreetmap.org/directions?engine=graphhopper_car&route=${this.state.pos.lat}%2C${this.state.pos.lng}%3B${this.state.target.lat}%2C${this.state.target.lng}`;
-                    window.open(url, '_blank');
-                } else {
-                    alert("Select a destination first.");
-                }
-            },
-
-            // --- DATA ACTIONS ---
             data: {
+                dump: () => Storage.state,
                 addLocation: function() {
-                    const name = document.getElementById('input-loc-name').value;
-                    if (name && App.state.pos) {
-                        Storage.addLocation(name, App.state.pos.lat, App.state.pos.lng);
-                        App.ui.closeModals();
-                        App.ui.renderStores();
-                        App.ui.updateSelect();
-                        MapEngine.renderMarkers();
-                        document.getElementById('input-loc-name').value = "";
-                    }
-                },
-                
-                removeLocation: function(id) {
-                    if (confirm("Delete this store?")) {
-                        Storage.removeLocation(id);
-                        App.ui.renderStores();
-                        App.ui.updateSelect();
-                        MapEngine.renderMarkers();
-                    }
-                },
-
-                addOrder: function() {
-                    const desc = document.getElementById('input-ord-desc').value;
-                    const amt = document.getElementById('input-ord-amt').value;
-                    const shop = document.getElementById('lbl-modal-shop').innerText;
+                    const name = document.getElementById('inp-name').value;
+                    if(!name || !App.pos) return alert("Name & GPS required");
                     
-                    if (desc && amt) {
-                        Storage.addOrder(shop, desc, amt);
+                    const payType = document.getElementById('inp-pay-type').value;
+                    const isCredit = payType === 'Credit';
+
+                    const payload = {
+                        id: Utils.id(),
+                        name: name,
+                        lat: App.pos.lat,
+                        lng: App.pos.lng,
+                        type: document.getElementById('inp-type').value,
+                        phone: document.getElementById('inp-phone').value || '',
+                        address: document.getElementById('inp-address').value || '',
+                        remarks: document.getElementById('inp-remarks').value || '',
+                        payment: {
+                            type: payType,
+                            limit: isCredit ? document.getElementById('inp-cred-limit').value : null,
+                            cycle: isCredit ? document.getElementById('inp-cred-days').value : null,
+                            gst: isCredit ? document.getElementById('inp-gst').value : null
+                        },
+                        isInside: false,
+                        created: Date.now()
+                    };
+
+                    Storage.addLocation(payload);
+                    App.ui.closeModals();
+                    App.ui.renderStores();
+                    MapEngine.render();
+                    
+                    // Reset Form
+                    document.getElementById('inp-name').value = '';
+                    document.getElementById('inp-address').value = '';
+                },
+                addOrder: function() {
+                    const d = document.getElementById('inp-ord-desc').value;
+                    const a = document.getElementById('inp-ord-amt').value;
+                    const s = document.getElementById('lbl-ord-shop').innerText;
+                    if(d && a) {
+                        Storage.addOrder(s, d, a);
                         App.ui.closeModals();
                         App.ui.renderOrders();
-                        document.getElementById('input-ord-desc').value = "";
-                        document.getElementById('input-ord-amt').value = "";
+                        document.getElementById('inp-ord-desc').value = '';
+                        document.getElementById('inp-ord-amt').value = '';
                     }
                 },
-
-                clearLogs: function() {
-                    if (confirm("Clear all order history?")) {
-                        Storage.state.orders = [];
-                        Storage.save();
-                        App.ui.renderOrders();
-                    }
-                },
-
-                saveProfile: function() {
-                    const name = document.getElementById('input-profile-name').value;
-                    Storage.updateProfile(name);
-                    alert("Profile Saved");
-                },
-
                 exportCSV: function() {
-                    let csv = "ID,TYPE,LOCATION,DETAILS,AMOUNT,DATE\n";
-                    Storage.state.orders.forEach(o => {
-                        csv += `${o.id},ORDER,"${o.loc}","${o.desc}",${o.amt},${new Date(o.date).toLocaleString()}\n`;
-                    });
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
+                    let c = "TYPE,SHOP,DETAILS,AMT,DATE\n";
+                    Storage.state.orders.forEach(o=> c+=`ORDER,${o.shop},"${o.desc}",${o.amt},${Utils.date(o.date)}\n`);
+                    Storage.state.locs.forEach(l=> c+=`SHOP,${l.name},"${l.address} - ${l.payment.type}",0,${Utils.date(l.created)}\n`);
                     const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'geoguard_export.csv';
+                    a.href = URL.createObjectURL(new Blob([c],{type:'text/csv'}));
+                    a.download = 'geo_export.csv';
                     a.click();
                 }
             },
-
-            // --- UI HANDLERS ---
             ui: {
-                switchTab: function(tabId) {
-                    // Hide all
-                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-                    document.querySelectorAll('.nav-btn').forEach(btn => {
-                        btn.classList.remove('active');
-                        const icon = btn.querySelector('i');
-                        const txt = btn.querySelector('span');
-                        // Reset colors
-                        icon.classList.remove('text-blue-600'); icon.classList.add('text-slate-400');
-                        txt.classList.remove('text-blue-600'); txt.classList.add('text-slate-400');
+                switchTab: function(t) {
+                    document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+                    document.getElementById('view-'+t).classList.add('active');
+                    document.querySelectorAll('.nav-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.target === t);
+                        // Update Icon Colors
+                        const icon = b.querySelector('i');
+                        const txt = b.querySelector('span');
+                        if(b.dataset.target === t) {
+                            icon.classList.remove('text-slate-400'); icon.classList.add('text-blue-600');
+                            txt.classList.remove('text-slate-400'); txt.classList.add('text-blue-600');
+                        } else {
+                            icon.classList.add('text-slate-400'); icon.classList.remove('text-blue-600');
+                            txt.classList.add('text-slate-400'); txt.classList.remove('text-blue-600');
+                        }
                     });
-
-                    // Show active
-                    document.getElementById('view-' + tabId).classList.add('active');
-                    const activeBtn = document.querySelector(`.nav-btn[data-target="${tabId}"]`);
-                    if(activeBtn) {
-                        const icon = activeBtn.querySelector('i');
-                        const txt = activeBtn.querySelector('span');
-                        icon.classList.add('text-blue-600'); icon.classList.remove('text-slate-400');
-                        txt.classList.add('text-blue-600'); txt.classList.remove('text-slate-400');
-                    }
-
-                    // Map Fix
-                    if (tabId === 'map') MapEngine.invalidate();
+                    if(t==='map') setTimeout(()=>MapEngine.map.invalidateSize(), 100);
                 },
-
                 modal: function(id) {
-                    const el = document.getElementById('modal-' + id);
-                    el.classList.add('open');
-                    
-                    if (id === 'add' && App.state.pos) {
-                        document.getElementById('lbl-modal-coords').innerText = `${App.state.pos.lat.toFixed(5)}, ${App.state.pos.lng.toFixed(5)}`;
+                    document.getElementById('modal-'+id).classList.add('open');
+                    if(id==='add' && App.pos) {
+                        document.getElementById('lbl-gps-coords').innerText = `${App.pos.lat.toFixed(6)}, ${App.pos.lng.toFixed(6)}`;
                     }
                 },
-
                 closeModals: function() {
-                    document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.remove('open'));
+                    document.querySelectorAll('.modal-backdrop').forEach(e=>e.classList.remove('open'));
                 },
-
-                updateZoneStatus: function(isInside, name) {
-                    const lbl = document.getElementById('lbl-zone');
-                    const btn = document.getElementById('btn-take-order');
-
-                    if (isInside) {
-                        lbl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> <span class="text-emerald-600">${name}</span>`;
-                        btn.disabled = false;
-                        btn.classList.remove('bg-slate-200', 'text-slate-400');
-                        btn.classList.add('bg-emerald-600', 'text-white', 'hover:bg-emerald-700', 'shadow-md');
-                        document.getElementById('lbl-modal-shop').innerText = name;
-                    } else {
-                        lbl.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> Outside Zone`;
-                        btn.disabled = true;
-                        btn.classList.add('bg-slate-200', 'text-slate-400');
-                        btn.classList.remove('bg-emerald-600', 'text-white', 'hover:bg-emerald-700', 'shadow-md');
-                        document.getElementById('lbl-modal-shop').innerText = "--";
-                    }
+                toggleCreditFields: function() {
+                    const val = document.getElementById('inp-pay-type').value;
+                    const div = document.getElementById('section-credit');
+                    if(val === 'Credit') div.classList.remove('hidden'); else div.classList.add('hidden');
                 },
+                renderStores: function() {
+                    const list = document.getElementById('list-stores');
+                    const stores = Storage.state.locs;
+                    if(!stores.length) { list.innerHTML='<div class="text-center text-slate-400 p-4">No shops saved.</div>'; return; }
+                    
+                    list.innerHTML = stores.map(s => {
+                        let badges = `<span class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] border border-slate-200">${s.type}</span>`;
+                        if(s.payment.type === 'Credit') badges += `<span class="ml-1 px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] border border-orange-200">Credit</span>`;
+                        else if(s.payment.type === 'Cash') badges += `<span class="ml-1 px-1.5 py-0.5 bg-green-100 text-green-600 rounded text-[10px] border border-green-200">Cash</span>`;
+                        else badges += `<span class="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] border border-blue-200">Online</span>`;
 
-                updateRouteStats: function(distMeters, timeSeconds) {
-                    let dStr = distMeters < 1000 ? Math.round(distMeters) + " m" : (distMeters / 1000).toFixed(1) + " km";
-                    let tStr = Math.round(timeSeconds / 60) + " min";
-                    document.getElementById('val-dist').innerText = dStr;
-                    document.getElementById('val-time').innerText = tStr;
+                        return `
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="font-bold text-slate-800">${s.name}</div>
+                                    <div class="mt-1 flex flex-wrap gap-1">${badges}</div>
+                                    <div class="mt-2 text-xs text-slate-500 flex items-center gap-1"><i class="ph-bold ph-map-pin"></i> ${s.address || 'No Address'}</div>
+                                    ${s.phone ? `<div class="mt-1 text-xs text-slate-500 flex items-center gap-1"><i class="ph-bold ph-phone"></i> ${s.phone}</div>` : ''}
+                                </div>
+                                <div class="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 rounded">
+                                    ${s.lat.toFixed(3)}, ${s.lng.toFixed(3)}
+                                </div>
+                            </div>
+                            <!-- Note: Delete button removed per requirements -->
+                        </div>`;
+                    }).join('');
                 },
-
-                updateSelect: function() {
-                    const sel = document.getElementById('input-target');
-                    let html = '<option value="">Select Destination...</option>';
-                    Storage.state.locations.forEach(l => {
-                        html += `<option value="${l.id}">${l.name}</option>`;
-                    });
-                    sel.innerHTML = html;
-                    if(App.state.target) sel.value = App.state.target.id;
-                },
-
                 renderOrders: function() {
                     const list = document.getElementById('list-orders');
                     let html = '';
-                    let total = 0;
-                    
                     Storage.state.orders.forEach(o => {
-                        total += parseFloat(o.amt);
-                        html += `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-slate-700">${o.loc}</div>
-                                <div class="text-[10px] text-slate-400">${new Date(o.date).toLocaleDateString()}</div>
-                            </td>
-                            <td class="px-4 py-3 text-slate-500">${o.desc}</td>
-                            <td class="px-4 py-3 text-right font-mono font-bold text-slate-700">${Utils.fmtMoney(o.amt)}</td>
-                        </tr>`;
+                        html += `<tr><td class="px-4 py-3 font-bold text-slate-700">${o.shop}</td><td class="px-4 py-3 text-slate-500">${o.desc}</td><td class="px-4 py-3 text-right font-bold text-emerald-600 font-mono">${Utils.fmtMoney(o.amt)}</td></tr>`;
                     });
-
-                    if(!html) html = `<tr><td colspan="3" class="px-4 py-8 text-center text-slate-400 italic">No orders recorded yet.</td></tr>`;
-                    
-                    list.innerHTML = html;
-                    document.getElementById('val-total').innerText = Utils.fmtMoney(total);
-                },
-
-                renderStores: function() {
-                    const list = document.getElementById('list-stores');
-                    const stores = Storage.state.locations;
-
-                    if (stores.length === 0) {
-                        list.innerHTML = `<div class="p-6 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">No stores saved yet.</div>`;
-                        return;
-                    }
-
-                    list.innerHTML = stores.map(s => `
-                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-colors">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                                    <i class="ph-bold ph-storefront text-xl"></i>
-                                </div>
-                                <div>
-                                    <div class="font-bold text-slate-700 text-sm">${s.name}</div>
-                                    <div class="text-[10px] text-slate-400 font-mono">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</div>
-                                </div>
-                            </div>
-                            <button onclick="App.data.removeLocation('${s.id}')" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                <i class="ph-bold ph-trash"></i>
-                            </button>
-                        </div>
-                    `).join('');
+                    list.innerHTML = html || '<tr><td colspan="3" class="p-4 text-center text-slate-400">No orders.</td></tr>';
                 }
             }
         };
 
-        // --- BOOTSTRAP ---
-        window.onload = function() {
-            App.init();
-        };
-
-        // Expose for Cloud Auth Callback
-        window.Cloud = Cloud;
+        // --- START ---
         window.App = App;
-
+        window.onload = () => App.init();
     </script>
 </body>
 </html>
