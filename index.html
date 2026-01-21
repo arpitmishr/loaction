@@ -233,6 +233,20 @@
                 </div>
             </div>
 
+            <!-- === TAB 5: ADMIN (MANAGER ONLY) === -->
+<div id="tab-admin" class="tab-content space-y-4 hidden">
+    <h2 class="text-lg font-bold text-white border-l-4 border-red-500 pl-3">Pending Approvals</h2>
+    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+        <p class="text-xs text-slate-400 mb-3">Review new shops added by salesmen.</p>
+        <button onclick="drive.fetchPendingRequests()" class="w-full py-2 bg-slate-800 border border-slate-700 rounded text-blue-400 text-xs font-bold mb-4">
+            <i class="ph-bold ph-arrows-clockwise"></i> Refresh List
+        </button>
+        <div id="admin-pending-list" class="space-y-3">
+            <div class="text-center text-slate-500 text-xs py-4">No pending requests</div>
+        </div>
+    </div>
+</div>
+
             <!-- SYNC STATUS -->
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
                 <h3 class="font-bold text-white mb-2 flex items-center gap-2">
@@ -264,6 +278,9 @@
             <button onclick="app.switchTab('profile')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="profile">
                 <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
             </button>
+            <button id="nav-admin-btn" onclick="app.switchTab('admin')" class="nav-btn hidden flex-col items-center gap-1 text-slate-500 w-full" data-target="admin">
+    <i class="ph-bold ph-shield-check text-xl"></i><span class="text-[10px]">Admin</span>
+</button>
         </div>
     </nav>
 
@@ -453,65 +470,153 @@ class GoogleCloud {
     // --- FOLDER & FILE LOGIC ---
     // --- INSERT/REPLACE INSIDE class GoogleCloud { ... } ---
 
+    // --- ADD/UPDATE INSIDE class GoogleCloud ---
+
+    // 1. Update ensureFolderStructure to create 'pending' folder
     async ensureFolderStructure() {
-        const msg = document.getElementById('login-status');
-        msg.innerText = "📂 Syncing User Profile...";
-
-        try {
-            // 1. Get Folder IDs
-            this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
-            const userDataFolderId = await this.findOrCreateFolder('user_data', this.rootId);
-            const ordersFolderId = await this.findOrCreateFolder('orders', this.rootId);
-
-            // 2. Define File Names
-            const safeEmail = this.userEmail.replace(/[@.]/g, '_');
-            const userFileName = `${safeEmail}.csv`; // Result: freskeypiyo_gmail_com.csv
-
-            // 3. HANDLE USER PROFILE FILE (user_data folder)
-            this.userFileId = await this.findFileId(userFileName, userDataFolderId);
-            
-            if (this.userFileId) {
-                // File exists: Download and Restore
-                console.log("Found Profile. Downloading...");
-                const content = await this.downloadFile(this.userFileId);
-                if (content) this.store.restoreProfileFromCSV(content);
-            } else {
-                // File missing: Create new with current local data
-                console.log("Creating New Profile on Cloud...");
-                const current = this.store.getProfile();
-                const initialCSV = `NAME,PHONE\n"${current.name}","${current.id}"`;
-                this.userFileId = await this.createFile(userFileName, userDataFolderId, initialCSV);
-            }
-
-            // 4. Handle Orders & Shops (Existing logic...)
-            // (Keep your existing Shops/Orders loading logic here from the previous step)
-            // ...
-            
-            // Finish
-            this.app.initUI(); 
-            this.app.initMap();
-            msg.innerText = "✅ Data Synced";
-            setTimeout(() => document.getElementById('modal-welcome').classList.add('hidden'), 1000);
-
-        } catch (e) { console.error("Sync Error", e); }
+        // ... (Previous code for root, user_data, orders) ...
+        this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
+        // ...
+        
+        // NEW: Create Pending Folder
+        this.pendingFolderId = await this.findOrCreateFolder('pending', this.rootId);
+        
+        // CHECK IF MANAGER
+        if (this.userEmail === 'freskeypiyo@gmail.com') {
+            document.getElementById('nav-admin-btn').classList.remove('hidden'); // Show Admin Tab
+            document.getElementById('tab-admin').classList.remove('hidden'); // Enable DOM access
+        }
+        
+        // ... (Rest of existing logic) ...
     }
 
-    // NEW METHOD: Call this whenever profile changes
-    async syncProfile() {
-        if (!this.userFileId) return;
-        const p = this.store.getProfile();
-        const csvContent = `NAME,PHONE\n"${p.name}","${p.id}"`;
-        await this.updateFileContent(this.userFileId, csvContent);
-        console.log("☁️ Profile Auto-Saved to Cloud");
+    // 2. LOGIC: Salesman Saves Shop -> Goes to Pending File
+    async submitShopForApproval(shopData) {
+        // shopData = { name, lat, lng, address, contact, ... }
+        const safeEmail = this.userEmail.replace(/[@.]/g, '_');
+        const fileName = `pending_shops_${safeEmail}.csv`;
         
-        // Visual Feedback
-        const status = document.getElementById('drive-msg');
-        if(status) {
-            status.innerText = "Saving Profile...";
-            setTimeout(() => status.innerText = "Sync Active", 2000);
+        // Check if user already has a pending file
+        let fileId = await this.findFileId(fileName, this.pendingFolderId);
+        
+        // CSV Format: NAME,LAT,LNG,CONTACT,ADDED_BY_EMAIL,TIMESTAMP
+        const line = `"${shopData.name}",${shopData.lat},${shopData.lng},"${shopData.contact}","${this.userEmail}",${Date.now()}`;
+        
+        if (fileId) {
+            // Append to existing file
+            const currentContent = await this.downloadFile(fileId);
+            const newContent = currentContent + '\n' + line;
+            await this.updateFileContent(fileId, newContent);
+        } else {
+            // Create new file
+            const header = "NAME,LAT,LNG,CONTACT,BY,TS\n";
+            await this.createFile(fileName, this.pendingFolderId, header + line);
+        }
+        alert("Shop sent to Manager for Approval!");
+    }
+
+    // 3. LOGIC: Manager Fetches Pending List
+    async fetchPendingRequests() {
+        if (this.userEmail !== 'freskeypiyo@gmail.com') return;
+
+        const listContainer = document.getElementById('admin-pending-list');
+        listContainer.innerHTML = '<div class="text-center text-blue-400">Scanning...</div>';
+
+        // List all files in 'pending' folder
+        const q = `'${this.pendingFolderId}' in parents and trashed = false`;
+        const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+        
+        let html = '';
+        let pendingCount = 0;
+
+        for (const file of res.result.files) {
+            const content = await this.downloadFile(file.id);
+            if (!content) continue;
+
+            const lines = content.split('\n').slice(1); // Skip header
+            lines.forEach((line, index) => {
+                if (!line.trim()) return;
+                const cols = line.split(','); // Simple parse
+                // cols: [0]Name, [1]Lat, [2]Lng, [3]Contact, [4]Email, [5]TS
+                
+                const shopName = cols[0].replace(/"/g, '');
+                const salesman = cols[4].replace(/"/g, '');
+                
+                // Create Card for UI
+                html += `
+                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="font-bold text-white text-sm">${shopName}</div>
+                            <div class="text-[10px] text-blue-400">By: ${salesman}</div>
+                        </div>
+                        <div class="text-[9px] text-slate-500 font-mono">${new Date(parseInt(cols[5])).toLocaleDateString()}</div>
+                    </div>
+                    <div class="flex gap-2 mt-1">
+                        <button onclick="drive.approveShop('${file.id}', ${index}, '${escape(line)}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded">APPROVE</button>
+                        <button onclick="drive.rejectShop('${file.id}', ${index})" class="flex-1 py-1.5 bg-red-900/50 border border-red-800 text-red-400 text-[10px] font-bold rounded">REJECT</button>
+                    </div>
+                </div>`;
+                pendingCount++;
+            });
+        }
+
+        listContainer.innerHTML = html || '<div class="text-center text-slate-500 text-xs">No pending requests</div>';
+    }
+
+    // 4. LOGIC: Manager Approves Shop
+    async approveShop(fileId, lineIndex, lineDataEscaped) {
+        const lineData = unescape(lineDataEscaped);
+        const cols = lineData.split(',');
+        
+        // 1. Construct Master Shop Entry
+        // Format: ID,NAME,LAT,LNG,TAG
+        const name = cols[0].replace(/"/g, '');
+        const lat = cols[1];
+        const lng = cols[2];
+        const salesman = cols[4].replace(/"/g, ''); // The email
+        
+        // Extract "Name" from email (e.g., "john" from john@gmail.com) for the Tag
+        const tagName = salesman.split('@')[0];
+        const taggedName = `${name} (By ${tagName})`; // Apply Tag
+        const uuid = Date.now().toString(36); // Generate ID
+
+        const newMasterLine = `${uuid},"${taggedName}",${lat},${lng},"Approved"`;
+
+        // 2. Append to shops_master.csv
+        if (this.shopsFileId) {
+            const currentMaster = await this.downloadFile(this.shopsFileId);
+            await this.updateFileContent(this.shopsFileId, currentMaster + '\n' + newMasterLine);
+        }
+
+        // 3. Remove from Pending File
+        await this.removeFromPendingFile(fileId, lineIndex);
+        
+        // 4. Refresh UI
+        alert("Shop Approved & Added to Master List!");
+        this.fetchPendingRequests();
+        
+        // 5. Force reload Master List locally
+        const updatedMaster = await this.downloadFile(this.shopsFileId);
+        this.store.restoreShopsFromCSV(updatedMaster);
+        this.app.initMap();
+    }
+
+    async rejectShop(fileId, lineIndex) {
+        if(confirm("Reject and delete this request?")) {
+            await this.removeFromPendingFile(fileId, lineIndex);
+            this.fetchPendingRequests();
         }
     }
 
+    // Helper to delete line from CSV in Drive
+    async removeFromPendingFile(fileId, lineIndexToRemove) {
+        const content = await this.downloadFile(fileId);
+        const lines = content.split('\n');
+        // Filter out the line (index + 1 because of header)
+        const newLines = lines.filter((_, idx) => idx !== (lineIndexToRemove + 1));
+        await this.updateFileContent(fileId, newLines.join('\n'));
+    }
     // --- HELPER METHODS ---
 
     async findOrCreateFolder(name, parentId = null) {
@@ -923,17 +1028,34 @@ class App {
         if(t==='store') this.renderStores();
     }
 
+// --- UPDATE INSIDE class App { ... } ---
+
     saveLocation() {
-        const name=document.getElementById('inp-name').value;
-        if(name && this.pos) {
-            this.store.saveLoc({ id:Utils.uuid(), name, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now() });
-            this.locs=this.store.getLocs();
-            this.populateDropdowns();
-            this.updateMapMarkers();
-            this.closeModals();
-            this.drive.save(); // AUTO SAVE
-            alert("Shop Saved!");
-        } else { alert("Name & GPS Required"); }
+        const name = document.getElementById('inp-name').value;
+        const contact = document.getElementById('inp-contact').value;
+        
+        if (!name || !this.pos) return alert("Name & GPS Required");
+        
+        const shopData = {
+            name: name,
+            contact: contact,
+            lat: this.pos.lat,
+            lng: this.pos.lng
+        };
+
+        // IF MANAGER: Save Directly
+        if (this.drive.userEmail === 'freskeypiyo@gmail.com') {
+            const id = Utils.uuid();
+            this.store.saveLoc({ ...shopData, id, isInside: true });
+            this.drive.save(); // Syncs to master
+            alert("Shop Saved to Master List");
+        } 
+        // IF SALESMAN: Send to Pending
+        else {
+            this.drive.submitShopForApproval(shopData);
+        }
+
+        this.closeModals();
     }
 
     renderStores() {
