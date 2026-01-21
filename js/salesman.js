@@ -1,28 +1,34 @@
-// js/salesman.js
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
 
-const loader = document.getElementById('loader');
-const content = document.getElementById('content');
+const bodyContent = document.body;
+bodyContent.style.visibility = "hidden";
 
 onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
+    if (!user) {
+        window.location.href = 'index.html';
+        return;
+    }
 
-        if (docSnap.exists() && docSnap.data().role === 'salesman') {
-            loader.style.display = 'none';
-            content.style.display = 'block';
-            document.getElementById('user-email').innerText = user.email;
+    try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        
+        if (userDoc.exists() && userDoc.data().role === 'salesman') {
+            // Authorized
+            bodyContent.style.visibility = "visible";
+            console.log("Salesman access granted.");
         } else {
-            alert("Access Denied. Salesmen only.");
-            logoutUser();
+            // Wrong role
+            alert("Access Denied: You are not a Salesman.");
+            await logoutUser();
         }
-    } else {
+    } catch (error) {
+        console.error("Auth Check Error:", error);
         window.location.href = 'index.html';
     }
 });
 
-document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+const btn = document.getElementById('logoutBtn');
+if(btn) btn.addEventListener('click', logoutUser);
