@@ -3,6 +3,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebas
 import { getAuth } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
+// Your provided configuration
 const firebaseConfig = {
   apiKey: "AIzaSyD08m5A0JA1VLkJkZ6Ktoz5dq6bVEgCLwA",
   authDomain: "sales-route-management.firebaseapp.com",
