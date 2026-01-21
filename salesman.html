@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Salesman Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="loader">Verifying Salesman Access...</div>
+
+    <div id="content" style="display: none;">
+        <nav>
+            <h1>Sales Dashboard</h1>
+            <button id="logoutBtn">Logout</button>
+        </nav>
+        <div class="main-body">
+            <p>Welcome, <span id="user-email"></span></p>
+            <div class="card">
+                <h3>My Routes</h3>
+                <p>View assigned routes here.</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/salesman.js"></script>
+</body>
+</html>
