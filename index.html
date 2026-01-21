@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
-    <title>GeoGuard Logistics | Cloud Sync</title>
+    <title>GeoGuard Logistics | Pro</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,7 +28,7 @@
         }
     </script>
 
-    <!-- LEAFLET MAP CSS & JS (OpenStreetMap) -->
+    <!-- LEAFLET MAP CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -45,13 +45,9 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .modal { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0; pointer-events: none; transform: scale(0.95); }
         .modal.open { opacity: 1; pointer-events: auto; transform: scale(1); }
-        
-        /* Tab Transitions */
         .tab-content { display: none; animation: fadeIn 0.2s ease-in-out; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Leaflet Dark Mode Tweaks */
         .leaflet-container { background: #0f172a; font-family: inherit; }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #fff; border: 1px solid #334155; }
         .leaflet-popup-close-button { color: #94a3b8 !important; }
@@ -80,49 +76,45 @@
         </div>
     </header>
 
-    <!-- MAIN CONTENT AREA -->
+    <!-- MAIN CONTENT -->
     <main class="flex-1 max-w-md mx-auto w-full pt-20 pb-24 px-4 overflow-y-auto no-scrollbar">
 
         <!-- === TAB 1: MAP & HOME === -->
         <div id="tab-home" class="tab-content active space-y-5">
-
-            <!-- === DAILY TARGETS CARD === -->
-<div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-    <div class="flex justify-between items-end mb-3">
-        <label class="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Daily Sales Targets</label>
-        <div class="text-[10px] text-slate-400" id="target-date-display">Today</div>
-    </div>
-
-    <!-- 1 LTR Target -->
-    <div class="mb-4">
-        <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300 font-medium">1 LTR Box</span>
-            <span id="label-1ltr" class="font-mono font-bold text-white">0 / 80</span>
-        </div>
-        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-            <div id="prog-1ltr" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-        </div>
-        <div id="msg-1ltr" class="text-[10px] text-right mt-1 h-3"></div>
-    </div>
-
-    <!-- 500 ML Target -->
-    <div>
-        <div class="flex justify-between text-xs mb-1">
-            <span class="text-slate-300 font-medium">500 ML Box</span>
-            <span id="label-500ml" class="font-mono font-bold text-white">0 / 20</span>
-        </div>
-        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-            <div id="prog-500ml" class="bg-purple-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-        </div>
-        <div id="msg-500ml" class="text-[10px] text-right mt-1 h-3"></div>
-    </div>
-</div>
             
-            <!-- OPENSTREETMAP CONTAINER -->
+            <!-- DAILY TARGETS DASHBOARD -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+                <div class="flex justify-between items-end mb-3">
+                    <label class="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Daily Sales Targets</label>
+                    <div class="text-[10px] text-slate-400" id="target-date-display">Today</div>
+                </div>
+                <!-- 1 LTR -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300 font-medium">1 LTR Box</span>
+                        <span id="label-1ltr" class="font-mono font-bold text-white">0 / 80</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div id="prog-1ltr" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div id="msg-1ltr" class="text-[10px] text-right mt-1 h-3"></div>
+                </div>
+                <!-- 500 ML -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-slate-300 font-medium">500 ML Box</span>
+                        <span id="label-500ml" class="font-mono font-bold text-white">0 / 20</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div id="prog-500ml" class="bg-purple-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div id="msg-500ml" class="text-[10px] text-right mt-1 h-3"></div>
+                </div>
+            </div>
+
+            <!-- MAP CONTAINER -->
             <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden z-0 group">
                 <div id="osm-map" class="absolute inset-0 w-full h-full z-10 block bg-slate-800"></div>
-                
-                <!-- Recenter Button -->
                 <button onclick="app.centerMap()" class="absolute bottom-4 right-4 z-[400] w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-blue-400 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
                     <i class="ph-bold ph-crosshair"></i>
                 </button>
@@ -169,11 +161,10 @@
         <div id="tab-orders" class="tab-content space-y-4">
             <h2 class="text-lg font-bold text-white border-l-4 border-blue-500 pl-3">Order History</h2>
             
-            <!-- Filters -->
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Date</label>
+                        <label class="text-[10px] text-slate-500 uppercase font-bold">Delivery Date</label>
                         <input type="date" id="filter-date" onchange="app.renderOrders()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
                     </div>
                     <div>
@@ -185,17 +176,14 @@
                 </div>
             </div>
 
-            <!-- List -->
             <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden min-h-[300px]">
                 <table class="w-full text-left text-xs">
                     <thead class="bg-slate-950 text-slate-500">
-                        <tr><th class="px-4 py-2">Shop</th><th class="px-4 py-2">Items</th><th class="px-4 py-2 text-right">Amt</th></tr>
+                        <tr><th class="px-4 py-2">Shop</th><th class="px-4 py-2">Details</th><th class="px-4 py-2 text-right">Amt</th></tr>
                     </thead>
-                    <tbody id="order-list" class="divide-y divide-slate-800 text-slate-300">
-                        <!-- Injected -->
-                    </tbody>
+                    <tbody id="order-list" class="divide-y divide-slate-800 text-slate-300"></tbody>
                     <tfoot class="bg-slate-950 text-white font-bold">
-                        <tr><td class="px-4 py-2" colspan="2">Total</td><td class="px-4 py-2 text-right text-emerald-400" id="order-total">₹0</td></tr>
+                        <tr><td class="px-4 py-2" colspan="2">Total Value</td><td class="px-4 py-2 text-right text-emerald-400" id="order-total">₹0</td></tr>
                     </tfoot>
                 </table>
             </div>
@@ -204,16 +192,13 @@
         <!-- === TAB 3: STORE MANAGEMENT === -->
         <div id="tab-store" class="tab-content space-y-4">
             <h2 class="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">My Stores</h2>
-            <div id="store-list" class="space-y-3">
-                <!-- Injected Stores -->
-            </div>
+            <div id="store-list" class="space-y-3"></div>
         </div>
 
         <!-- === TAB 4: PROFILE === -->
         <div id="tab-profile" class="tab-content space-y-4">
             <h2 class="text-lg font-bold text-white border-l-4 border-purple-500 pl-3">Rider Profile</h2>
             
-            <!-- Profile Card -->
             <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 text-center">
                 <div class="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center border-2 border-slate-700">
                     <i class="ph-fill ph-user text-4xl text-slate-500"></i>
@@ -231,36 +216,29 @@
                 </div>
             </div>
 
-            <!-- Cloud Sync Control -->
-            <!-- Inside #tab-profile -->
-<div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
-        <i class="ph-bold ph-google-logo text-white"></i> Google Cloud Backup
-    </h3>
-    <p class="text-xs text-slate-400 mb-4">
-        Sync Shops, Orders, and Sales Achievements to Drive.
-    </p>
-    
-    <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded-lg font-bold text-sm flex items-center justify-center gap-2 mb-2 hover:bg-gray-200 transition-colors">
-        <i class="ph-bold ph-sign-in"></i> Sign in with Google
-    </button>
-    
-    <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all">
-        <i class="ph-bold ph-cloud-arrow-up"></i> Sync Data Now
-    </button>
-    
-    <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500 font-mono">Not connected</div>
-</div>
+            <!-- GOOGLE DRIVE SECTION -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+                    <i class="ph-bold ph-google-logo text-white"></i> Google Cloud Backup
+                </h3>
+                <p class="text-xs text-slate-400 mb-4">Sync Shops, Orders, and Targets to Drive.</p>
+                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded-lg font-bold text-sm flex items-center justify-center gap-2 mb-2 hover:bg-gray-200">
+                    <i class="ph-bold ph-sign-in"></i> Sign in with Google
+                </button>
+                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all">
+                    <i class="ph-bold ph-cloud-arrow-up"></i> Sync Data Now
+                </button>
+                <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500 font-mono">Not connected</div>
+            </div>
 
-            <!-- Export -->
             <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
-                <i class="ph-bold ph-file-csv"></i> EXPORT ALL DATA
+                <i class="ph-bold ph-file-csv"></i> EXPORT CSV
             </button>
         </div>
 
     </main>
 
-    <!-- BOTTOM NAVIGATION -->
+    <!-- BOTTOM NAV -->
     <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-50 pb-safe">
         <div class="max-w-md mx-auto flex justify-around items-center h-16">
             <button onclick="app.switchTab('home')" class="nav-btn active flex flex-col items-center gap-1 text-slate-500 w-full" data-target="home">
@@ -278,105 +256,80 @@
         </div>
     </nav>
 
-    <!-- MODALS (Hidden) -->
-    <!-- UPDATED ADD MODAL -->
+    <!-- MODALS -->
+    <!-- Add Shop Modal -->
     <div id="modal-add" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 flex flex-col max-h-[85vh]">
-            
-            <!-- Header -->
             <div class="p-4 border-b border-slate-800">
                 <h3 class="font-bold text-white">Save Shop Location</h3>
                 <p class="text-[10px] text-slate-400">Current GPS: <span id="add-modal-gps" class="font-mono text-emerald-400">Waiting...</span></p>
             </div>
-
-            <!-- Scrollable Form -->
             <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="text" id="inp-name" placeholder="Shop Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                <input type="text" id="inp-auth" placeholder="Authorized Person *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                <input type="tel" id="inp-contact" placeholder="Contact Number *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                <textarea id="inp-addr" rows="2" placeholder="Full Address *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
                 
-                <!-- Important Fields -->
-                <div class="space-y-3">
-                    <div class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Important (Mandatory)</div>
-                    
-                    <input type="text" id="inp-name" placeholder="Shop Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
-                    
-                    <input type="text" id="inp-auth" placeholder="Authorized Person Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
-                    
-                    <input type="tel" id="inp-contact" placeholder="Contact Number *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none">
-                    
-                    <textarea id="inp-addr" rows="2" placeholder="Full Address *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white focus:border-blue-500 outline-none"></textarea>
+                <div class="grid grid-cols-2 gap-3">
+                    <select id="inp-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                        <option value="Cash">Type: Cash</option>
+                        <option value="Credit">Type: Credit</option>
+                    </select>
+                    <input type="text" id="inp-gst" placeholder="GST No." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
                 </div>
-
-                <!-- Optional Fields -->
-                <div class="space-y-3 pt-2 border-t border-slate-800">
-                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Optional</div>
-                    
-                    <div class="grid grid-cols-2 gap-3">
-                        <select id="inp-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                            <option value="Cash">Type: Cash</option>
-                            <option value="Credit">Type: Credit</option>
-                        </select>
-                        <input type="text" id="inp-gst" placeholder="GST No." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="number" id="inp-limit" placeholder="Credit Limit (₹)" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                        <input type="number" id="inp-days" placeholder="Credit Days" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                    </div>
-
-                    <textarea id="inp-remark" rows="1" placeholder="Remarks / Notes" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" id="inp-limit" placeholder="Credit Limit" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
+                    <input type="number" id="inp-days" placeholder="Credit Days" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
                 </div>
+                <textarea id="inp-remark" rows="1" placeholder="Remarks" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
             </div>
-
-            <!-- Footer Buttons -->
             <div class="p-4 border-t border-slate-800 flex gap-3 bg-slate-900 rounded-b-xl">
                 <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
-                <button onclick="app.saveLocation()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-900/20">Save Shop</button>
+                <button onclick="app.saveLocation()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg">Save Shop</button>
             </div>
         </div>
     </div>
 
-    <!-- UPDATED ORDER MODAL -->
+    <!-- Order Modal (Updated with Targets & Dates) -->
     <div id="modal-order" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-    <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 flex flex-col max-h-[90vh]">
-        
-        <div class="border-b border-slate-800 pb-2 mb-3">
-            <div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div>
-        </div>
-        
-        <div class="overflow-y-auto custom-scrollbar space-y-3">
-            <!-- QUANTITY INPUTS -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-blue-900/10 p-2 rounded border border-blue-900/30">
-                    <label class="text-[10px] text-blue-400 font-bold block mb-1">1 LTR (Box)</label>
-                    <input type="number" id="inp-qty-1ltr" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none focus:border-blue-500">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 flex flex-col max-h-[90vh]">
+            <div class="border-b border-slate-800 pb-2 mb-3">
+                <div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar space-y-3">
+                <!-- Targets -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-blue-900/10 p-2 rounded border border-blue-900/30">
+                        <label class="text-[10px] text-blue-400 font-bold block mb-1">1 LTR (Box)</label>
+                        <input type="number" id="inp-qty-1ltr" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none">
+                    </div>
+                    <div class="bg-purple-900/10 p-2 rounded border border-purple-900/30">
+                        <label class="text-[10px] text-purple-400 font-bold block mb-1">500 ML (Box)</label>
+                        <input type="number" id="inp-qty-500ml" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none">
+                    </div>
                 </div>
-                <div class="bg-purple-900/10 p-2 rounded border border-purple-900/30">
-                    <label class="text-[10px] text-purple-400 font-bold block mb-1">500 ML (Box)</label>
-                    <input type="number" id="inp-qty-500ml" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none focus:border-purple-500">
+                <!-- Details -->
+                <textarea id="input-order-details" rows="2" placeholder="Other Items / Remarks..." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm outline-none"></textarea>
+                <!-- Date & Amount -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Due Date</label>
+                        <input type="date" id="input-order-date" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Amount (₹)</label>
+                        <input type="number" id="input-order-amt" placeholder="Optional" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
+                    </div>
                 </div>
             </div>
-
-            <!-- OTHER DETAILS -->
-            <textarea id="input-order-details" rows="2" placeholder="Other Items / Remarks..." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm outline-none"></textarea>
-            
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Due Date</label>
-                    <input type="date" id="input-order-date" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
-                </div>
-                <div>
-                    <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Amount (₹)</label>
-                    <input type="number" id="input-order-amt" placeholder="Optional" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
-                </div>
+            <div class="flex gap-3 pt-4 mt-auto">
+                <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
+                <button onclick="app.submitOrder()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-lg">Confirm</button>
             </div>
-        </div>
-
-        <div class="flex gap-3 pt-4 mt-auto">
-            <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
-            <button onclick="app.submitOrder()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-lg">Confirm</button>
         </div>
     </div>
-</div>
 
+    <!-- Wifi Warning -->
     <div id="modal-wifi" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6 text-center">
         <div class="bg-slate-900 p-6 rounded-2xl border border-red-500 shadow-2xl max-w-xs">
             <i class="ph-fill ph-wifi-slash text-4xl text-red-500 mb-4"></i>
@@ -387,45 +340,46 @@
 
 <script>
 /**
- * ==========================================================================================
- * GEOGUARD LOGISTICS PRO - CLOUD EDITION (LEAFLET)
- * ==========================================================================================
+ * GEOGUARD LOGISTICS PRO - INTEGRATED EDITION
  */
 
-
-
-    
-// --- CONFIGURATION ---
-// --- UPDATED GOOGLE DRIVE SERVICE ---
+// --- 1. CONFIGURATION (REPLACE WITH YOUR KEYS) ---
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DB_FILE_NAME = 'geoguard_db.json';
 
+// --- 2. UTILITIES ---
+const Utils = {
+    getDist: (lat1, lon1, lat2, lon2) => {
+        const R=6371e3, rad=Math.PI/180;
+        const a = Math.sin((lat2-lat1)*rad/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin((lon2-lon1)*rad/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    },
+    getBearing: (lat1, lon1, lat2, lon2) => {
+        const rad=Math.PI/180, deg=180/Math.PI;
+        const y=Math.sin((lon2-lon1)*rad)*Math.cos(lat2*rad);
+        const x=Math.cos(lat1*rad)*Math.sin(lat2*rad)-Math.sin(lat1*rad)*Math.cos(lat2*rad)*Math.cos((lon2-lon1)*rad);
+        return (Math.atan2(y, x)*deg+360)%360;
+    },
+    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
+    fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
+};
+
+// --- 3. GOOGLE CLOUD SERVICE (ROBUST VERSION) ---
 class GoogleCloud {
     constructor(storeInstance) {
         this.store = storeInstance;
         this.tokenClient = null;
         this.accessToken = null;
         this.isReady = false;
-        
-        // Auto-load libraries
-        this.loadLibs();
-    }
-
-    loadLibs() {
-        const script1 = document.createElement('script');
-        script1.src = "https://accounts.google.com/gsi/client";
-        script1.async = true;
-        script1.defer = true;
-        document.body.appendChild(script1);
-
-        const script2 = document.createElement('script');
-        script2.src = "https://apis.google.com/js/api.js";
-        script2.async = true;
-        script2.defer = true;
-        script2.onload = () => this.initGapi();
-        document.body.appendChild(script2);
+        // Wait for Scripts to load then init
+        const check = setInterval(() => {
+            if (window.google && window.gapi) {
+                clearInterval(check);
+                this.initGapi();
+            }
+        }, 500);
     }
 
     initGapi() {
@@ -435,126 +389,91 @@ class GoogleCloud {
                     apiKey: GOOGLE_API_KEY,
                     discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
                 });
-
                 this.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: GOOGLE_CLIENT_ID,
                     scope: SCOPES,
                     callback: (resp) => {
-                        if (resp.error !== undefined) {
-                            throw (resp);
-                        }
+                        if (resp.error) throw resp;
                         this.accessToken = resp.access_token;
                         this.updateUI(true);
-                        this.sync(); // Auto-sync after login
+                        this.sync();
                     },
                 });
-
                 this.isReady = true;
-                console.log("Google API Ready");
-            } catch (err) {
-                console.error("GAPI Init Error:", err);
-                document.getElementById('drive-msg').innerText = "API Error: Check Console";
-            }
+                console.log("GAPI Ready");
+            } catch (err) { console.error("GAPI Error", err); }
         });
     }
 
     login() {
-        if (!this.isReady) return alert("Google Services loading... Wait 5s");
-        // Request token
+        if (!this.isReady) return alert("Google Service Loading... Please wait.");
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
     updateUI(isLoggedIn) {
-        const btnLogin = document.getElementById('btn-glogin');
-        const btnSync = document.getElementById('btn-gsync');
-        const status = document.getElementById('cloud-status');
-        const dot = document.getElementById('cloud-dot');
-        const msg = document.getElementById('drive-msg');
-
         if (isLoggedIn) {
-            btnLogin.classList.add('hidden');
-            btnSync.disabled = false;
-            btnSync.classList.replace('text-slate-500', 'text-white');
-            btnSync.classList.replace('bg-slate-800', 'bg-blue-600');
-            status.innerText = "ONLINE";
-            status.classList.add('text-blue-400');
-            dot.classList.replace('bg-slate-500', 'bg-blue-500');
-            dot.classList.add('animate-pulse');
-            msg.innerText = "Connected. Ready to Sync.";
+            document.getElementById('btn-glogin').classList.add('hidden');
+            const btn = document.getElementById('btn-gsync');
+            btn.disabled = false;
+            btn.classList.replace('bg-slate-800', 'bg-blue-600');
+            btn.classList.replace('text-slate-500', 'text-white');
+            document.getElementById('cloud-status').innerText = "CONNECTED";
+            document.getElementById('cloud-dot').classList.replace('bg-slate-500', 'bg-blue-500');
+            document.getElementById('drive-msg').innerText = "Connected. Ready.";
         }
     }
 
     async sync() {
         const msg = document.getElementById('drive-msg');
-        const btnSync = document.getElementById('btn-gsync');
-        
-        msg.innerText = "⏳ Syncing Data...";
-        btnSync.disabled = true;
-
+        msg.innerText = "⏳ Syncing...";
         try {
-            // 1. Prepare Data
             const localData = this.store.dump();
             const fileContent = JSON.stringify(localData, null, 2);
-            const fileObj = new Blob([fileContent], { type: 'application/json' });
-
-            // 2. Check if file exists
+            
             const q = `name = '${DB_FILE_NAME}' and trashed = false`;
             const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
             const files = res.result.files;
 
             if (files && files.length > 0) {
-                // UPDATE Existing File
-                const fileId = files[0].id;
-                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, {
                     method: 'PATCH',
                     headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json' },
                     body: fileContent
                 });
-                msg.innerText = "✅ Sync Complete (Updated)";
+                msg.innerText = "✅ Updated Successfully";
             } else {
-                // CREATE New File
                 const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
                 const form = new FormData();
                 form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', fileObj);
-
+                form.append('file', new Blob([fileContent], { type: 'application/json' }));
+                
                 await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + this.accessToken },
                     body: form
                 });
-                msg.innerText = "✅ Sync Complete (Created)";
+                msg.innerText = "✅ Created & Saved";
             }
-            
-            // Optional: Save timestamp of last sync locally
-            localStorage.setItem('last_sync_ts', new Date().toLocaleTimeString());
-
         } catch (e) {
             console.error(e);
-            msg.innerText = "❌ Sync Failed (See Console)";
-            if(e.status === 401) {
-                alert("Session Expired. Please Login Again.");
-                window.location.reload();
-            }
-        } finally {
-            btnSync.disabled = false;
+            msg.innerText = "❌ Sync Failed";
         }
     }
 }
 
-// --- DATA STORE ---
+// --- 4. DATA STORE ---
 class Store {
     constructor() {
-        this.LOCS = 'geo_shops';
-        this.LOGS = 'geo_activity';
-        this.PROF = 'geo_profile';
+        this.LOCS = 'geo_shops'; this.LOGS = 'geo_activity'; this.PROF = 'geo_profile';
     }
     getLocs() { return JSON.parse(localStorage.getItem(this.LOCS)) || []; }
-    saveLoc(l) { const d = this.getLocs(); d.push(l); localStorage.setItem(this.LOCS, JSON.stringify(d)); return d; }
+    saveLoc(l) { const d = this.getLocs(); d.push(l); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
     updateLoc(l) { const d = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
     deleteLoc(id) { const d = this.getLocs().filter(x => x.id !== id); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
     
     getLogs() { return JSON.parse(localStorage.getItem(this.LOGS)) || []; }
+    
+    // UPDATED LOG FOR QUANTITIES & DATES
     log(type, locName, details, amt=0, targetDate=null, q1=0, q5=0) {
         const tDate = targetDate || Utils.fmtDate(Date.now());
         const l = { 
@@ -564,8 +483,8 @@ class Store {
             desc: details, 
             amt: amt || 0,
             targetDate: tDate,
-            q1: parseInt(q1) || 0, // 1 Ltr Qty
-            q5: parseInt(q5) || 0, // 500 ml Qty
+            q1: parseInt(q1) || 0, 
+            q5: parseInt(q5) || 0,
             ts: Date.now(), 
             date: Utils.fmtDate(Date.now()) 
         };
@@ -576,32 +495,20 @@ class Store {
     getProfile() { return JSON.parse(localStorage.getItem(this.PROF)) || { name: '', id: '' }; }
     saveProfile(p) { localStorage.setItem(this.PROF, JSON.stringify(p)); }
 
-    dump() {
-        return { profile: this.getProfile(), locations: this.getLocs(), logs: this.getLogs(), lastSync: Date.now() };
-    }
+    dump() { return { profile: this.getProfile(), locations: this.getLocs(), logs: this.getLogs(), lastSync: Date.now() }; }
 }
 
-// --- APP CONTROLLER ---
+// --- 5. APP CONTROLLER ---
 class App {
     constructor() {
         this.store = new Store();
         this.drive = new GoogleCloud(this.store);
-        window.drive = this.drive;
+        window.drive = this.drive; // Expose to window for onclick
 
-        // Geo Engine
         this.latK = {x:NaN,p:1,q:0.001,r:0.01}; 
         this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
-        this.pos = null; 
-        this.targetLoc = null; 
-        this.locs = this.store.getLocs();
-
-        // Map Objects
-        this.map = null;
-        this.userMarker = null;
-        this.shopLayer = null;
-        this.routeLine = null;
-
-        // Bind UI
+        this.pos = null; this.targetLoc = null; this.locs = this.store.getLocs();
+        
         this.initUI();
         this.initMap();
         this.startGeo();
@@ -614,423 +521,141 @@ class App {
         document.getElementById('prof-name').value = p.name;
         document.getElementById('prof-id').value = p.id;
         document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
-        
         this.renderStores();
         this.populateDropdowns();
-        this.updateTargets(); // <--- ADD THIS LINE
+        this.updateTargets(); // Load sales targets
     }
 
-    // --- LEAFLET MAP ---
     initMap() {
-        // Init Leaflet
         this.map = L.map('osm-map', { zoomControl: false, attributionControl: false }).setView([20.5937, 78.9629], 5);
-        
-        // Dark Theme Tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19, subdomains: 'abcd'
-        }).addTo(this.map);
-
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(this.map);
         this.shopLayer = L.layerGroup().addTo(this.map);
         this.updateMapMarkers();
+        setTimeout(() => this.map.invalidateSize(), 500); // Fix map render issue
     }
-
- updateTargets() {
-        const TARGET_1L = 80;
-        const TARGET_500ML = 20;
-        const today = Utils.fmtDate(Date.now());
-        
-        // Calculate totals for TODAY (Activity Date)
-        const logs = this.store.getLogs();
-        let sum1 = 0, sum5 = 0;
-        
-        logs.forEach(l => {
-            // Only count orders taken today
-            if(l.type === 'ORDER' && l.date === today) {
-                sum1 += (l.q1 || 0);
-                sum5 += (l.q5 || 0);
-            }
-        });
-
-        // Helper to update UI
-        const updateUI = (current, target, labelId, progId, msgId, colorCls) => {
-            const pct = Math.min(100, (current / target) * 100);
-            const extra = current - target;
-            
-            document.getElementById(progId).style.width = `${pct}%`;
-            
-            if(extra > 0) {
-                // Over Achieved
-                document.getElementById(labelId).innerHTML = `<span class="text-emerald-400">${current}</span> / ${target}`;
-                document.getElementById(msgId).innerHTML = `+${extra} Additional Sales! 🎉`;
-                document.getElementById(msgId).className = "text-[10px] text-right mt-1 h-3 text-emerald-400 font-bold animate-pulse";
-                document.getElementById(progId).classList.replace(colorCls, 'bg-emerald-500');
-            } else {
-                // Normal
-                document.getElementById(labelId).innerText = `${current} / ${target}`;
-                document.getElementById(msgId).innerText = "";
-                // Reset color if they deleted an order
-                if(document.getElementById(progId).classList.contains('bg-emerald-500')) {
-                    document.getElementById(progId).classList.remove('bg-emerald-500');
-                    document.getElementById(progId).classList.add(colorCls);
-                }
-            }
-        };
-
-        updateUI(sum1, TARGET_1L, 'label-1ltr', 'prog-1ltr', 'msg-1ltr', 'bg-blue-600');
-        updateUI(sum5, TARGET_500ML, 'label-500ml', 'prog-500ml', 'msg-500ml', 'bg-purple-600');
-    }
-
-    
 
     updateMapMarkers() {
-        if(!this.map || !this.shopLayer) return;
         this.shopLayer.clearLayers();
-
         this.locs.forEach(l => {
             const color = l.isInside ? '#10b981' : (l.id === this.targetLoc?.id ? '#f59e0b' : '#3b82f6');
-            
-            const marker = L.circleMarker([l.lat, l.lng], {
-                radius: 8, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
-            });
-
-            marker.bindPopup(`
-                <div class="text-slate-900 font-bold">${l.name}</div>
-                <button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Select Target</button>
-            `);
-            marker.addTo(this.shopLayer);
+            const m = L.circleMarker([l.lat, l.lng], { radius: 8, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8 });
+            m.bindPopup(`<div class="text-slate-900 font-bold">${l.name}</div><button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`);
+            m.addTo(this.shopLayer);
         });
     }
 
-    updateRouteLine() {
-        if (this.routeLine) { this.map.removeLayer(this.routeLine); this.routeLine = null; }
-        if (this.pos && this.targetLoc) {
-            this.routeLine = L.polyline([[this.pos.lat, this.pos.lng], [this.targetLoc.lat, this.targetLoc.lng]], {
-                color: '#f59e0b', weight: 3, dashArray: '5, 10', opacity: 0.7
-            }).addTo(this.map);
-        }
-    }
-
-    centerMap() {
-        if(this.pos && this.map) this.map.setView([this.pos.lat, this.pos.lng], 17);
-    }
-
-    // --- GEO LOGIC ---
     startGeo() {
         if(!navigator.geolocation) return alert("GPS Required");
         navigator.geolocation.watchPosition(p => {
-            const {latitude, longitude, accuracy} = p.coords;
-            const lat = this.kalman(this.latK, latitude); const lng = this.kalman(this.lngK, longitude);
-            this.onGeo({lat, lng, acc: accuracy});
+            const lat = this.kalman(this.latK, p.coords.latitude);
+            const lng = this.kalman(this.lngK, p.coords.longitude);
+            this.onGeo({lat, lng, acc: p.coords.accuracy});
         }, e => console.error(e), {enableHighAccuracy:true, timeout:15000});
     }
 
     onGeo(pos) {
         this.pos = pos;
         document.getElementById('current-coords').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
-        
-        const wifiModal = document.getElementById('modal-wifi');
-        if(pos.acc > 40) wifiModal.classList.add('open'); else wifiModal.classList.remove('open');
+        document.getElementById('modal-wifi').classList.toggle('open', pos.acc > 40);
 
-        // Update User Marker
         const latLng = [pos.lat, pos.lng];
         if (!this.userMarker) {
-            const pulseIcon = L.divIcon({
-                className: 'css-icon',
-                html: '<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] relative"><div class="absolute -inset-4 rounded-full bg-blue-500/30 animate-pulse-fast"></div></div>',
-                iconSize: [16, 16], iconAnchor: [8, 8]
-            });
-            this.userMarker = L.marker(latLng, {icon: pulseIcon}).addTo(this.map);
+            const icon = L.divIcon({ className: '', html: '<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] relative"><div class="absolute -inset-4 rounded-full bg-blue-500/30 animate-pulse-fast"></div></div>' });
+            this.userMarker = L.marker(latLng, {icon}).addTo(this.map);
             this.map.setView(latLng, 16);
-        } else {
-            this.userMarker.setLatLng(latLng);
-        }
+        } else { this.userMarker.setLatLng(latLng); }
 
-        this.updateRouteLine();
-        this.checkGeofences(pos);
-
-        if(this.targetLoc) {
-            const d = Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng);
-            document.getElementById('nav-dist').innerText = Math.round(d);
+        if (this.routeLine) this.map.removeLayer(this.routeLine);
+        if (this.targetLoc) {
+            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { color: '#f59e0b', weight: 3, dashArray: '5, 10' }).addTo(this.map);
+            document.getElementById('nav-dist').innerText = Math.round(Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
             document.getElementById('nav-bear').innerText = Math.round(Utils.getBearing(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
         }
+
+        this.checkGeofences(pos);
     }
 
-checkGeofences(pos) {
+    checkGeofences(pos) {
         let inside = false;
-        
-        // --- UPDATED CONFIGURATION ---
-        const radius = 5; // 5 meters radius (10m Diameter)
-        const exitBuffer = 5; // Must move 5m past the radius to exit (Total 10m distance)
-        // -----------------------------
-
         this.locs.forEach(l => {
             const dist = Utils.getDist(pos.lat, pos.lng, l.lat, l.lng);
-            
-            // Calculate buffer based on GPS accuracy to prevent false exits
-            const buff = pos.acc / 2;
-            const adj = Math.max(0, dist - buff);
-
-            // ENTRY LOGIC: Strict 5m radius
-            if(!l.isInside && dist <= radius) {
-                l.isInside = true; 
-                l.entryTime = Date.now();
-                this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
+            if (!l.isInside && dist <= 10) { // 10m Enter
+                l.isInside = true; l.entryTime = Date.now();
+                this.store.log('VISIT_IN', l.name, `Accuracy: ${Math.round(pos.acc)}m`);
                 this.store.updateLoc(l);
-            } 
-            // EXIT LOGIC: Hysteresis (Radius + Buffer) to prevent flickering
-            else if(l.isInside && adj > (radius + exitBuffer)) {
-                if(!l._exitT) l._exitT = Date.now();
-                
-                // Must be outside for 10 seconds to confirm exit
-                if(Date.now() - l._exitT > 10000) { 
-                    l.isInside = false; 
-                    l._exitT = null;
-                    const min = Math.round((Date.now() - l.entryTime)/60000);
-                    this.store.log('VISIT_OUT', l.name, `Duration: ${min}m`);
-                    this.store.updateLoc(l);
-                }
-            } else { 
-                l._exitT = null; 
+            } else if (l.isInside && dist > 15) { // 15m Exit
+                l.isInside = false;
+                const dur = Math.round((Date.now() - l.entryTime)/60000);
+                this.store.log('VISIT_OUT', l.name, `Duration: ${dur} min`);
+                this.store.updateLoc(l);
             }
-
-            // UI UPDATES IF INSIDE
-            if(l.isInside) {
+            if (l.isInside) {
                 inside = true;
                 document.getElementById('current-loc-name').innerText = l.name;
                 document.getElementById('zone-status').innerText = "INSIDE";
                 document.getElementById('zone-status').className = "px-2 py-1 bg-emerald-900/50 border border-emerald-500 rounded text-[10px] font-bold text-emerald-400";
-                
-                // Enable Order Button
-                const btn = document.getElementById('btn-order');
-                btn.disabled = false;
-                btn.className = "py-3 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse";
+                document.getElementById('btn-order').disabled = false;
                 document.getElementById('order-shop-name').innerText = l.name;
             }
         });
-
-        // UI UPDATES IF OUTSIDE
-        if(!inside) {
+        if (!inside) {
             document.getElementById('current-loc-name').innerText = "In Transit";
             document.getElementById('zone-status').innerText = "OUTSIDE";
             document.getElementById('zone-status').className = "px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500";
-            
-            // Disable Order Button
-            const btn = document.getElementById('btn-order');
-            btn.disabled = true;
-            btn.className = "py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2";
+            document.getElementById('btn-order').disabled = true;
         }
-        
-        this.updateMapMarkers(); // Refresh map colors
+        this.updateMapMarkers();
     }
 
-    // --- TABS & UI ---
-    switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + tabId).classList.add('active');
+    // --- LOGIC: TARGETS & ORDERS ---
+    updateTargets() {
+        const TARGET_1L = 80; const TARGET_500ML = 20;
+        const today = Utils.fmtDate(Date.now());
+        const logs = this.store.getLogs();
+        let s1=0, s5=0;
         
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            if(btn.dataset.target === tabId) {
-                btn.classList.add('text-blue-500'); btn.classList.remove('text-slate-500');
+        logs.forEach(l => { if(l.type==='ORDER' && l.date===today) { s1+=(l.q1||0); s5+=(l.q5||0); } });
+
+        const draw = (curr, tgt, lbl, bar, msg, clr) => {
+            const pct = Math.min(100, (curr/tgt)*100);
+            const ext = curr - tgt;
+            document.getElementById(bar).style.width = `${pct}%`;
+            if(ext > 0) {
+                document.getElementById(lbl).innerHTML = `<span class="text-emerald-400">${curr}</span> / ${tgt}`;
+                document.getElementById(msg).innerText = `+${ext} Extra Sales!`;
+                document.getElementById(msg).className = "text-[10px] text-right mt-1 h-3 text-emerald-400 font-bold animate-pulse";
+                document.getElementById(bar).classList.replace(clr, 'bg-emerald-500');
             } else {
-                btn.classList.remove('text-blue-500'); btn.classList.add('text-slate-500');
+                document.getElementById(lbl).innerText = `${curr} / ${tgt}`;
+                document.getElementById(msg).innerText = "";
             }
-        });
-
-        if(tabId === 'orders') this.renderOrders();
-        if(tabId === 'store') this.renderStores();
-        if(tabId === 'home' && this.map) setTimeout(() => this.map.invalidateSize(), 100);
+        };
+        draw(s1, TARGET_1L, 'label-1ltr', 'prog-1ltr', 'msg-1ltr', 'bg-blue-600');
+        draw(s5, TARGET_500ML, 'label-500ml', 'prog-500ml', 'msg-500ml', 'bg-purple-600');
     }
 
-    populateDropdowns() {
-        const sel = document.getElementById('select-target');
-        const filter = document.getElementById('filter-shop');
-        let html = '<option value="">-- Select Shop --</option>';
-        let filterHtml = '<option value="all">All Shops</option>';
-        
-        this.locs.forEach(l => {
-            html += `<option value="${l.id}">${l.name}</option>`;
-            filterHtml += `<option value="${l.name}">${l.name}</option>`;
-        });
-        
-        sel.innerHTML = html;
-        filter.innerHTML = filterHtml;
-    }
-
-    // --- ORDER LOGIC ---
     renderOrders() {
-        // 1. Get the date selected by the user
-        const filterDate = document.getElementById('filter-date').value;
+        const date = document.getElementById('filter-date').value;
         const shop = document.getElementById('filter-shop').value;
         const logs = this.store.getLogs();
         let total = 0;
-        
-        // 2. Filter logs based on Delivery Date (targetDate)
+
         const filtered = logs.filter(l => {
-            if(l.type !== 'ORDER') return false;
-            
-            // USE TARGET DATE (Due Date)
-            // If l.targetDate doesn't exist (old data), fallback to l.date (creation date)
-            const dueOn = l.targetDate || l.date;
-            
-            if(dueOn !== filterDate) return false; // Show orders needed for THIS date
-            if(shop !== 'all' && l.loc !== shop) return false;
-            
+            if(l.type!=='ORDER') return false;
+            // Use Target Date (Due Date)
+            const due = l.targetDate || l.date;
+            if(due !== date) return false;
+            if(shop!=='all' && l.loc!==shop) return false;
             return true;
         });
 
-        // 3. Render the list
         document.getElementById('order-list').innerHTML = filtered.map(l => {
             total += parseFloat(l.amt || 0);
-            
-            const amountDisplay = l.amt > 0 ? `₹${l.amt}` : `<span class="text-slate-600 text-[10px]">No Cash</span>`;
-            
-            // Show "Booked On" badge so we know when the order was taken
-            const bookedBadge = `<div class="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded inline-block mt-1 border border-blue-900/50">Booked: ${l.date}</div>`;
-
-            return `
-                <tr class="border-b border-slate-800 hover:bg-slate-900/50 transition-colors">
-                    <td class="px-4 py-3 align-top">
-                        <div class="font-bold text-white text-sm">${l.loc}</div>
-                        ${bookedBadge}
-                    </td>
-                    <td class="px-4 py-3 text-slate-400 text-xs align-top whitespace-pre-wrap">
-                        ${l.desc}
-                    </td>
-                    <td class="px-4 py-3 text-right text-emerald-400 font-mono text-xs align-top font-bold">
-                        ${amountDisplay}
-                    </td>
-                </tr>
-            `;
-        }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No deliveries scheduled for this date</td></tr>';
-
+            const b = `<div class="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 rounded inline-block mt-1">Booked: ${l.date}</div>`;
+            return `<tr class="border-b border-slate-800"><td class="px-4 py-3 align-top"><div class="font-bold text-white text-sm">${l.loc}</div>${b}</td><td class="px-4 py-3 text-slate-400 text-xs align-top whitespace-pre-wrap">${l.desc}</td><td class="px-4 py-3 text-right text-emerald-400 font-mono text-xs font-bold">${l.amt? '₹'+l.amt : '-'}</td></tr>`;
+        }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No orders due on this date</td></tr>';
+        
         document.getElementById('order-total').innerText = `₹${total}`;
-    }
-
-
-    
-    // --- STORE LOGIC ---
-    renderStores() {
-        document.getElementById('store-list').innerHTML = this.locs.map(l => `
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
-                <div>
-                    <div class="font-bold text-white">${l.name}</div>
-                    <div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="app.navTo('${l.id}')" class="w-8 h-8 rounded bg-slate-800 border border-slate-700 text-blue-400"><i class="ph-bold ph-navigation-arrow"></i></button>
-                    <button onclick="app.delStore('${l.id}')" class="w-8 h-8 rounded bg-slate-800 border border-slate-700 text-red-400"><i class="ph-bold ph-trash"></i></button>
-                </div>
-            </div>
-        `).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores Saved</div>';
-    }
-
-    navTo(id) {
-        this.switchTab('home');
-        document.getElementById('select-target').value = id;
-        this.setTarget();
-    }
-
-    delStore(id) {
-        // 1. Ask for Password
-        const password = prompt("Restricted Action.\nEnter Admin Password to delete:");
-        
-        // 2. Validate Password
-        if (password !== "King3095@") {
-            alert("❌ Incorrect Password! Access Denied.");
-            return;
-        }
-
-        // 3. Delete Store
-        this.store.deleteLoc(id);
-        this.locs = this.store.getLocs();
-        
-        // 4. Update UI & Map
-        this.populateDropdowns();
-        this.renderStores();
-        this.updateMapMarkers();
-        
-        // 5. Clear route if the target was deleted
-        if(this.targetLoc?.id === id) { 
-            this.targetLoc = null; 
-            this.updateRouteLine(); 
-        }
-
-        alert("✅ Store Deleted Successfully.");
-    }
-
-    // --- ACTIONS ---
-    saveLocation() {
-        // 1. Get Important Values
-        const name = document.getElementById('inp-name').value.trim();
-        const auth = document.getElementById('inp-auth').value.trim();
-        const contact = document.getElementById('inp-contact').value.trim();
-        const addr = document.getElementById('inp-addr').value.trim();
-
-        // 2. Validation
-        if (!name || !auth || !contact || !addr) {
-            alert("⚠️ Please fill all IMPORTANT fields marked with *");
-            return;
-        }
-        if (!this.pos) {
-            alert("❌ Waiting for GPS signal...");
-            return;
-        }
-
-        // 3. Get Optional Values
-        const details = {
-            authPerson: auth,
-            contact: contact,
-            address: addr,
-            storeType: document.getElementById('inp-type').value,
-            gst: document.getElementById('inp-gst').value.trim(),
-            creditLimit: document.getElementById('inp-limit').value.trim(),
-            creditDays: document.getElementById('inp-days').value.trim(),
-            remark: document.getElementById('inp-remark').value.trim()
-        };
-
-        // 4. Save to Store
-        const newLoc = {
-            id: Utils.uuid(),
-            name: name,
-            lat: this.pos.lat,
-            lng: this.pos.lng,
-            ...details, // Spread details into object
-            isInside: true,
-            entryTime: Date.now()
-        };
-
-        this.store.saveLoc(newLoc);
-        
-        // 5. Update UI
-        this.locs = this.store.getLocs();
-        this.populateDropdowns();
-        this.updateMapMarkers();
-        this.closeModals();
-
-        // 6. Reset Form
-        ['inp-name', 'inp-auth', 'inp-contact', 'inp-addr', 'inp-gst', 'inp-limit', 'inp-days', 'inp-remark'].forEach(id => {
-            document.getElementById(id).value = '';
-        });
-        document.getElementById('inp-type').value = 'Cash';
-
-        alert("✅ Shop Saved Successfully!");
-    }
-
-    setTarget() {
-        const id = document.getElementById('select-target').value;
-        this.targetLoc = id ? this.locs.find(l=>l.id===id) : null;
-        if(this.targetLoc) document.getElementById('nav-info').classList.remove('hidden');
-        else document.getElementById('nav-info').classList.add('hidden');
-        
-        this.updateMapMarkers();
-        this.updateRouteLine();
-    }
-
-    openOrderModal() {
-        const modal = document.getElementById('modal-order');
-        modal.classList.add('open');
-        // Set date picker to today by default
-        document.getElementById('input-order-date').value = Utils.fmtDate(Date.now());
     }
 
     submitOrder() {
@@ -1040,65 +665,91 @@ checkGeofences(pos) {
         const amt = document.getElementById('input-order-amt').value;
         const dateVal = document.getElementById('input-order-date').value;
         const shop = document.getElementById('order-shop-name').innerText;
-        
-        // Validation: Must have at least one quantity OR a description
-        if(q1 > 0 || q5 > 0 || desc) {
-            // Generate automatic description if empty
-            let finalDesc = desc;
-            if((q1 > 0 || q5 > 0) && !finalDesc) {
-                finalDesc = `Order: ${q1 ? q1+'x 1L' : ''} ${q5 ? q5+'x 500ml' : ''}`;
-            }
 
+        if(q1>0 || q5>0 || desc) {
+            let finalDesc = desc;
+            if((q1>0||q5>0) && !finalDesc) finalDesc = `Order: ${q1?q1+'x1L':''} ${q5?q5+'x500ml':''}`;
             this.store.log('ORDER', shop, finalDesc, amt, dateVal, q1, q5);
             this.closeModals();
-            
-            // Clear inputs
-            document.getElementById('inp-qty-1ltr').value = '';
-            document.getElementById('inp-qty-500ml').value = '';
-            document.getElementById('input-order-details').value = '';
-            document.getElementById('input-order-amt').value = '';
-            
+            ['inp-qty-1ltr','inp-qty-500ml','input-order-details','input-order-amt'].forEach(id=>document.getElementById(id).value='');
+            this.updateTargets();
             this.renderOrders();
-            this.updateTargets(); // Update the progress bars immediately
-            alert("✅ Order Saved!");
-        } else {
-            alert("⚠️ Enter Quantity or Description");
+            alert("Order Saved!");
+        } else { alert("Enter Qty or Details"); }
+    }
+
+    // --- TABS & ACTIONS ---
+    switchTab(t) {
+        document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+        document.getElementById('tab-'+t).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(b => {
+            b.classList.toggle('text-blue-500', b.dataset.target===t);
+            b.classList.toggle('text-slate-500', b.dataset.target!==t);
+        });
+        if(t==='home') setTimeout(()=>this.map.invalidateSize(), 200);
+        if(t==='orders') this.renderOrders();
+        if(t==='store') this.renderStores();
+    }
+
+    saveLocation() {
+        const name=document.getElementById('inp-name').value;
+        if(name && this.pos) {
+            this.store.saveLoc({
+                id:Utils.uuid(), name, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now()
+            });
+            this.locs=this.store.getLocs();
+            this.populateDropdowns();
+            this.updateMapMarkers();
+            this.closeModals();
+            alert("Shop Saved!");
+        } else { alert("Name & GPS Required"); }
+    }
+
+    renderStores() {
+        document.getElementById('store-list').innerHTML = this.locs.map(l => 
+            `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center"><div><div class="font-bold text-white">${l.name}</div><div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div></div><button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button></div>`
+        ).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores</div>';
+    }
+
+    delStore(id) {
+        if(confirm("Delete this store?")) {
+            this.store.deleteLoc(id);
+            this.locs = this.store.getLocs();
+            this.renderStores();
+            this.updateMapMarkers();
         }
     }
 
-    saveProfile() {
-        const p = { name: document.getElementById('prof-name').value, id: document.getElementById('prof-id').value };
-        this.store.saveProfile(p);
-        alert("Profile Updated");
+    populateDropdowns() {
+        const h = '<option value="">-- Select --</option>' + this.locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+        document.getElementById('select-target').innerHTML = h;
+        document.getElementById('filter-shop').innerHTML = '<option value="all">All Shops</option>' + this.locs.map(l=>`<option value="${l.name}">${l.name}</option>`).join('');
     }
 
+    saveProfile() { this.store.saveProfile({name:document.getElementById('prof-name').value, id:document.getElementById('prof-id').value}); alert("Saved"); }
     exportData() {
-        const logs = this.store.getLogs();
-        const prof = this.store.getProfile();
-        let csv = `RIDER PROFILE\nName,${prof.name}\nID,${prof.id}\n\nTYPE,LOCATION,DATE,DETAILS,AMOUNT\n`;
-        logs.forEach(l => { csv += `${l.type},"${l.loc}",${new Date(l.ts).toISOString()},"${l.desc}",${l.amt||0}\n`; });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-        a.download = `GeoLog_${prof.name || 'Export'}.csv`;
-        a.click();
+        const logs=this.store.getLogs();
+        const csv = "TYPE,LOC,DATE,DESC,AMT\n" + logs.map(l=>`${l.type},${l.loc},${l.date},"${l.desc}",${l.amt}`).join('\n');
+        const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='data.csv'; a.click();
     }
 
-    openMaps() {
-        if(this.targetLoc) window.open(`https://www.google.com/maps/dir/?api=1&destination=${this.targetLoc.lat},${this.targetLoc.lng}`);
-        else alert("Select Shop");
+    setTarget() {
+        const id=document.getElementById('select-target').value;
+        this.targetLoc = id ? this.locs.find(l=>l.id===id) : null;
+        document.getElementById('nav-info').classList.toggle('hidden', !this.targetLoc);
+        this.updateMapMarkers();
     }
-
-    openAddModal() {
-        document.getElementById('modal-add').classList.add('open');
-        // Update the GPS text in the modal header
-        if(this.pos) {
-            document.getElementById('add-modal-gps').innerText = `${this.pos.lat.toFixed(5)}, ${this.pos.lng.toFixed(5)}`;
-        }
-    }
-    openOrderModal(){document.getElementById('modal-order').classList.add('open')}
-    closeModals(){document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'))}
+    
+    centerMap() { if(this.pos) this.map.setView([this.pos.lat, this.pos.lng], 17); }
+    openMaps() { if(this.targetLoc) window.open(`https://www.google.com/maps/dir/?api=1&destination=${this.targetLoc.lat},${this.targetLoc.lng}`); }
+    
+    openAddModal() { document.getElementById('modal-add').classList.add('open'); if(this.pos) document.getElementById('add-modal-gps').innerText=`${this.pos.lat.toFixed(4)},${this.pos.lng.toFixed(4)}`; }
+    openOrderModal() { document.getElementById('modal-order').classList.add('open'); document.getElementById('input-order-date').value = Utils.fmtDate(Date.now()); }
+    closeModals() { document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open')); }
+    navTo(id) { this.switchTab('home'); document.getElementById('select-target').value = id; this.setTarget(); }
 }
 
+// START APP
 const app = new App();
 </script>
 </body>
