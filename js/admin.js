@@ -1,33 +1,39 @@
-// js/admin.js
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
 
-const loader = document.getElementById('loader');
-const content = document.getElementById('content');
+// DOM Elements
+const bodyContent = document.body; // or a specific wrapper div
+// Initially hide content to prevent "flashing" unauthorized data
+bodyContent.style.visibility = "hidden"; 
 
 onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // Check if user is actually an admin
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
+    if (!user) {
+        // No user logged in -> Kick out
+        window.location.href = 'index.html';
+        return;
+    }
 
-        if (docSnap.exists() && docSnap.data().role === 'admin') {
-            // Success: Show content
-            loader.style.display = 'none';
-            content.style.display = 'block';
-            document.getElementById('user-email').innerText = user.email;
+    // User is logged in, but are they an Admin?
+    try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+            // Authorized! Show content.
+            bodyContent.style.visibility = "visible";
+            console.log("Admin access granted.");
         } else {
-            // Wrong role
-            alert("Access Denied. Admins only.");
-            logoutUser();
+            // Logged in, but WRONG role (e.g., a Salesman trying to access Admin page)
+            alert("Access Denied: You do not have Admin privileges.");
+            await logoutUser();
         }
-    } else {
-        // Not logged in
+    } catch (error) {
+        console.error("Auth Check Error:", error);
         window.location.href = 'index.html';
     }
 });
 
-// Logout Listener
-document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+// Attach Logout Listener if button exists
+const btn = document.getElementById('logoutBtn');
+if(btn) btn.addEventListener('click', logoutUser);
