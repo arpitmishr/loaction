@@ -555,19 +555,48 @@ class App {
 
     onGeo(pos) {
         this.pos = pos;
+        
+        // Update UI coordinates
         document.getElementById('current-coords').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+        // Show Wi-Fi warning if accuracy is bad (> 40m)
         document.getElementById('modal-wifi').classList.toggle('open', pos.acc > 40);
 
         const latLng = [pos.lat, pos.lng];
+        
+        // --- CREATE MAN EMOJI MARKER ---
         if (!this.userMarker) {
-            const icon = L.divIcon({ className: '', html: '<div class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] relative"><div class="absolute -inset-4 rounded-full bg-blue-500/30 animate-pulse-fast"></div></div>' });
-            this.userMarker = L.marker(latLng, {icon}).addTo(this.map);
-            this.map.setView(latLng, 16);
-        } else { this.userMarker.setLatLng(latLng); }
+            const icon = L.divIcon({ 
+                className: 'bg-transparent', // Removes default white square
+                html: `
+                    <div class="relative w-12 h-12 flex items-center justify-center">
+                        <!-- Pulsing Effect -->
+                        <div class="absolute w-full h-full bg-blue-500/50 rounded-full animate-ping opacity-75"></div>
+                        <!-- Man Emoji -->
+                        <div class="relative text-4xl z-10 drop-shadow-lg filter drop-shadow-black">🏃‍♂️</div> 
+                    </div>
+                `,
+                iconSize: [48, 48],    // Size of the icon box
+                iconAnchor: [24, 24]   // Center the icon (half of size)
+            });
+            
+            this.userMarker = L.marker(latLng, {icon: icon}).addTo(this.map);
+            this.map.setView(latLng, 18); // Zoom in close on first load
+        } else { 
+            // Just move the existing marker
+            this.userMarker.setLatLng(latLng); 
+        }
 
+        // --- UPDATE ROUTE LINE IF TARGET SELECTED ---
         if (this.routeLine) this.map.removeLayer(this.routeLine);
         if (this.targetLoc) {
-            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { color: '#f59e0b', weight: 3, dashArray: '5, 10' }).addTo(this.map);
+            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { 
+                color: '#f59e0b', 
+                weight: 4, 
+                dashArray: '10, 10', 
+                opacity: 0.8 
+            }).addTo(this.map);
+            
+            // Update Distance Text
             document.getElementById('nav-dist').innerText = Math.round(Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
             document.getElementById('nav-bear').innerText = Math.round(Utils.getBearing(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
         }
