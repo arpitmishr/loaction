@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
-    <title>GeoGuard Logistics | Pro</title>
+    <title>GeoGuard Logistics | Cloud Pro</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,7 +35,7 @@
     <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- GOOGLE API SCRIPTS (REQUIRED FOR DRIVE) -->
+    <!-- GOOGLE API SCRIPTS -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
@@ -51,12 +51,25 @@
         .leaflet-container { background: #0f172a; font-family: inherit; }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #fff; border: 1px solid #334155; }
         .leaflet-popup-close-button { color: #94a3b8 !important; }
-        
-        /* Custom Marker Animation */
         @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- === MANDATORY LOGIN MODAL === -->
+    <div id="modal-welcome" class="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-500/50 mb-6">
+            <i class="ph-fill ph-moped text-4xl text-white"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-white mb-2">GeoGuard Cloud</h1>
+        <p class="text-slate-400 mb-8 max-w-xs">Securely sync your Shops, Orders, and Sales Targets with Google Drive.</p>
+        
+        <button onclick="drive.login()" class="w-full max-w-xs py-3.5 bg-white text-slate-900 rounded-xl font-bold text-base flex items-center justify-center gap-3 hover:bg-slate-200 transition-all shadow-lg group">
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-6 h-6" alt="Google">
+            <span>Login to Load Data</span>
+        </button>
+        <div id="login-status" class="mt-4 text-xs text-slate-500 h-5 font-mono">Waiting for user...</div>
+    </div>
 
     <!-- HEADER -->
     <header class="fixed top-0 w-full z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
@@ -66,10 +79,10 @@
                     <i class="ph-fill ph-moped text-white text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold text-white leading-tight">LOGISTICS <span class="text-blue-500">CLOUD</span></h1>
+                    <h1 class="text-sm font-bold text-white leading-tight">LOGISTICS <span class="text-blue-500">PRO</span></h1>
                     <div class="flex items-center gap-1">
-                        <span id="cloud-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-                        <span class="text-[10px] text-slate-400 font-mono tracking-wide" id="cloud-status">OFFLINE</span>
+                        <span id="cloud-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-[10px] text-emerald-400 font-mono tracking-wide" id="cloud-status">ONLINE</span>
                     </div>
                 </div>
             </div>
@@ -219,19 +232,13 @@
                 </div>
             </div>
 
-            <!-- GOOGLE DRIVE SECTION -->
+            <!-- SYNC STATUS -->
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
                 <h3 class="font-bold text-white mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-google-logo text-white"></i> Google Cloud Backup
+                    <i class="ph-bold ph-google-logo text-white"></i> Cloud Status
                 </h3>
-                <p class="text-xs text-slate-400 mb-4">Sync Shops, Orders, and Targets to Drive.</p>
-                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded-lg font-bold text-sm flex items-center justify-center gap-2 mb-2 hover:bg-gray-200">
-                    <i class="ph-bold ph-sign-in"></i> Sign in with Google
-                </button>
-                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all">
-                    <i class="ph-bold ph-cloud-arrow-up"></i> Sync Data Now
-                </button>
-                <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500 font-mono">Not connected</div>
+                <p class="text-xs text-slate-400 mb-2">Data is syncing automatically to Google Drive.</p>
+                <div id="drive-msg" class="text-[10px] mt-2 text-emerald-400 font-mono">Sync Active</div>
             </div>
 
             <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
@@ -340,8 +347,11 @@
 
 <script>
 // --- CONFIGURATION ---
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DB_FILE_NAME = 'geoguard_db.json';
 
@@ -364,13 +374,13 @@ const Utils = {
 
 // --- GOOGLE CLOUD SERVICE ---
 class GoogleCloud {
-    constructor(storeInstance) {
+    constructor(storeInstance, appInstance) {
         this.store = storeInstance;
+        this.app = appInstance;
         this.tokenClient = null;
         this.accessToken = null;
         this.isReady = false;
         
-        // Dynamic Load Checker
         const check = setInterval(() => {
             if (window.google && window.gapi) {
                 clearInterval(check);
@@ -380,7 +390,7 @@ class GoogleCloud {
     }
 
     initGapi() {
-        if(GOOGLE_API_KEY.includes('PASTE')) return; // Safety check
+        if(GOOGLE_API_KEY.includes('PASTE')) return; 
         gapi.load('client', async () => {
             try {
                 await gapi.client.init({
@@ -391,10 +401,10 @@ class GoogleCloud {
                     client_id: GOOGLE_CLIENT_ID,
                     scope: SCOPES,
                     callback: (resp) => {
-                        if (resp.error) throw resp;
+                        if (resp.error) return alert("Auth Error: " + resp.error);
                         this.accessToken = resp.access_token;
-                        this.updateUI(true);
-                        this.sync();
+                        document.getElementById('login-status').innerText = "Logged in! Searching for Data...";
+                        this.findAndLoad();
                     },
                 });
                 this.isReady = true;
@@ -408,54 +418,77 @@ class GoogleCloud {
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
-    updateUI(isLoggedIn) {
-        if (isLoggedIn) {
-            document.getElementById('btn-glogin').classList.add('hidden');
-            const btn = document.getElementById('btn-gsync');
-            btn.disabled = false;
-            btn.classList.replace('bg-slate-800', 'bg-blue-600');
-            btn.classList.replace('text-slate-500', 'text-white');
-            document.getElementById('cloud-status').innerText = "ONLINE";
-            document.getElementById('cloud-dot').classList.replace('bg-slate-500', 'bg-blue-500');
-            document.getElementById('drive-msg').innerText = "Connected";
+    // --- CORE SYNC LOGIC ---
+    async findAndLoad() {
+        const msg = document.getElementById('login-status');
+        try {
+            msg.innerText = "⏳ Checking Google Drive...";
+            const q = `name = '${DB_FILE_NAME}' and trashed = false`;
+            const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+            
+            if (res.result.files.length > 0) {
+                // FILE FOUND: DOWNLOAD IT
+                msg.innerText = "📂 Data Found. Downloading...";
+                const fileId = res.result.files[0].id;
+                const fileContent = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+                
+                // RESTORE LOCAL STORAGE
+                if(fileContent.result) {
+                    this.store.restore(fileContent.result);
+                    this.app.initUI(); // Refresh UI with new data
+                    this.app.initMap(); // Refresh Map
+                    msg.innerText = "✅ Data Loaded Successfully!";
+                    setTimeout(() => {
+                        document.getElementById('modal-welcome').classList.add('hidden');
+                    }, 1000);
+                }
+            } else {
+                // FILE NOT FOUND: CREATE NEW
+                msg.innerText = "🆕 No Data Found. Creating New...";
+                await this.createFile();
+                setTimeout(() => {
+                    document.getElementById('modal-welcome').classList.add('hidden');
+                }, 1000);
+            }
+        } catch (e) {
+            console.error(e);
+            msg.innerText = "❌ Error Loading Data. Check Console.";
         }
     }
 
-    async sync() {
-        const msg = document.getElementById('drive-msg');
-        msg.innerText = "⏳ Syncing...";
+    async createFile() {
+        const localData = this.store.dump();
+        const fileContent = JSON.stringify(localData);
+        const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', new Blob([fileContent], { type: 'application/json' }));
+
+        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + this.accessToken },
+            body: form
+        });
+    }
+
+    async save() {
+        // Silent Background Save
         try {
-            const localData = this.store.dump();
-            const fileContent = JSON.stringify(localData, null, 2);
-            
             const q = `name = '${DB_FILE_NAME}' and trashed = false`;
             const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-            const files = res.result.files;
+            const localData = this.store.dump();
+            const fileContent = JSON.stringify(localData);
 
-            if (files && files.length > 0) {
-                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${files[0].id}?uploadType=media`, {
+            if (res.result.files.length > 0) {
+                const fileId = res.result.files[0].id;
+                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                     method: 'PATCH',
                     headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json' },
                     body: fileContent
                 });
-                msg.innerText = "✅ Synced (Updated)";
-            } else {
-                const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', new Blob([fileContent], { type: 'application/json' }));
-                
-                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + this.accessToken },
-                    body: form
-                });
-                msg.innerText = "✅ Synced (Created)";
+                console.log("Auto-Saved to Cloud");
             }
-        } catch (e) {
-            console.error(e);
-            msg.innerText = "❌ Failed";
-        }
+        } catch (e) { console.error("Auto-Save Failed", e); }
     }
 }
 
@@ -484,18 +517,26 @@ class Store {
     getProfile() { return JSON.parse(localStorage.getItem(this.PROF)) || { name: '', id: '' }; }
     saveProfile(p) { localStorage.setItem(this.PROF, JSON.stringify(p)); }
     dump() { return { profile: this.getProfile(), locations: this.getLocs(), logs: this.getLogs(), lastSync: Date.now() }; }
+    
+    restore(data) {
+        if(data.profile) localStorage.setItem(this.PROF, JSON.stringify(data.profile));
+        if(data.locations) localStorage.setItem(this.LOCS, JSON.stringify(data.locations));
+        if(data.logs) localStorage.setItem(this.LOGS, JSON.stringify(data.logs));
+    }
 }
 
 // --- APP ---
 class App {
     constructor() {
         this.store = new Store();
-        this.drive = new GoogleCloud(this.store);
+        // Pass app instance to Drive so it can refresh UI after load
+        this.drive = new GoogleCloud(this.store, this);
         window.drive = this.drive;
         this.latK = {x:NaN,p:1,q:0.001,r:0.01}; 
         this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
         this.pos = null; this.targetLoc = null; this.locs = this.store.getLocs();
         
+        // Initial setup (UI might change after Google Login)
         this.initUI();
         this.initMap();
         this.startGeo();
@@ -505,6 +546,7 @@ class App {
 
     initUI() {
         const p = this.store.getProfile();
+        this.locs = this.store.getLocs(); // Refresh locs from store
         document.getElementById('prof-name').value = p.name;
         document.getElementById('prof-id').value = p.id;
         document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
@@ -514,6 +556,7 @@ class App {
     }
 
     initMap() {
+        if(this.map) { this.map.remove(); }
         this.map = L.map('osm-map', { zoomControl: false, attributionControl: false }).setView([20.5937, 78.9629], 5);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(this.map);
         this.shopLayer = L.layerGroup().addTo(this.map);
@@ -531,7 +574,7 @@ class App {
     }
 
     startGeo() {
-        if(!navigator.geolocation) return alert("GPS Required");
+        if(!navigator.geolocation) return; // Don't alert yet, wait for login
         navigator.geolocation.watchPosition(p => {
             const lat = this.kalman(this.latK, p.coords.latitude);
             const lng = this.kalman(this.lngK, p.coords.longitude);
@@ -572,11 +615,13 @@ class App {
                 l.isInside = true; l.entryTime = Date.now();
                 this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
                 this.store.updateLoc(l);
+                this.drive.save(); // AUTO SAVE
             } else if (l.isInside && dist > 15) { 
                 l.isInside = false;
                 const dur = Math.round((Date.now() - l.entryTime)/60000);
                 this.store.log('VISIT_OUT', l.name, `Duration: ${dur} min`);
                 this.store.updateLoc(l);
+                this.drive.save(); // AUTO SAVE
             }
             if (l.isInside) {
                 inside = true;
@@ -659,6 +704,7 @@ class App {
             ['inp-qty-1ltr','inp-qty-500ml','input-order-details','input-order-amt'].forEach(id=>document.getElementById(id).value='');
             this.updateTargets();
             this.renderOrders();
+            this.drive.save(); // AUTO SAVE
             alert("Order Saved!");
         } else { alert("Enter Qty or Details"); }
     }
@@ -683,6 +729,7 @@ class App {
             this.populateDropdowns();
             this.updateMapMarkers();
             this.closeModals();
+            this.drive.save(); // AUTO SAVE
             alert("Shop Saved!");
         } else { alert("Name & GPS Required"); }
     }
@@ -699,6 +746,7 @@ class App {
             this.locs = this.store.getLocs();
             this.renderStores();
             this.updateMapMarkers();
+            this.drive.save(); // AUTO SAVE
         }
     }
 
@@ -708,7 +756,12 @@ class App {
         document.getElementById('filter-shop').innerHTML = '<option value="all">All Shops</option>' + this.locs.map(l=>`<option value="${l.name}">${l.name}</option>`).join('');
     }
 
-    saveProfile() { this.store.saveProfile({name:document.getElementById('prof-name').value, id:document.getElementById('prof-id').value}); alert("Saved"); }
+    saveProfile() { 
+        this.store.saveProfile({name:document.getElementById('prof-name').value, id:document.getElementById('prof-id').value}); 
+        this.drive.save(); // AUTO SAVE
+        alert("Saved"); 
+    }
+    
     exportData() {
         const logs=this.store.getLogs();
         const csv = "TYPE,LOC,DATE,DESC,AMT\n" + logs.map(l=>`${l.type},${l.loc},${l.date},"${l.desc}",${l.amt}`).join('\n');
