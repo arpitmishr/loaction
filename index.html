@@ -2,43 +2,54 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login - Sales Management</title>
+    <title>Login System</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="login-container">
-        <h2>Sales App Login</h2>
+
+    <div class="container">
+        <h2>System Login</h2>
         <form id="loginForm">
-            <input type="email" id="email" placeholder="Email" required>
-            <input type="password" id="password" placeholder="Password" required>
-            <button type="submit">Login</button>
+            <input type="email" id="email" placeholder="Enter Email" required>
+            <input type="password" id="password" placeholder="Enter Password" required>
+            <button type="submit" id="submitBtn">Login</button>
         </form>
+        <p id="statusMessage"></p>
     </div>
 
-    <!-- type="module" is required for the imports to work -->
     <script type="module">
         import { loginUser } from './js/auth.js';
         import { auth, db } from './js/firebase.js';
         import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
         import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
-        // Auto-redirect if already logged in
+        const form = document.getElementById('loginForm');
+        const status = document.getElementById('statusMessage');
+
+        // 1. Check if user is already logged in (Auto-Redirect)
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                const docSnap = await getDoc(doc(db, "users", user.uid));
-                if (docSnap.exists()) {
-                    const role = docSnap.data().role;
+                status.innerText = "Session found. Redirecting...";
+                // Re-fetch role to decide where to go
+                const snap = await getDoc(doc(db, "users", user.uid));
+                if (snap.exists()) {
+                    const role = snap.data().role;
                     if (role === 'admin') window.location.href = 'admin.html';
                     if (role === 'salesman') window.location.href = 'salesman.html';
                 }
             }
         });
 
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        // 2. Handle Login Form Submit
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            status.innerText = "Verifying credentials...";
+            
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            loginUser(email, password);
+            
+            await loginUser(email, password);
+            status.innerText = ""; 
         });
     </script>
 </body>
