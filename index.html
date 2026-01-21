@@ -52,6 +52,8 @@
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #fff; border: 1px solid #334155; }
         .leaflet-popup-close-button { color: #94a3b8 !important; }
         @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+        .spin-slow { animation: spin 2s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
@@ -86,8 +88,17 @@
                     </div>
                 </div>
             </div>
-            <div id="gps-badge" class="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-yellow-500 flex items-center gap-1">
-                <i class="ph-bold ph-spinner animate-spin"></i> GPS
+            
+            <div class="flex items-center gap-2">
+                <!-- FORCE UPLOAD BUTTON -->
+                <button onclick="app.manualSync()" class="w-8 h-8 rounded-full bg-blue-600 border border-blue-400 text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform" title="Force Upload to Cloud">
+                    <i id="sync-icon" class="ph-bold ph-cloud-arrow-up text-lg"></i>
+                </button>
+
+                <!-- GPS BADGE -->
+                <div id="gps-badge" class="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-yellow-500 flex items-center gap-1">
+                    <i class="ph-bold ph-spinner animate-spin"></i> GPS
+                </div>
             </div>
         </div>
     </header>
@@ -368,7 +379,6 @@ const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE';
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-// FIX: Only load Drive API here to prevent hang
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 
 const ROOT_FOLDER_NAME = 'FreskeyPiyo';
@@ -533,16 +543,17 @@ class GoogleCloud {
         const fileName = `pending_shops_${safeEmail}.csv`;
         
         let fileId = await this.findFileId(fileName, this.pendingFolderId);
-        const line = `"${shopData.name}",${shopData.lat},${shopData.lng},"${shopData.contact}","${this.userEmail}",${Date.now()}`;
+        // Save ID in CSV so manager approves with same ID
+        const line = `"${shopData.name}",${shopData.lat},${shopData.lng},"${shopData.contact}","${this.userEmail}",${Date.now()},"${shopData.id}"`;
         
         if (fileId) {
             const currentContent = await this.downloadFile(fileId);
             await this.updateFileContent(fileId, currentContent + '\n' + line);
         } else {
-            const header = "NAME,LAT,LNG,CONTACT,BY,TS\n";
+            const header = "NAME,LAT,LNG,CONTACT,BY,TS,ID\n";
             await this.createFile(fileName, this.pendingFolderId, header + line);
         }
-        alert("Shop sent to Manager for Approval!");
+        console.log("Shop sent for approval in background");
     }
 
     async fetchPendingRequests() {
@@ -590,10 +601,12 @@ class GoogleCloud {
         const lat = cols[1];
         const lng = cols[2];
         const salesman = cols[4].replace(/"/g, '');
+        const existingId = cols[6] ? cols[6].replace(/"/g, '') : Date.now().toString(36); // Keep original ID if exists
+
         const tagName = salesman.split('@')[0];
         const taggedName = `${name} (By ${tagName})`;
-        const uuid = Date.now().toString(36);
-        const newMasterLine = `${uuid},"${taggedName}",${lat},${lng},"Approved"`;
+        
+        const newMasterLine = `${existingId},"${taggedName}",${lat},${lng},"Approved"`;
 
         if (this.shopsFileId) {
             const currentMaster = await this.downloadFile(this.shopsFileId);
@@ -621,6 +634,48 @@ class GoogleCloud {
         // lineIndexToRemove + 1 because of header
         const newLines = lines.filter((_, idx) => idx !== (lineIndexToRemove + 1));
         await this.updateFileContent(fileId, newLines.join('\n'));
+    }
+
+    // --- FORCE SYNC LOGIC ---
+    async forceSync() {
+        const btnIcon = document.getElementById('sync-icon');
+        btnIcon.classList.remove('ph-cloud-arrow-up');
+        btnIcon.classList.add('ph-spinner', 'spin-slow');
+        
+        try {
+            // 1. Save Orders
+            if(this.ordersFileId) {
+                const logs = this.store.getLogs();
+                const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
+                    logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
+                await this.updateFileContent(this.ordersFileId, csvOrders);
+            }
+
+            // 2. Save Profile
+            if(this.userFileId) {
+                const p = this.store.getProfile();
+                const csvContent = `NAME,PHONE\n"${p.name}","${p.id}"`;
+                await this.updateFileContent(this.userFileId, csvContent);
+            }
+
+            // 3. Re-Sync Pending Shops (If they aren't in Master yet)
+            // Note: We don't have a local queue for pending uploads in this simple version, 
+            // but we ensure Master list is pulled to check for approvals.
+            if(this.shopsFileId) {
+                const content = await this.downloadFile(this.shopsFileId);
+                if(content) this.store.restoreShopsFromCSV(content);
+            }
+
+            alert("✅ Force Sync Complete!\nOrders uploaded & Shop list updated.");
+            this.app.initMap(); // Refresh map (to show if pending shops became approved)
+
+        } catch(e) {
+            console.error(e);
+            alert("❌ Sync Failed: " + e.message);
+        } finally {
+            btnIcon.classList.remove('ph-spinner', 'spin-slow');
+            btnIcon.classList.add('ph-cloud-arrow-up');
+        }
     }
 
     // --- HELPERS ---
@@ -672,11 +727,11 @@ class GoogleCloud {
 
     async save() {
         if(!this.ordersFileId) return;
+        // Background Save (non-blocking)
         const logs = this.store.getLogs();
         const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
             logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
-        await this.updateFileContent(this.ordersFileId, csvOrders);
-        console.log("Cloud Saved Orders");
+        this.updateFileContent(this.ordersFileId, csvOrders).catch(e => console.log("Bg save fail", e));
     }
 
     async syncProfile() {
@@ -743,6 +798,10 @@ class Store {
         if(!csv) return;
         const lines = csv.split('\n').slice(1);
         const locs = [];
+        // Preserve local pending shops that are NOT in the Master list yet
+        const currentLocs = this.getLocs();
+        const pendingLocs = currentLocs.filter(l => l.pending === true);
+
         lines.forEach(line => {
             if(!line.trim()) return;
             const cols = line.split(','); 
@@ -753,10 +812,19 @@ class Store {
                     name: name,
                     lat: parseFloat(cols[2]),
                     lng: parseFloat(cols[3]),
-                    isInside: false
+                    isInside: false,
+                    pending: false // It's from master, so it's approved
                 });
             }
         });
+
+        // Merge: Add pending shops back to list if they aren't already in Master (by ID)
+        pendingLocs.forEach(pl => {
+            if(!locs.find(ml => ml.id === pl.id)) {
+                locs.push(pl);
+            }
+        });
+
         if(locs.length > 0) localStorage.setItem(this.LOCS, JSON.stringify(locs));
     }
 
@@ -832,6 +900,14 @@ class App {
         if(!silent) alert("Profile Updated & Synced!"); 
     }
 
+    manualSync() {
+        if(this.drive && this.drive.isReady) {
+            this.drive.forceSync();
+        } else {
+            alert("Cloud not ready. Login first.");
+        }
+    }
+
     initMap() {
         if(this.map) { this.map.remove(); }
         this.map = L.map('osm-map', { zoomControl: false, attributionControl: false }).setView([20.5937, 78.9629], 5);
@@ -842,10 +918,20 @@ class App {
 
     updateMapMarkers() {
         this.shopLayer.clearLayers();
+        this.locs = this.store.getLocs(); // Ensure fresh data
         this.locs.forEach(l => {
-            const color = l.isInside ? '#10b981' : (l.id === this.targetLoc?.id ? '#f59e0b' : '#3b82f6');
-            const m = L.circleMarker([l.lat, l.lng], { radius: 8, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8 });
-            m.bindPopup(`<div class="text-slate-900 font-bold">${l.name}</div><button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`);
+            let fillColor = '#3b82f6'; // Default Blue (Approved)
+            if (l.pending) fillColor = '#f59e0b'; // Orange (Pending)
+            if (l.isInside) fillColor = '#10b981'; // Green (Inside)
+            if (l.id === this.targetLoc?.id) fillColor = '#f59e0b'; // Target
+            
+            const m = L.circleMarker([l.lat, l.lng], { radius: 8, fillColor: fillColor, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8 });
+            
+            let popup = `<div class="text-slate-900 font-bold">${l.name}</div>`;
+            if(l.pending) popup += `<div class="text-[10px] text-orange-600 font-bold">(Pending Approval)</div>`;
+            popup += `<button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`;
+            
+            m.bindPopup(popup);
             m.addTo(this.shopLayer);
         });
     }
@@ -1004,31 +1090,51 @@ class App {
         
         if (!name || !this.pos) return alert("Name & GPS Required");
         
+        const shopId = Utils.uuid();
+
         const shopData = {
+            id: shopId,
             name: name,
             contact: contact,
             lat: this.pos.lat,
-            lng: this.pos.lng
+            lng: this.pos.lng,
+            isInside: true,
+            pending: false
         };
 
         // IF MANAGER: Save Directly
         if (this.drive.userEmail === MANAGER_EMAIL) {
-            const id = Utils.uuid();
-            this.store.saveLoc({ ...shopData, id, isInside: true });
+            this.store.saveLoc(shopData);
             this.drive.save(); // Syncs to master
             alert("Shop Saved to Master List");
         } 
-        // IF SALESMAN: Send to Pending
+        // IF SALESMAN: 
         else {
+            // 1. Save Locally as PENDING (So they can take orders immediately)
+            shopData.pending = true;
+            this.store.saveLoc(shopData);
+            
+            // 2. Send to Manager
             this.drive.submitShopForApproval(shopData);
+            
+            alert("Shop Saved Locally! Sent for Approval.");
         }
 
+        // Refresh UI
+        this.populateDropdowns();
+        this.updateMapMarkers();
         this.closeModals();
     }
 
     renderStores() {
         document.getElementById('store-list').innerHTML = this.locs.map(l => 
-            `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center"><div><div class="font-bold text-white">${l.name}</div><div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div></div><button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button></div>`
+            `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div>
+                    <div class="font-bold text-white">${l.name} ${l.pending ? '<span class="text-orange-500 text-[10px]">(Pending)</span>' : ''}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div>
+                </div>
+                <button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button>
+            </div>`
         ).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores</div>';
     }
 
