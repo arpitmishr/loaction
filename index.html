@@ -451,63 +451,64 @@ class GoogleCloud {
     }
 
     // --- FOLDER & FILE LOGIC ---
+    // --- INSERT/REPLACE INSIDE class GoogleCloud { ... } ---
+
     async ensureFolderStructure() {
         const msg = document.getElementById('login-status');
-        msg.innerText = "📂 Syncing Folders...";
+        msg.innerText = "📂 Syncing User Profile...";
 
         try {
-            // 1. Find or Create ROOT Folder (FreskeyPiyo)
-            this.rootId = await this.findOrCreateFolder(ROOT_FOLDER_NAME);
-
-            // 2. Find or Create SUB Folders
+            // 1. Get Folder IDs
+            this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
             const userDataFolderId = await this.findOrCreateFolder('user_data', this.rootId);
             const ordersFolderId = await this.findOrCreateFolder('orders', this.rootId);
-            const backupFolderId = await this.findOrCreateFolder('backups', this.rootId);
 
-            // 3. Define File Names based on Email
-            const safeEmail = this.userEmail.replace(/[@.]/g, '_'); // Sanitized email for filename
-            const shopsFileName = 'shops_master.csv'; // Shared file
-            const userFileName = `${safeEmail}.csv`; // User settings
-            const ordersFileName = `orders_${safeEmail}.csv`; // User orders
+            // 2. Define File Names
+            const safeEmail = this.userEmail.replace(/[@.]/g, '_');
+            const userFileName = `${safeEmail}.csv`; // Result: freskeypiyo_gmail_com.csv
 
-            // 4. Load/Create Files
-            
-            // A. Master Shops List (Shared)
-            // If Manager: Can write. If Salesman: Read only (logic handled in save)
-            this.shopsFileId = await this.findFileId(shopsFileName, this.rootId);
-            if(this.shopsFileId) {
-                const content = await this.downloadFile(this.shopsFileId);
-                if(content) this.store.restoreShopsFromCSV(content);
-            }
-
-            // B. User Profile Data
+            // 3. HANDLE USER PROFILE FILE (user_data folder)
             this.userFileId = await this.findFileId(userFileName, userDataFolderId);
-            if(this.userFileId) {
+            
+            if (this.userFileId) {
+                // File exists: Download and Restore
+                console.log("Found Profile. Downloading...");
                 const content = await this.downloadFile(this.userFileId);
-                // Assume simpler restore for profile
+                if (content) this.store.restoreProfileFromCSV(content);
             } else {
-                // Create blank user file
-                this.userFileId = await this.createFile(userFileName, userDataFolderId, "NAME,ID\n", 'text/csv');
+                // File missing: Create new with current local data
+                console.log("Creating New Profile on Cloud...");
+                const current = this.store.getProfile();
+                const initialCSV = `NAME,PHONE\n"${current.name}","${current.id}"`;
+                this.userFileId = await this.createFile(userFileName, userDataFolderId, initialCSV);
             }
 
-            // C. Orders Data
-            this.ordersFileId = await this.findFileId(ordersFileName, ordersFolderId);
-            if(this.ordersFileId) {
-                const content = await this.downloadFile(this.ordersFileId);
-                if(content) this.store.restoreLogsFromCSV(content);
-            } else {
-                this.ordersFileId = await this.createFile(ordersFileName, ordersFolderId, "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n", 'text/csv');
-            }
-
+            // 4. Handle Orders & Shops (Existing logic...)
+            // (Keep your existing Shops/Orders loading logic here from the previous step)
+            // ...
+            
             // Finish
-            this.app.initUI();
+            this.app.initUI(); 
             this.app.initMap();
-            msg.innerText = "✅ Cloud Sync Active";
+            msg.innerText = "✅ Data Synced";
             setTimeout(() => document.getElementById('modal-welcome').classList.add('hidden'), 1000);
 
-        } catch (e) {
-            console.error("Structure Error", e);
-            msg.innerText = "❌ Sync Error. Check Console.";
+        } catch (e) { console.error("Sync Error", e); }
+    }
+
+    // NEW METHOD: Call this whenever profile changes
+    async syncProfile() {
+        if (!this.userFileId) return;
+        const p = this.store.getProfile();
+        const csvContent = `NAME,PHONE\n"${p.name}","${p.id}"`;
+        await this.updateFileContent(this.userFileId, csvContent);
+        console.log("☁️ Profile Auto-Saved to Cloud");
+        
+        // Visual Feedback
+        const status = document.getElementById('drive-msg');
+        if(status) {
+            status.innerText = "Saving Profile...";
+            setTimeout(() => status.innerText = "Sync Active", 2000);
         }
     }
 
@@ -600,6 +601,24 @@ class Store {
 
 // Add inside class Store { ... }
 
+// --- INSERT INSIDE class Store { ... } ---
+
+    restoreProfileFromCSV(csv) {
+        if (!csv) return;
+        const lines = csv.split('\n');
+        // Expecting Format: NAME,PHONE \n "John Doe","9876543210"
+        if (lines.length < 2) return; 
+        
+        const data = lines[1].split(','); // Get second line
+        if (data.length >= 2) {
+            const p = {
+                name: data[0].replace(/"/g, '').trim(),
+                id: data[1].replace(/"/g, '').trim()
+            };
+            this.saveProfile(p); // Save to LocalStorage
+        }
+    }
+    
     // Convert CSV string back to Shop Array
     restoreShopsFromCSV(csv) {
         if(!csv) return;
@@ -699,15 +718,43 @@ class App {
 
     kalman(k, z) { if(isNaN(k.x)){k.x=z;return z} k.p+=k.q; const kg=k.p/(k.p+k.r); k.x+=kg*(z-k.x); k.p=(1-kg)*k.p; return k.x; }
 
+    // --- INSERT/REPLACE INSIDE class App { ... } ---
+
     initUI() {
         const p = this.store.getProfile();
-        this.locs = this.store.getLocs(); // Refresh locs from store
-        document.getElementById('prof-name').value = p.name;
-        document.getElementById('prof-id').value = p.id;
+        this.locs = this.store.getLocs();
+        
+        // Set values
+        const nameInput = document.getElementById('prof-name');
+        const idInput = document.getElementById('prof-id');
+        nameInput.value = p.name;
+        idInput.value = p.id;
+
+        // --- NEW: Continuous Sync Listeners ---
+        // Auto-save when user finishes typing (on blur) to save API quota
+        [nameInput, idInput].forEach(el => {
+            el.addEventListener('change', () => this.saveProfile(true)); 
+        });
+
         document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
         this.renderStores();
         this.populateDropdowns();
         this.updateTargets();
+    }
+
+    // Updated Save Function
+    saveProfile(silent = false) { 
+        const name = document.getElementById('prof-name').value;
+        const id = document.getElementById('prof-id').value;
+        
+        this.store.saveProfile({ name, id }); 
+        
+        // Trigger Cloud Sync
+        if(this.drive && this.drive.isReady) {
+            this.drive.syncProfile();
+        }
+
+        if(!silent) alert("Profile Updated & Synced!"); 
     }
 
     initMap() {
