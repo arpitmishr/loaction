@@ -556,84 +556,127 @@ class GoogleCloud {
         console.log("Shop sent for approval in background");
     }
 
+    // --- REPLACE THIS FUNCTION INSIDE class GoogleCloud ---
     async fetchPendingRequests() {
         if (this.userEmail !== MANAGER_EMAIL) return;
+
         const listContainer = document.getElementById('admin-pending-list');
-        listContainer.innerHTML = '<div class="text-center text-blue-400">Scanning...</div>';
+        // Show loading spinner
+        listContainer.innerHTML = '<div class="text-center text-blue-400 flex flex-col items-center gap-2 py-4"><i class="ph-bold ph-spinner animate-spin text-2xl"></i><span>Scanning Drive...</span></div>';
 
-        const q = `'${this.pendingFolderId}' in parents and trashed = false`;
-        const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-        
-        let html = '';
-        for (const file of res.result.files) {
-            const content = await this.downloadFile(file.id);
-            if (!content) continue;
-            const lines = content.split('\n').slice(1);
-            lines.forEach((line, index) => {
-                if (!line.trim()) return;
-                const cols = line.split(','); 
-                if(cols.length < 5) return;
-                const shopName = cols[0].replace(/"/g, '');
-                const salesman = cols[4].replace(/"/g, '');
+        try {
+            // 1. Ensure we have the folder ID
+            if(!this.pendingFolderId) {
+                this.pendingFolderId = await this.findOrCreateFolder('pending', this.rootId);
+            }
+
+            // 2. Search for files
+            const q = `'${this.pendingFolderId}' in parents and trashed = false`;
+            const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+            
+            if (!res.result.files || res.result.files.length === 0) {
+                listContainer.innerHTML = '<div class="text-center text-slate-500 text-xs py-4">No pending files found in Drive.</div>';
+                return;
+            }
+
+            let html = '';
+            let count = 0;
+
+            // 3. Loop through files
+            for (const file of res.result.files) {
+                const content = await this.downloadFile(file.id);
+                if (!content) continue;
+
+                const lines = content.split('\n');
                 
-                html += `
-                <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-2">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <div class="font-bold text-white text-sm">${shopName}</div>
-                            <div class="text-[10px] text-blue-400">By: ${salesman}</div>
+                // 4. Loop through lines (Skip header index 0)
+                for(let i=1; i<lines.length; i++) {
+                    const line = lines[i];
+                    if (!line.trim()) continue;
+
+                    // Parse CSV: "NAME",LAT,LNG,"CONTACT","BY",TS,"ID"
+                    const cols = line.split(','); 
+                    if(cols.length < 5) continue;
+
+                    const shopName = cols[0].replace(/"/g, '');
+                    const contact = cols[3] ? cols[3].replace(/"/g, '') : 'N/A';
+                    const salesman = cols[4].replace(/"/g, '');
+                    const ts = parseInt(cols[5]);
+                    const dateStr = !isNaN(ts) ? new Date(ts).toLocaleDateString() : 'Unknown';
+
+                    // SAFE ENCODING (Fixes the bug with quotes/spaces)
+                    const safeLine = encodeURIComponent(line);
+
+                    html += `
+                    <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-2 mb-2">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-bold text-white text-sm">${shopName}</div>
+                                <div class="text-[10px] text-blue-400">By: ${salesman}</div>
+                                <div class="text-[10px] text-slate-500">Ph: ${contact}</div>
+                            </div>
+                            <div class="text-[9px] text-slate-500 font-mono">${dateStr}</div>
                         </div>
-                    </div>
-                    <div class="flex gap-2 mt-1">
-                        <button onclick="drive.approveShop('${file.id}', ${index}, '${escape(line)}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded">APPROVE</button>
-                        <button onclick="drive.rejectShop('${file.id}', ${index})" class="flex-1 py-1.5 bg-red-900/50 border border-red-800 text-red-400 text-[10px] font-bold rounded">REJECT</button>
-                    </div>
-                </div>`;
-            });
+                        <div class="flex gap-2 mt-1">
+                            <button onclick="drive.approveShop('${file.id}', ${i}, '${safeLine}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded shadow transition-colors">APPROVE</button>
+                            <button onclick="drive.rejectShop('${file.id}', ${i})" class="flex-1 py-1.5 bg-red-900/30 border border-red-800 text-red-400 text-[10px] font-bold rounded hover:bg-red-900/50 transition-colors">REJECT</button>
+                        </div>
+                    </div>`;
+                    count++;
+                }
+            }
+
+            listContainer.innerHTML = count > 0 ? html : '<div class="text-center text-slate-500 text-xs py-4">No pending requests in files.</div>';
+
+        } catch (e) {
+            console.error("Fetch Pending Error:", e);
+            listContainer.innerHTML = `<div class="text-center text-red-400 text-xs py-4">Error: ${e.message}</div>`;
         }
-        listContainer.innerHTML = html || '<div class="text-center text-slate-500 text-xs">No pending requests</div>';
     }
 
-    async approveShop(fileId, lineIndex, lineDataEscaped) {
-        const lineData = unescape(lineDataEscaped);
-        const cols = lineData.split(',');
-        const name = cols[0].replace(/"/g, '');
-        const lat = cols[1];
-        const lng = cols[2];
-        const salesman = cols[4].replace(/"/g, '');
-        const existingId = cols[6] ? cols[6].replace(/"/g, '') : Date.now().toString(36); // Keep original ID if exists
+    // --- REPLACE THIS FUNCTION INSIDE class GoogleCloud ---
+    async approveShop(fileId, lineIndex, lineDataEncoded) {
+        try {
+            // 1. Decode the safe line
+            const lineData = decodeURIComponent(lineDataEncoded);
+            const cols = lineData.split(',');
+            
+            // 2. Extract Data
+            const name = cols[0].replace(/"/g, '');
+            const lat = cols[1];
+            const lng = cols[2];
+            const salesman = cols[4].replace(/"/g, '');
+            // Get ID (index 6) or generate new one if missing
+            const existingId = (cols[6] && cols[6].trim()) ? cols[6].replace(/"/g, '') : Date.now().toString(36);
 
-        const tagName = salesman.split('@')[0];
-        const taggedName = `${name} (By ${tagName})`;
-        
-        const newMasterLine = `${existingId},"${taggedName}",${lat},${lng},"Approved"`;
+            // 3. Format for Master List
+            const tagName = salesman.split('@')[0];
+            const taggedName = `${name} (By ${tagName})`;
+            const newMasterLine = `${existingId},"${taggedName}",${lat},${lng},"Approved"`;
 
-        if (this.shopsFileId) {
-            const currentMaster = await this.downloadFile(this.shopsFileId);
-            await this.updateFileContent(this.shopsFileId, currentMaster + '\n' + newMasterLine);
-        }
-        await this.removeFromPendingFile(fileId, lineIndex);
-        alert("Approved!");
-        this.fetchPendingRequests();
-        // Force refresh
-        const updatedMaster = await this.downloadFile(this.shopsFileId);
-        this.store.restoreShopsFromCSV(updatedMaster);
-        this.app.initMap();
-    }
+            // 4. Save to Master File
+            if (this.shopsFileId) {
+                const currentMaster = await this.downloadFile(this.shopsFileId);
+                await this.updateFileContent(this.shopsFileId, currentMaster + '\n' + newMasterLine);
+            }
 
-    async rejectShop(fileId, lineIndex) {
-        if(confirm("Reject?")) {
+            // 5. Remove from Pending File
             await this.removeFromPendingFile(fileId, lineIndex);
+            
+            alert("✅ Shop Approved!");
+            
+            // 6. Refresh UI
             this.fetchPendingRequests();
-        }
-    }
+            
+            // Update Map Immediately
+            const updatedMaster = await this.downloadFile(this.shopsFileId);
+            this.store.restoreShopsFromCSV(updatedMaster);
+            this.app.initMap();
 
-    async removeFromPendingFile(fileId, lineIndexToRemove) {
-        const content = await this.downloadFile(fileId);
-        const lines = content.split('\n');
-        // lineIndexToRemove + 1 because of header
-        const newLines = lines.filter((_, idx) => idx !== (lineIndexToRemove + 1));
-        await this.updateFileContent(fileId, newLines.join('\n'));
+        } catch(e) {
+            console.error(e);
+            alert("Approval Failed: " + e.message);
+        }
     }
 
     // --- FORCE SYNC LOGIC ---
