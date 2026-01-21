@@ -345,630 +345,393 @@
          JAVASCRIPT LOGIC
          ================================================================= -->
     <script>
-        /**
-         * ===============================================================
-         * 1. CONFIGURATION
-         * ===============================================================
-         * IMPORTANT: You must replace the placeholders below.
-         */
-        const CONFIG = {
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            // PASTE YOUR KEYS HERE
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE',
-const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
-            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+       /**
+     * ===============================================================
+     * 1. CONFIGURATION
+     * ===============================================================
+     */
+    const CONFIG = {
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        // STEP 1: PASTE YOUR KEYS HERE OR IT WILL NOT WORK
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        
+        API_KEY: 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE', 
+        CLIENT_ID: '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com',
+        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
+        PROJECT_NAME: 'FreskeyPiyo',
+        MANAGER_EMAIL: 'freskeypiyo@gmail.com',
+        SCOPES: 'https://www.googleapis.com/auth/drive.file',
+        FILES: {
+            MASTER: 'shops_master.csv',
+            USER_FOLDER: 'user_data',
+            ORDER_FOLDER: 'orders'
+        }
+    };
+
+    // Global State
+    const State = {
+        userEmail: null,
+        isManager: false,
+        accessToken: null,
+        shops: [],      
+        userData: [],   
+        orders: [],     
+        fileIds: {},    
+        syncing: false
+    };
+
+    // Logging Utility (Prints to the black box on screen)
+    const Logger = {
+        log: (msg, type='info') => {
+            const box = document.getElementById('console-log');
+            if(!box) return;
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.style.color = type === 'error' ? '#ff5252' : (type === 'success' ? '#69f0ae' : '#ccc');
+            line.innerText = `> ${msg}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${msg}`);
+        },
+        error: (msg) => Logger.log(msg, 'error'),
+        success: (msg) => Logger.log(msg, 'success')
+    };
+
+    // Utils
+    const Utils = {
+        uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        getToday: () => new Date().toISOString().split('T')[0],
+        parseCSV: (text) => {
+            if (!text) return [];
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            if (lines.length < 2) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const data = line.split(',');
+                let obj = {};
+                headers.forEach((h, i) => obj[h] = data[i] ? data[i].replace(/"/g, '').trim() : '');
+                return obj;
+            });
+        },
+        toCSV: (arr, headers) => {
+            const headerRow = headers.join(',');
+            const rows = arr.map(obj => headers.map(h => `"${(obj[h]||'').toString().replace(/"/g,'""')}"`).join(','));
+            return [headerRow, ...rows].join('\n');
+        }
+    };
+
+    // Drive API Wrapper
+    const Drive = {
+        find: async (name, parentId = null, mimeType = null) => {
+            let q = `name = '${name}' and trashed = false`;
+            if (parentId) q += ` and '${parentId}' in parents`;
+            if (mimeType) q += ` and mimeType = '${mimeType}'`;
+            try {
+                const res = await gapi.client.drive.files.list({ 'q': q, 'fields': 'files(id, name)' });
+                return res.result.files.length > 0 ? res.result.files[0] : null;
+            } catch (e) { Logger.error(`Find Error: ${e.message}`); return null; }
+        },
+        createFolder: async (name, parentId = null) => {
+            const meta = { 'name': name, 'mimeType': 'application/vnd.google-apps.folder' };
+            if (parentId) meta.parents = [parentId];
+            const res = await gapi.client.drive.files.create({ resource: meta, fields: 'id' });
+            return res.result;
+        },
+        read: async (fileId) => {
+            try { return (await gapi.client.drive.files.get({ fileId, alt: 'media' })).body; } 
+            catch (e) { return ""; }
+        },
+        save: async (name, content, parentId = null, existingId = null) => {
+            const meta = { 'name': name, 'mimeType': 'text/csv' };
+            if (parentId && !existingId) meta.parents = [parentId];
+            const boundary = '-------314159265358979323846';
+            const delimiter = "\r\n--" + boundary + "\r\n";
+            const close_delim = "\r\n--" + boundary + "--";
+            const multipartRequestBody = delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(meta) + delimiter + 'Content-Type: text/csv\r\n\r\n' + content + close_delim;
             
-            PROJECT_NAME: 'FreskeyPiyo',
-            MANAGER_EMAIL: 'freskeypiyo@gmail.com',
-            SCOPES: 'https://www.googleapis.com/auth/drive.file', // Using drive.file for safety
-            FILES: {
-                MASTER: 'shops_master.csv',
-                USER_FOLDER: 'user_data',
-                ORDER_FOLDER: 'orders'
-            }
-        };
-
-        // Global State
-        const State = {
-            userEmail: null,
-            isManager: false,
-            accessToken: null,
-            shops: [],      // Master list
-            userData: [],   // Specific to user (visits)
-            orders: [],     // Orders list
-            fileIds: {},    // Map of Drive File IDs
-            syncing: false
-        };
-
-        // Logging Utility
-        const Logger = {
-            log: (msg, type='info') => {
-                const box = document.getElementById('console-log');
-                const line = document.createElement('div');
-                line.className = 'log-line';
-                line.style.color = type === 'error' ? '#ff5252' : (type === 'success' ? '#69f0ae' : '#ccc');
-                line.innerText = `> ${msg}`;
-                box.appendChild(line);
-                box.scrollTop = box.scrollHeight;
-                console.log(`[${type.toUpperCase()}] ${msg}`);
-            },
-            error: (msg) => Logger.log(msg, 'error'),
-            success: (msg) => Logger.log(msg, 'success')
-        };
-
-        /**
-         * ===============================================================
-         * 2. UTILITY FUNCTIONS (CSV, ID, Dates)
-         * ===============================================================
-         */
-        const Utils = {
-            uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+            const path = existingId ? `/upload/drive/v3/files/${existingId}` : '/upload/drive/v3/files';
+            const method = existingId ? 'PATCH' : 'POST';
             
-            getToday: () => new Date().toISOString().split('T')[0],
+            await gapi.client.request({
+                path: path,
+                method: method,
+                params: { uploadType: 'multipart' },
+                headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
+                body: multipartRequestBody
+            });
+            Logger.success(`Saved ${name}`);
+        }
+    };
 
-            // Robust CSV Parser
-            parseCSV: (text) => {
-                if (!text) return [];
-                const lines = text.split('\n').filter(l => l.trim() !== '');
-                if (lines.length < 2) return []; // Header only or empty
+    // Auth & Init Logic
+    const Auth = {
+        tokenClient: null,
+        
+        init: () => {
+            // --- CRITICAL CHECK ---
+            if (CONFIG.API_KEY.includes('PASTE') || CONFIG.CLIENT_ID.includes('PASTE')) {
+                const btn = document.getElementById('btn-google-login');
+                btn.innerText = "CONFIGURATION ERROR";
+                btn.style.backgroundColor = "#d32f2f";
+                btn.style.borderColor = "#d32f2f";
                 
-                const headers = lines[0].split(',').map(h => h.trim());
-                const result = [];
-                
-                for (let i = 1; i < lines.length; i++) {
-                    const currentline = lines[i].split(',');
-                    // Handle simple CSV (assuming no commas in fields for simplicity in this demo)
-                    // For production, use a regex parser to handle quoted commas
-                    let obj = {};
-                    for (let j = 0; j < headers.length; j++) {
-                        obj[headers[j]] = currentline[j] ? currentline[j].replace(/"/g, '').trim() : '';
-                    }
-                    result.push(obj);
-                }
-                return result;
-            },
-
-            // Convert JSON Array to CSV String
-            toCSV: (arr, headers) => {
-                const headerRow = headers.join(',');
-                const rows = arr.map(obj => {
-                    return headers.map(fieldName => {
-                        let val = obj[fieldName] || '';
-                        // Escape quotes and wrap in quotes if necessary
-                        val = String(val).replace(/"/g, '""');
-                        if (val.includes(',')) val = `"${val}"`;
-                        return val;
-                    }).join(',');
-                });
-                return [headerRow, ...rows].join('\n');
+                Logger.error("STOP: Missing API Keys!");
+                alert("ERROR: You must open the code and paste your API_KEY and CLIENT_ID where indicated.\n\nThe app cannot start without them.");
+                return;
             }
-        };
 
-        /**
-         * ===============================================================
-         * 3. GOOGLE DRIVE API SERVICE
-         * ===============================================================
-         */
-        const Drive = {
-            // Find a file by name, optionally inside a parent folder
-            find: async (name, parentId = null, mimeType = null) => {
-                let q = `name = '${name}' and trashed = false`;
-                if (parentId) q += ` and '${parentId}' in parents`;
-                if (mimeType) q += ` and mimeType = '${mimeType}'`;
-                
+            Logger.log("Loading GAPI Client...");
+            gapi.load('client', async () => {
                 try {
-                    const response = await gapi.client.drive.files.list({
-                        'q': q,
-                        'fields': 'files(id, name)',
-                        'spaces': 'drive'
+                    await gapi.client.init({
+                        apiKey: CONFIG.API_KEY,
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
                     });
-                    const files = response.result.files;
-                    if (files && files.length > 0) return files[0];
-                    return null;
-                } catch (e) {
-                    Logger.error(`Search failed for ${name}: ${e.message}`);
-                    throw e;
-                }
-            },
-
-            // Create a folder
-            createFolder: async (name, parentId = null) => {
-                const fileMetadata = {
-                    'name': name,
-                    'mimeType': 'application/vnd.google-apps.folder'
-                };
-                if (parentId) fileMetadata.parents = [parentId];
-                
-                const response = await gapi.client.drive.files.create({
-                    resource: fileMetadata,
-                    fields: 'id'
-                });
-                Logger.success(`Created folder: ${name}`);
-                return response.result;
-            },
-
-            // Read file content (Download)
-            read: async (fileId) => {
-                try {
-                    const response = await gapi.client.drive.files.get({
-                        fileId: fileId,
-                        alt: 'media'
+                    
+                    // Initialize Identity Services
+                    Auth.tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CONFIG.CLIENT_ID,
+                        scope: CONFIG.SCOPES,
+                        callback: Auth.handleLogin
                     });
-                    return response.body;
-                } catch (e) {
-                    Logger.error(`Read failed: ${e.message}`);
-                    return "";
-                }
-            },
 
-            // Create or Update File (Multipart upload for CSV)
-            save: async (name, content, parentId = null, existingId = null) => {
-                const metadata = {
-                    'name': name,
-                    'mimeType': 'text/csv'
-                };
-                if (parentId && !existingId) metadata.parents = [parentId];
-
-                const multipart = [
-                    '--boundary_sep',
-                    'Content-Type: application/json; charset=UTF-8',
-                    '',
-                    JSON.stringify(metadata),
-                    '--boundary_sep',
-                    'Content-Type: text/csv',
-                    '',
-                    content,
-                    '--boundary_sep--'
-                ].join('\r\n');
-
-                const path = existingId 
-                    ? `/upload/drive/v3/files/${existingId}?uploadType=multipart` 
-                    : '/upload/drive/v3/files?uploadType=multipart';
-                const method = existingId ? 'PATCH' : 'POST';
-
-                await gapi.client.request({
-                    path: path,
-                    method: method,
-                    params: { uploadType: 'multipart' },
-                    headers: { 'Content-Type': 'multipart/related; boundary=boundary_sep' },
-                    body: multipart
-                });
-                Logger.success(`Saved: ${name}`);
-            }
-        };
-
-        /**
-         * ===============================================================
-         * 4. AUTHENTICATION SERVICE
-         * ===============================================================
-         */
-        const Auth = {
-            tokenClient: null,
-
-            // Step 1: Initialize Google Scripts
-            init: () => {
-                // Check Configuration first
-                if (CONFIG.API_KEY.includes('PASTE') || CONFIG.CLIENT_ID.includes('PASTE')) {
-                    Logger.error("CRITICAL: API_KEY or CLIENT_ID missing in Code!");
-                    alert("Developer Error: Please configure API Keys in the source code.");
-                    return;
-                }
-
-                Logger.log("Initializing GAPI...");
-                
-                // Load GAPI
-                gapi.load('client', async () => {
-                    try {
-                        await gapi.client.init({
-                            apiKey: CONFIG.API_KEY,
-                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                        });
-                        Logger.success("GAPI Loaded.");
-                        
-                        // Load Identity Services
-                        Auth.tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: CONFIG.CLIENT_ID,
-                            scope: CONFIG.SCOPES,
-                            callback: Auth.handleTokenResponse
-                        });
-                        
-                        // Enable Button
-                        const btn = document.getElementById('btn-google-login');
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="ph-bold ph-google-logo"></i> Sign In with Google';
-                        Logger.log("Ready for User Login.");
-
-                    } catch (err) {
-                        Logger.error("GAPI Init Failed: " + JSON.stringify(err));
-                    }
-                });
-            },
-
-            // Step 2: Trigger Login
-            login: () => {
-                if (!Auth.tokenClient) return Logger.error("Auth Client not ready.");
-                Auth.tokenClient.requestAccessToken({ prompt: 'consent' });
-            },
-
-            // Step 3: Handle Token
-            handleTokenResponse: async (resp) => {
-                if (resp.error) return Logger.error(resp.error);
-                
-                State.accessToken = resp.access_token;
-                Logger.success("Authenticated!");
-                
-                // Get User Info
-                try {
-                    const res = await gapi.client.drive.about.get({ fields: "user" });
-                    State.userEmail = res.result.user.emailAddress;
-                    State.isManager = (State.userEmail.toLowerCase() === CONFIG.MANAGER_EMAIL.toLowerCase());
+                    // Activate Button
+                    const btn = document.getElementById('btn-google-login');
+                    btn.disabled = false;
+                    btn.classList.remove('contrast');
+                    btn.classList.add('primary');
+                    btn.innerHTML = '<i class="ph-bold ph-google-logo"></i> Sign In with Google';
+                    Logger.success("System Ready. Please Login.");
                     
-                    Logger.log(`User: ${State.userEmail} (${State.isManager ? 'Manager' : 'Salesman'})`);
-                    
-                    // Proceed to App
-                    document.getElementById('modal-login').removeAttribute('open');
-                    document.getElementById('app-layout').classList.remove('hidden');
-                    UI.init();
-                    Sync.start();
-
-                } catch (e) {
-                    Logger.error("Failed to get user profile");
+                } catch (err) {
+                    Logger.error("GAPI Init Error: " + JSON.stringify(err));
+                    alert("Google API failed to load. Check console for details. (Are your keys correct? Is 'Drive API' enabled in console?)");
                 }
-            },
+            });
+        },
 
-            logout: () => {
-                const token = gapi.client.getToken();
-                if (token !== null) {
-                    google.accounts.oauth2.revoke(token.access_token);
-                    gapi.client.setToken(''); 
-                }
-                location.reload();
+        login: () => {
+            if(!Auth.tokenClient) return alert("System not ready yet.");
+            Auth.tokenClient.requestAccessToken({ prompt: 'consent' });
+        },
+
+        handleLogin: async (resp) => {
+            if (resp.error) {
+                Logger.error("Login Failed: " + resp.error);
+                return;
             }
-        };
+            State.accessToken = resp.access_token;
+            Logger.success("Logged In! Fetching profile...");
+            
+            try {
+                const res = await gapi.client.drive.about.get({ fields: "user" });
+                State.userEmail = res.result.user.emailAddress;
+                State.isManager = (State.userEmail.toLowerCase() === CONFIG.MANAGER_EMAIL.toLowerCase());
+                
+                document.getElementById('modal-login').removeAttribute('open');
+                document.getElementById('app-layout').classList.remove('hidden');
+                
+                UI.init();
+                Sync.start();
+            } catch(e) { Logger.error("Profile Error: "+e.message); }
+        },
 
-        /**
-         * ===============================================================
-         * 5. SYNC & DATA LOGIC
-         * ===============================================================
-         */
-        const Sync = {
-            start: async () => {
-                const btn = document.getElementById('btn-sync');
-                btn.setAttribute('aria-busy', 'true');
-                Logger.log("Starting Sync...");
-
-                try {
-                    // 1. ROOT FOLDER
-                    let root = await Drive.find(CONFIG.PROJECT_NAME, null, 'application/vnd.google-apps.folder');
-                    if (!root) {
-                        if (State.isManager) {
-                            root = await Drive.createFolder(CONFIG.PROJECT_NAME);
-                        } else {
-                            alert("System Folder not found. Please ask Manager to share 'FreskeyPiyo' folder.");
-                            throw new Error("Folder access denied");
-                        }
-                    }
-                    State.fileIds.root = root.id;
-
-                    // 2. MASTER SHOPS FILE
-                    let master = await Drive.find(CONFIG.FILES.MASTER, root.id);
-                    const masterHeaders = ['id', 'name', 'address', 'route', 'type', 'created_by'];
-                    
-                    if (master) {
-                        const content = await Drive.read(master.id);
-                        State.shops = Utils.parseCSV(content);
-                        State.fileIds.master = master.id;
-                    } else if (State.isManager) {
-                        // Create empty master
-                        await Drive.save(CONFIG.FILES.MASTER, masterHeaders.join(','), root.id);
-                        State.shops = [];
-                        // Need to fetch ID again
-                        master = await Drive.find(CONFIG.FILES.MASTER, root.id);
-                        State.fileIds.master = master.id;
-                    }
-
-                    // 3. USER DATA FOLDER
-                    let userDir = await Drive.find(CONFIG.FILES.USER_FOLDER, root.id, 'application/vnd.google-apps.folder');
-                    if (!userDir && State.isManager) userDir = await Drive.createFolder(CONFIG.FILES.USER_FOLDER, root.id);
-                    if (userDir) {
-                        State.fileIds.userDir = userDir.id;
-                        // 3b. SPECIFIC USER FILE
-                        const myFile = `${State.userEmail}.csv`;
-                        let uFile = await Drive.find(myFile, userDir.id);
-                        const uHeaders = ['shop_id', 'status', 'notes', 'target', 'due', 'last_visit'];
-                        
-                        if (uFile) {
-                            const content = await Drive.read(uFile.id);
-                            State.userData = Utils.parseCSV(content);
-                            State.fileIds.userFile = uFile.id;
-                        } else {
-                            await Drive.save(myFile, uHeaders.join(','), userDir.id);
-                            State.userData = [];
-                            uFile = await Drive.find(myFile, userDir.id);
-                            State.fileIds.userFile = uFile.id;
-                        }
-                    }
-
-                    // 4. ORDERS FOLDER
-                    let orderDir = await Drive.find(CONFIG.FILES.ORDER_FOLDER, root.id, 'application/vnd.google-apps.folder');
-                    if (!orderDir && State.isManager) orderDir = await Drive.createFolder(CONFIG.FILES.ORDER_FOLDER, root.id);
-                    if (orderDir) {
-                        State.fileIds.orderDir = orderDir.id;
-                        
-                        if (State.isManager) {
-                            // Manager reads ALL orders
-                            // simplified for this demo: only reads own or specific strategy needed for all
-                            // For now, let's just read "all files in this folder" logic would be heavy for demo
-                            // We will read just the manager's view or all if we listed children.
-                            // Implementing: Read ALL files in order dir
-                            // Note: This can be slow if many users.
-                            State.orders = []; // Reset
-                            // Implementation skipped for brevity in "1900 lines" context, sticking to role specific
-                        }
-                        
-                        // Read My Orders
-                        const oFile = `orders_${State.userEmail}.csv`;
-                        let myOrderFile = await Drive.find(oFile, orderDir.id);
-                        const oHeaders = ['id', 'date', 'shop_id', 'qty', 'status', 'salesman'];
-                        
-                        if (myOrderFile) {
-                            const content = await Drive.read(myOrderFile.id);
-                            State.orders = Utils.parseCSV(content);
-                            State.fileIds.orderFile = myOrderFile.id;
-                        } else {
-                            await Drive.save(oFile, oHeaders.join(','), orderDir.id);
-                            State.orders = [];
-                            myOrderFile = await Drive.find(oFile, orderDir.id);
-                            State.fileIds.orderFile = myOrderFile.id;
-                        }
-                    }
-
-                    Logger.success("Sync Complete.");
-                    UI.renderShops();
-                    UI.renderOrders();
-
-                } catch (e) {
-                    Logger.error("Sync Error: " + e.message);
-                    alert("Sync Error: " + e.message);
-                } finally {
-                    btn.setAttribute('aria-busy', 'false');
-                }
+        logout: () => {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken('');
             }
-        };
+            location.reload();
+        }
+    };
 
-        const Data = {
-            addShop: async (e) => {
-                e.preventDefault();
-                const form = e.target;
-                const newShop = {
-                    id: Utils.uuid(),
-                    name: form.name.value,
-                    address: form.addr.value,
-                    route: form.route.value,
-                    type: form.type.value,
-                    created_by: State.userEmail
-                };
+    const Sync = {
+        start: async () => {
+            const btn = document.getElementById('btn-sync');
+            btn.setAttribute('aria-busy', 'true');
+            Logger.log("Syncing...");
+            
+            try {
+                // 1. Root
+                let root = await Drive.find(CONFIG.PROJECT_NAME, null, 'application/vnd.google-apps.folder');
+                if(!root) {
+                    if(State.isManager) root = await Drive.createFolder(CONFIG.PROJECT_NAME);
+                    else throw new Error("Folder 'FreskeyPiyo' not found. Ask manager to share it.");
+                }
+                State.fileIds.root = root.id;
 
-                // Optimistic UI Update
-                State.shops.push(newShop);
+                // 2. Master
+                let master = await Drive.find(CONFIG.FILES.MASTER, root.id);
+                if(master) {
+                    const txt = await Drive.read(master.id);
+                    State.shops = Utils.parseCSV(txt);
+                    State.fileIds.master = master.id;
+                } else if(State.isManager) {
+                    await Drive.save(CONFIG.FILES.MASTER, "id,name,address,route,type,created_by", root.id);
+                    State.shops = [];
+                    master = await Drive.find(CONFIG.FILES.MASTER, root.id);
+                    State.fileIds.master = master.id;
+                }
+
+                // 3. User Data
+                let userDir = await Drive.find(CONFIG.FILES.USER_FOLDER, root.id, 'application/vnd.google-apps.folder');
+                if(!userDir && State.isManager) userDir = await Drive.createFolder(CONFIG.FILES.USER_FOLDER, root.id);
+                if(userDir) {
+                    State.fileIds.userDir = userDir.id;
+                    const fName = `${State.userEmail}.csv`;
+                    let uFile = await Drive.find(fName, userDir.id);
+                    if(uFile) {
+                        State.userData = Utils.parseCSV(await Drive.read(uFile.id));
+                        State.fileIds.userFile = uFile.id;
+                    } else {
+                        await Drive.save(fName, "shop_id,status,notes,target,due,last_visit", userDir.id);
+                        State.userData = [];
+                        uFile = await Drive.find(fName, userDir.id);
+                        State.fileIds.userFile = uFile.id;
+                    }
+                }
+
+                // 4. Orders
+                let orderDir = await Drive.find(CONFIG.FILES.ORDER_FOLDER, root.id, 'application/vnd.google-apps.folder');
+                if(!orderDir && State.isManager) orderDir = await Drive.createFolder(CONFIG.FILES.ORDER_FOLDER, root.id);
+                if(orderDir) {
+                    State.fileIds.orderDir = orderDir.id;
+                    const oName = `orders_${State.userEmail}.csv`;
+                    let oFile = await Drive.find(oName, orderDir.id);
+                    if(oFile) {
+                        State.orders = Utils.parseCSV(await Drive.read(oFile.id));
+                        State.fileIds.orderFile = oFile.id;
+                    } else {
+                        await Drive.save(oName, "id,date,shop_id,qty,status,salesman", orderDir.id);
+                        State.orders = [];
+                        oFile = await Drive.find(oName, orderDir.id);
+                        State.fileIds.orderFile = oFile.id;
+                    }
+                }
+
+                Logger.success("Sync Complete");
                 UI.renderShops();
-                form.reset();
-                UI.toggleAddShop();
-
-                // Save to Cloud
-                const headers = ['id', 'name', 'address', 'route', 'type', 'created_by'];
-                const csv = Utils.toCSV(State.shops, headers);
-                await Drive.save(CONFIG.FILES.MASTER, csv, null, State.fileIds.master);
-            },
-
-            saveVisit: async () => {
-                if (!State.currentShopId) return;
-                
-                const note = document.getElementById('inp-notes').value;
-                const target = document.getElementById('inp-target').value;
-                const due = document.getElementById('inp-due').value;
-
-                // Find existing entry or create new
-                let entryIndex = State.userData.findIndex(u => u.shop_id === State.currentShopId);
-                const entry = {
-                    shop_id: State.currentShopId,
-                    status: 'Visited',
-                    notes: note,
-                    target: target,
-                    due: due,
-                    last_visit: Utils.getToday()
-                };
-
-                if (entryIndex >= 0) {
-                    State.userData[entryIndex] = entry;
-                } else {
-                    State.userData.push(entry);
-                }
-
-                // Save
-                const headers = ['shop_id', 'status', 'notes', 'target', 'due', 'last_visit'];
-                const csv = Utils.toCSV(State.userData, headers);
-                await Drive.save(`${State.userEmail}.csv`, csv, null, State.fileIds.userFile);
-                
-                UI.closeModal();
-                UI.renderShops(); // Update badge
-            },
-
-            saveOrder: async () => {
-                const qty = document.getElementById('inp-qty').value;
-                if (!qty) return alert("Please enter quantity");
-
-                const order = {
-                    id: Utils.uuid(),
-                    date: Utils.getToday(),
-                    shop_id: State.currentShopId,
-                    qty: qty,
-                    status: document.getElementById('inp-pay').value,
-                    salesman: State.userEmail
-                };
-
-                State.orders.push(order);
-                
-                const headers = ['id', 'date', 'shop_id', 'qty', 'status', 'salesman'];
-                const csv = Utils.toCSV(State.orders, headers);
-                await Drive.save(`orders_${State.userEmail}.csv`, csv, null, State.fileIds.orderFile);
-
-                UI.closeModal();
                 UI.renderOrders();
-                alert("Order Placed Successfully!");
+            } catch(e) { 
+                Logger.error("Sync Failed: "+e.message); 
+                alert("Sync Failed: "+e.message);
+            } finally {
+                btn.setAttribute('aria-busy', 'false');
             }
-        };
+        }
+    };
 
-        /**
-         * ===============================================================
-         * 6. UI MANAGER
-         * ===============================================================
-         */
-        const UI = {
-            init: () => {
-                const badge = document.getElementById('user-badge');
-                badge.innerText = State.isManager ? 'MANAGER' : 'SALESMAN';
-                badge.className = `badge ${State.isManager ? 'manager' : 'sales'}`;
-                
-                if(State.isManager) document.getElementById('manager-controls').classList.remove('hidden');
-            },
+    const Data = {
+        addShop: async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const newShop = { id: Utils.uuid(), name: form.name.value, address: form.addr.value, route: form.route.value, type: form.type.value, created_by: State.userEmail };
+            State.shops.push(newShop);
+            UI.renderShops();
+            UI.toggleAddShop();
+            form.reset();
+            const headers = ['id', 'name', 'address', 'route', 'type', 'created_by'];
+            await Drive.save(CONFIG.FILES.MASTER, Utils.toCSV(State.shops, headers), null, State.fileIds.master);
+        },
+        saveVisit: async () => {
+            const note = document.getElementById('inp-notes').value;
+            const target = document.getElementById('inp-target').value;
+            const due = document.getElementById('inp-due').value;
+            let idx = State.userData.findIndex(u => u.shop_id === State.currentShopId);
+            const entry = { shop_id: State.currentShopId, status: 'Visited', notes: note, target, due, last_visit: Utils.getToday() };
+            if (idx >= 0) State.userData[idx] = entry; else State.userData.push(entry);
+            UI.closeModal();
+            UI.renderShops();
+            const headers = ['shop_id', 'status', 'notes', 'target', 'due', 'last_visit'];
+            await Drive.save(`${State.userEmail}.csv`, Utils.toCSV(State.userData, headers), null, State.fileIds.userFile);
+        },
+        saveOrder: async () => {
+            const qty = document.getElementById('inp-qty').value;
+            if(!qty) return;
+            const order = { id: Utils.uuid(), date: Utils.getToday(), shop_id: State.currentShopId, qty, status: document.getElementById('inp-pay').value, salesman: State.userEmail };
+            State.orders.push(order);
+            UI.closeModal();
+            UI.renderOrders();
+            const headers = ['id', 'date', 'shop_id', 'qty', 'status', 'salesman'];
+            await Drive.save(`orders_${State.userEmail}.csv`, Utils.toCSV(State.orders, headers), null, State.fileIds.orderFile);
+        }
+    };
 
-            renderShops: () => {
-                const container = document.getElementById('shop-list-container');
-                const term = document.getElementById('shop-search').value.toLowerCase();
-                
-                // Manager Stats
-                document.getElementById('stat-shops').innerText = State.shops.length;
-                document.getElementById('stat-orders').innerText = State.orders.length;
+    const UI = {
+        init: () => {
+            const b = document.getElementById('user-badge');
+            b.innerText = State.isManager ? 'MANAGER' : 'SALESMAN';
+            b.className = `badge ${State.isManager ? 'manager' : 'sales'}`;
+            if(State.isManager) document.getElementById('manager-controls').classList.remove('hidden');
+        },
+        renderShops: () => {
+            const term = document.getElementById('shop-search').value.toLowerCase();
+            document.getElementById('stat-shops').innerText = State.shops.length;
+            document.getElementById('stat-orders').innerText = State.orders.length;
+            const list = State.shops.filter(s => s.name.toLowerCase().includes(term));
+            const container = document.getElementById('shop-list-container');
+            if(list.length === 0) { container.innerHTML = '<div class="text-center text-small">No Data</div>'; return; }
+            container.innerHTML = list.map(s => {
+                const meta = State.userData.find(u => u.shop_id === s.id);
+                const visited = meta && meta.status === 'Visited';
+                return `<article class="shop-card ${visited?'visited':''}" onclick="UI.openShopModal('${s.id}')">
+                    <header style="display:flex;justify-content:space-between"><strong>${s.name}</strong>${visited?'<span class="badge" style="background:#43a047">VISITED</span>':''}</header>
+                    <div class="text-small" style="color:#bbb"><i class="ph-bold ph-map-pin"></i> ${s.address}<br><span style="color:var(--primary)">${s.route}</span></div>
+                </article>`;
+            }).join('');
+        },
+        renderOrders: () => {
+            document.getElementById('order-table-body').innerHTML = State.orders.map(o => {
+                const s = State.shops.find(x => x.id === o.shop_id);
+                return `<tr><td>${o.date}</td><td>${s?s.name:'Unknown'}</td><td>${o.qty}</td><td>${o.status}</td></tr>`;
+            }).join('');
+        },
+        openShopModal: (id) => {
+            State.currentShopId = id;
+            const s = State.shops.find(x => x.id === id);
+            const m = State.userData.find(x => x.shop_id === id) || {};
+            document.getElementById('modal-shop-title').innerText = s.name;
+            document.getElementById('modal-shop-subtitle').innerText = s.address;
+            document.getElementById('inp-notes').value = m.notes||'';
+            document.getElementById('inp-target').value = m.target||'';
+            document.getElementById('inp-due').value = m.due||'';
+            document.getElementById('inp-qty').value = '';
+            document.getElementById('modal-shop').setAttribute('open', true);
+        },
+        closeModal: () => document.getElementById('modal-shop').removeAttribute('open'),
+        modalTab: (t) => {
+            document.getElementById('mview-visit').classList.toggle('hidden', t!=='visit');
+            document.getElementById('mview-order').classList.toggle('hidden', t!=='order');
+            document.getElementById('mtab-visit').classList.toggle('secondary', t==='visit');
+            document.getElementById('mtab-order').classList.toggle('secondary', t==='order');
+        },
+        switchTab: (t) => {
+            document.getElementById('nav-home').classList.toggle('active', t==='home');
+            document.getElementById('nav-orders').classList.toggle('active', t==='orders');
+            document.getElementById('view-home').classList.toggle('hidden', t!=='home');
+            document.getElementById('view-orders').classList.toggle('hidden', t!=='orders');
+        },
+        toggleAddShop: () => document.getElementById('form-add-shop').classList.toggle('hidden')
+    };
 
-                // Filter
-                const filtered = State.shops.filter(s => 
-                    s.name.toLowerCase().includes(term) || s.route.toLowerCase().includes(term)
-                );
-
-                if (filtered.length === 0) {
-                    container.innerHTML = `<div class="text-center text-small">No shops found. ${State.isManager?'Add one!':''}</div>`;
-                    return;
-                }
-
-                container.innerHTML = filtered.map(shop => {
-                    const userMeta = State.userData.find(u => u.shop_id === shop.id);
-                    const isVisited = userMeta && userMeta.status === 'Visited';
-                    
-                    return `
-                    <article class="shop-card ${isVisited ? 'visited' : ''}" onclick="UI.openShopModal('${shop.id}')">
-                        <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                            <strong>${shop.name}</strong>
-                            ${isVisited ? '<span class="badge" style="background:#43a047">VISITED</span>' : ''}
-                        </header>
-                        <div class="text-small" style="color: #bbb;">
-                            <i class="ph-bold ph-map-pin"></i> ${shop.address}<br>
-                            <span style="color: var(--primary);">Route: ${shop.route}</span>
-                            ${userMeta && userMeta.due ? `<br><strong class="text-error">Due: ₹${userMeta.due}</strong>` : ''}
-                        </div>
-                    </article>
-                    `;
-                }).join('');
-            },
-
-            renderOrders: () => {
-                const tbody = document.getElementById('order-table-body');
-                tbody.innerHTML = State.orders.map(o => {
-                    const shop = State.shops.find(s => s.id === o.shop_id);
-                    return `
-                    <tr>
-                        <td>${o.date}</td>
-                        <td>${shop ? shop.name : 'Unknown'}</td>
-                        <td>${o.qty}</td>
-                        <td>${o.status}</td>
-                    </tr>`;
-                }).join('');
-            },
-
-            // Modal Logic
-            openShopModal: (id) => {
-                State.currentShopId = id;
-                const shop = State.shops.find(s => s.id === id);
-                const meta = State.userData.find(u => u.shop_id === id) || {};
-
-                document.getElementById('modal-shop-title').innerText = shop.name;
-                document.getElementById('modal-shop-subtitle').innerText = shop.address;
-                
-                // Fill Visit Data
-                document.getElementById('inp-notes').value = meta.notes || '';
-                document.getElementById('inp-target').value = meta.target || '';
-                document.getElementById('inp-due').value = meta.due || '';
-
-                // Reset Order
-                document.getElementById('inp-qty').value = '';
-
-                // Show Modal
-                document.getElementById('modal-shop').setAttribute('open', true);
-            },
-
-            closeModal: () => {
-                document.getElementById('modal-shop').removeAttribute('open');
-                State.currentShopId = null;
-            },
-
-            modalTab: (tab) => {
-                const visitBtn = document.getElementById('mtab-visit');
-                const orderBtn = document.getElementById('mtab-order');
-                const visitView = document.getElementById('mview-visit');
-                const orderView = document.getElementById('mview-order');
-
-                if (tab === 'visit') {
-                    visitBtn.classList.add('secondary'); orderBtn.classList.remove('secondary');
-                    visitView.classList.remove('hidden'); orderView.classList.add('hidden');
-                } else {
-                    orderBtn.classList.add('secondary'); visitBtn.classList.remove('secondary');
-                    orderView.classList.remove('hidden'); visitView.classList.add('hidden');
-                }
-            },
-
-            switchTab: (tabName) => {
-                // Nav Styles
-                document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-                document.getElementById('nav-' + tabName).classList.add('active');
-
-                // View Visibility
-                document.getElementById('view-home').classList.add('hidden');
-                document.getElementById('view-orders').classList.add('hidden');
-                document.getElementById('view-' + tabName).classList.remove('hidden');
-            },
-
-            toggleAddShop: () => {
-                const el = document.getElementById('form-add-shop');
-                el.classList.toggle('hidden');
+    // BOOTSTRAP
+    window.onload = () => {
+        Logger.log("Booting...");
+        let attempts = 0;
+        const check = setInterval(() => {
+            if (window.google && window.gapi) {
+                clearInterval(check);
+                Logger.log("Scripts Found.");
+                Auth.init();
+            } else if (++attempts > 20) {
+                clearInterval(check);
+                Logger.error("Google Scripts Timeout (Check Internet)");
             }
-        };
-
-        /**
-         * ===============================================================
-         * 7. BOOTSTRAP
-         * ===============================================================
-         */
-        window.onload = () => {
-            Logger.log("Window Loaded. Checking scripts...");
-            
-            // Safety Check: Wait for Google Scripts to definitely load
-            let attempts = 0;
-            const checkGoogle = setInterval(() => {
-                if (window.google && window.gapi) {
-                    clearInterval(checkGoogle);
-                    Logger.log("Google Scripts Detected.");
-                    Auth.init();
-                } else {
-                    attempts++;
-                    if(attempts > 20) {
-                        clearInterval(checkGoogle);
-                        Logger.error("Google Scripts timed out. Check internet connection.");
-                    }
-                }
-            }, 500);
-        };
-
+        }, 500);
+    };
     </script>
 </body>
 </html>
