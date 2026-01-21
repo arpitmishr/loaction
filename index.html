@@ -3,629 +3,733 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FreskeyPiyo | Logistics</title>
+    <title>FreskeyPiyo Sales System</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: { extend: { colors: { slate: { 850: '#1e293b', 950: '#020617' } } } }
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' },
+                        brand: '#e11d48'
+                    }
+                }
+            }
         }
     </script>
-
-    <!-- LEAFLET MAP -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    
     <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- GOOGLE APIS -->
+    <!-- GOOGLE SCRIPTS -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <style>
-        body { -webkit-tap-highlight-color: transparent; user-select: none; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .modal { transition: opacity 0.3s; opacity: 0; pointer-events: none; }
-        .modal.open { opacity: 1; pointer-events: auto; }
+        body { background-color: #020617; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .hide { display: none !important; }
+        .loader { border: 3px solid #1e293b; border-top: 3px solid #e11d48; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col overflow-hidden">
 
-    <!-- LOGIN SCREEN -->
-    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div class="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
-            <i class="ph-fill ph-plant text-4xl text-white"></i>
+    <!-- === AUTH SCREEN === -->
+    <div id="view-auth" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-20 h-20 bg-brand rounded-2xl flex items-center justify-center shadow-2xl shadow-rose-900/50 mb-6">
+            <i class="ph-fill ph-brandy text-4xl text-white"></i>
         </div>
-        <h1 class="text-2xl font-bold text-white mb-2">FreskeyPiyo</h1>
-        <p class="text-slate-400 mb-8 text-sm">Role-Based Sales & Logistics System<br>Powered by Google Drive</p>
-        <button onclick="auth.login()" class="bg-white text-slate-900 px-6 py-3 rounded-xl font-bold flex items-center gap-3 hover:bg-slate-100 transition-all">
-            <i class="ph-bold ph-google-logo"></i> Login with Google
+        <h1 class="text-3xl font-bold text-white mb-2">FreskeyPiyo</h1>
+        <p class="text-slate-400 mb-8 max-w-xs">Sales Force Automation System<br><span class="text-xs opacity-50">Powered by Google Drive</span></p>
+        
+        <button onclick="driveAuth.login()" class="w-full max-w-xs py-3 bg-white text-slate-900 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-200 transition-all">
+            <i class="ph-bold ph-google-logo text-xl"></i>
+            <span>Sign in with Google</span>
         </button>
-        <div id="login-status" class="mt-4 text-xs text-slate-500 font-mono"></div>
+        <div id="auth-status" class="mt-4 text-xs text-slate-500 font-mono h-5">Waiting for input...</div>
     </div>
 
-    <!-- HEADER -->
-    <header class="fixed top-0 w-full z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
-        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white">
-                    <i class="ph-bold ph-storefront"></i>
-                </div>
-                <div>
-                    <h1 class="text-xs font-bold text-slate-400">FRESKEYPIYO</h1>
-                    <div class="flex items-center gap-2">
-                        <span id="user-role" class="text-[10px] bg-slate-700 px-1 rounded text-white font-bold">...</span>
-                        <span id="sync-status" class="text-[10px] text-emerald-400 font-mono">Synced</span>
-                    </div>
-                </div>
+    <!-- === APP HEADER === -->
+    <header class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 fixed top-0 w-full z-40">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-brand rounded flex items-center justify-center">
+                <span class="font-bold text-white">FP</span>
             </div>
-            <button onclick="app.sync()" class="p-2 bg-slate-800 rounded-full border border-slate-700 text-emerald-400">
-                <i class="ph-bold ph-arrows-clockwise"></i>
+            <div>
+                <h1 class="text-sm font-bold text-white leading-none">FreskeyPiyo</h1>
+                <span id="user-role-badge" class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">GUEST</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <div id="sync-status" class="text-[10px] text-emerald-500 font-mono hidden">SYNCED</div>
+            <button onclick="app.sync()" class="w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 active:scale-95 text-slate-400 hover:text-white">
+                <i id="sync-icon" class="ph-bold ph-arrows-clockwise"></i>
+            </button>
+            <button onclick="driveAuth.logout()" class="w-8 h-8 bg-red-900/20 rounded-full flex items-center justify-center border border-red-900/50 text-red-500">
+                <i class="ph-bold ph-sign-out"></i>
             </button>
         </div>
     </header>
 
-    <!-- MAIN APP -->
-    <main class="flex-1 max-w-md mx-auto w-full pt-20 pb-24 px-4 overflow-y-auto no-scrollbar">
+    <!-- === MAIN CONTENT === -->
+    <main class="flex-1 pt-16 pb-20 overflow-y-auto bg-slate-950 px-4 scroll-smooth">
         
-        <!-- MAP TAB -->
-        <div id="tab-map" class="tab-content active space-y-4">
-            <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
-                <div id="map" class="absolute inset-0 z-10"></div>
-                <button onclick="app.centerMap()" class="absolute bottom-4 right-4 z-20 w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center shadow-lg">
-                    <i class="ph-bold ph-crosshair"></i>
-                </button>
-            </div>
-            
-            <!-- Add Shop (Salesman) -->
-            <button id="btn-add-shop" onclick="ui.openAddShop()" class="w-full py-3 bg-slate-800 border border-slate-700 text-white font-bold rounded-xl hidden">
-                <i class="ph-bold ph-plus-circle"></i> Add New Shop
-            </button>
-
-            <!-- Shop List -->
-            <div id="shop-list" class="space-y-3">
-                <!-- Injected via JS -->
-            </div>
-        </div>
-
-        <!-- PROFILE TAB -->
-        <div id="tab-profile" class="tab-content space-y-4">
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <h3 class="font-bold text-white mb-4">My Dashboard</h3>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        <div class="text-xs text-slate-500">Shops</div>
-                        <div id="dash-shops" class="text-xl font-bold text-white">0</div>
+        <!-- DASHBOARD TAB -->
+        <div id="tab-dash" class="tab-content py-4 space-y-4">
+            <!-- Manager Only Panel -->
+            <div id="manager-panel" class="hide bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <h2 class="text-xs font-bold text-brand uppercase tracking-wider mb-3 border-b border-slate-800 pb-2">Manager Controls</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-950 p-3 rounded border border-slate-800 text-center">
+                        <div class="text-2xl font-bold text-white" id="stat-shops">0</div>
+                        <div class="text-[10px] text-slate-500">Total Shops</div>
                     </div>
-                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                        <div class="text-xs text-slate-500">Total Due</div>
-                        <div id="dash-due" class="text-xl font-bold text-red-400">₹0</div>
+                    <div class="bg-slate-950 p-3 rounded border border-slate-800 text-center">
+                        <div class="text-2xl font-bold text-emerald-400" id="stat-orders">0</div>
+                        <div class="text-[10px] text-slate-500">Total Orders</div>
                     </div>
                 </div>
-                <div class="text-xs text-slate-500">Logged in as: <span id="user-email" class="text-white">--</span></div>
+                <div class="mt-3">
+                    <button onclick="app.initializeDriveStructure()" class="w-full py-2 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 hover:text-white flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-folder-notch-plus"></i> Re-Check Drive Folders
+                    </button>
+                </div>
+            </div>
+
+            <!-- Shop Input -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+                <h2 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <i class="ph-fill ph-storefront text-brand"></i> Add New Shop
+                </h2>
+                <form id="form-shop" onsubmit="app.addShop(event)" class="space-y-3">
+                    <input type="text" id="inp-shop-name" placeholder="Shop Name" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm focus:border-brand outline-none">
+                    <input type="text" id="inp-shop-addr" placeholder="Address" required class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm focus:border-brand outline-none">
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="inp-shop-route" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm outline-none text-slate-300">
+                            <option value="Route A">Route A</option>
+                            <option value="Route B">Route B</option>
+                            <option value="Route C">Route C</option>
+                        </select>
+                        <select id="inp-shop-type" class="bg-slate-950 border border-slate-700 rounded p-2 text-sm outline-none text-slate-300">
+                            <option value="Retail">Retail</option>
+                            <option value="Wholesale">Wholesale</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-brand hover:bg-rose-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-lg shadow-rose-900/20">
+                        Add to Master List
+                    </button>
+                </form>
+            </div>
+
+            <!-- Shops List -->
+            <div class="space-y-2">
+                <h3 class="text-xs font-bold text-slate-500 uppercase px-1">Registered Shops</h3>
+                <div id="list-shops" class="space-y-2 pb-10">
+                    <!-- Populated via JS -->
+                    <div class="text-center text-slate-600 py-10 text-xs">Loading Shops...</div>
+                </div>
             </div>
         </div>
+
+        <!-- ORDERS TAB -->
+        <div id="tab-orders" class="tab-content py-4 space-y-4 hide">
+            <h2 class="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">Order History</h2>
+            <div id="list-orders" class="space-y-2"></div>
+        </div>
+
     </main>
 
-    <!-- NAV -->
-    <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-40 pb-safe">
-        <div class="max-w-md mx-auto flex justify-around items-center h-16">
-            <button onclick="ui.switchTab('map')" class="nav-btn text-emerald-500 flex flex-col items-center gap-1">
-                <i class="ph-fill ph-map-trifold text-xl"></i><span class="text-[10px]">Map</span>
-            </button>
-            <button onclick="ui.switchTab('profile')" class="nav-btn text-slate-500 flex flex-col items-center gap-1">
-                <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
-            </button>
-        </div>
+    <!-- === BOTTOM NAV === -->
+    <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-50 h-16 flex justify-around items-center">
+        <button onclick="app.switchTab('dash')" class="nav-btn active flex flex-col items-center gap-1 text-slate-500 w-full" data-target="dash">
+            <i class="ph-bold ph-house text-xl"></i>
+            <span class="text-[10px]">Home</span>
+        </button>
+        <button onclick="app.switchTab('orders')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="orders">
+            <i class="ph-bold ph-receipt text-xl"></i>
+            <span class="text-[10px]">Orders</span>
+        </button>
     </nav>
 
-    <!-- ADD SHOP MODAL -->
-    <div id="modal-shop" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-3">
-            <h3 class="font-bold text-white">Add New Shop</h3>
-            <input id="inp-shop-name" placeholder="Shop Name" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
-            <input id="inp-shop-addr" placeholder="Address / Route" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
-            <select id="inp-shop-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
-                <option value="Retail">Retail</option>
-                <option value="Wholesale">Wholesale</option>
-            </select>
-            <div class="text-[10px] text-slate-400">Location will be captured automatically.</div>
-            <div class="flex gap-3">
-                <button onclick="ui.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm">Cancel</button>
-                <button onclick="app.saveNewShop()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Save Shop</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- VISIT / ORDER MODAL -->
-    <div id="modal-visit" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-3 flex flex-col max-h-[90vh]">
-            <div class="border-b border-slate-800 pb-2">
-                <h3 id="visit-shop-name" class="font-bold text-white">Shop Name</h3>
-                <span id="visit-shop-id" class="text-[10px] text-slate-500 font-mono">ID</span>
-            </div>
-            
-            <div class="overflow-y-auto space-y-3 custom-scrollbar">
-                <!-- User Data Section -->
-                <div class="bg-slate-950 p-3 rounded border border-slate-800">
-                    <label class="text-[10px] text-slate-500 uppercase font-bold">Target</label>
-                    <input id="inp-target" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm mb-2">
-                    
-                    <label class="text-[10px] text-slate-500 uppercase font-bold">Due Amount (₹)</label>
-                    <input id="inp-due" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm mb-2">
-                    
-                    <label class="text-[10px] text-slate-500 uppercase font-bold">Visit Notes</label>
-                    <textarea id="inp-notes" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm"></textarea>
+    <!-- === MODAL: TAKE ORDER / UPDATE STATUS === -->
+    <div id="modal-action" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-5 scale-95 transition-transform duration-300" id="modal-content">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="font-bold text-white text-lg" id="modal-shop-name">Shop Name</h3>
+                    <div class="text-xs text-slate-500" id="modal-shop-id">ID: 123</div>
                 </div>
-
-                <!-- Order Section -->
-                <div class="bg-blue-900/10 p-3 rounded border border-blue-900/30">
-                    <h4 class="text-xs font-bold text-blue-400 mb-2">New Order</h4>
-                    <input id="inp-order-qty" type="number" placeholder="Quantity" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm">
-                </div>
+                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="ph-bold ph-x text-xl"></i></button>
             </div>
 
-            <div class="flex gap-3 pt-2">
-                <button onclick="ui.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm">Close</button>
-                <button onclick="app.saveVisit()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Update</button>
+            <!-- Tabs in Modal -->
+            <div class="flex bg-slate-950 p-1 rounded-lg mb-4">
+                <button onclick="app.switchModalTab('visit')" class="modal-tab-btn flex-1 py-1.5 text-xs font-bold rounded text-white bg-slate-800" data-tab="visit">Visit Info</button>
+                <button onclick="app.switchModalTab('order')" class="modal-tab-btn flex-1 py-1.5 text-xs font-bold rounded text-slate-500 hover:text-white" data-tab="order">New Order</button>
+            </div>
+
+            <!-- Visit Form -->
+            <div id="m-tab-visit" class="space-y-3">
+                <textarea id="inp-visit-notes" rows="2" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" placeholder="Visit Notes / Remarks"></textarea>
+                <input type="number" id="inp-visit-target" placeholder="Sales Target (Amount)" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white">
+                <input type="number" id="inp-visit-due" placeholder="Due Amount" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white">
+                <button onclick="app.saveVisit()" class="w-full py-2 bg-blue-600 text-white rounded font-bold text-sm">Save Visit Info</button>
+            </div>
+
+            <!-- Order Form -->
+            <div id="m-tab-order" class="space-y-3 hidden">
+                <input type="number" id="inp-order-qty" placeholder="Quantity" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white">
+                <select id="inp-order-status" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white">
+                    <option value="Pending">Pending Payment</option>
+                    <option value="Paid">Paid</option>
+                </select>
+                <button onclick="app.saveOrder()" class="w-full py-2 bg-emerald-600 text-white rounded font-bold text-sm">Place Order</button>
             </div>
         </div>
     </div>
 
 <script>
-/**
- * FRESKEYPIYO - LOGISTICS PRO
- * Stack: HTML5, Tailwind, Leaflet, Google Drive API (No Firebase)
- */
+// ==========================================
+// CONFIGURATION (ENTER YOUR KEYS HERE)
+// ==========================================
+const CONFIG = {
+    // Replace with your actual credentials
+    const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
+const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com'; 
+    
+    // Constants
+    MANAGER_EMAIL: 'freskeypiyo@gmail.com',
+    SCOPES: 'https://www.googleapis.com/auth/drive', // Full access needed to manage structure
+    ROOT_FOLDER: 'FreskeyPiyo',
+    FILES: {
+        MASTER: 'shops_master.csv',
+        USER_DIR: 'user_data',
+        ORDER_DIR: 'orders'
+    }
+};
 
-// --- CONFIGURATION ---
-const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
-const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-const MANAGER_EMAIL = 'freskeypiyo@gmail.com';
-
-// --- FOLDER STRUCTURE ---
-const FOLDER_ROOT = 'FreskeyPiyo';
-const FOLDER_USER = 'user_data';
-const FOLDER_ORDERS = 'orders';
-const FILE_MASTER = 'shops_master.csv';
-
-// --- UTILS ---
+// ==========================================
+// UTILITIES (CSV Parsing/Generating)
+// ==========================================
 const Utils = {
     uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-    now: () => new Date().toISOString(),
+    fmtDate: () => new Date().toISOString().split('T')[0],
     
-    // Convert Array of Objects to CSV String
-    toCSV: (data) => {
-        if (!data || data.length === 0) return '';
-        const headers = Object.keys(data[0]);
-        const rows = data.map(obj => headers.map(header => {
-            let val = obj[header] || '';
-            // Escape commas/quotes
-            if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
-                val = `"${val.replace(/"/g, '""')}"`;
-            }
-            return val;
-        }).join(','));
-        return [headers.join(','), ...rows].join('\n');
+    // Simple CSV Parser (Handles quotes basically)
+    parseCSV: (str) => {
+        const arr = [];
+        let quote = false;
+        let col = 0, row = 0;
+        let c = '';
+        for (let i = 0; i < str.length; i++) {
+            let cc = str[i], nc = str[i+1];
+            arr[row] = arr[row] || [];
+            if (cc == '"' && quote && nc == '"') { c += cc; ++i; continue; }
+            if (cc == '"') { quote = !quote; continue; }
+            if (cc == ',' && !quote) { arr[row][col] = c; c = ''; ++col; continue; }
+            if (cc == '\r' && nc == '\n' && !quote) { arr[row][col] = c; c = ''; ++row; col = 0; ++i; continue; }
+            if (cc == '\n' && !quote) { arr[row][col] = c; c = ''; ++row; col = 0; continue; }
+            c += cc;
+        }
+        if(c) arr[row][col] = c;
+        return arr; // Returns [[header], [row1], [row2]]
+    },
+    
+    // Array of Objects to CSV string
+    toCSV: (data, headers) => {
+        const rows = [headers.join(',')];
+        data.forEach(obj => {
+            const row = headers.map(h => {
+                let val = obj[h] || '';
+                if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                    val = `"${val.replace(/"/g, '""')}"`;
+                }
+                return val;
+            });
+            rows.push(row.join(','));
+        });
+        return rows.join('\n');
     },
 
-    // Convert CSV String to Array of Objects
-    fromCSV: (text) => {
-        if (!text || text.trim() === '') return [];
-        const lines = text.trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        return lines.slice(1).map(line => {
-            const obj = {};
-            // Handle simple CSV splitting (ignores complex quoted commas for simplicity in this MVP)
-            const values = line.split(','); 
-            headers.forEach((h, i) => obj[h] = values[i] ? values[i].replace(/^"|"$/g, '') : '');
-            return obj;
-        });
+    // CSV Array to Array of Objects
+    csvToObj: (arr) => {
+        if(arr.length < 2) return [];
+        const headers = arr[0].map(h => h.trim());
+        const data = [];
+        for(let i=1; i<arr.length; i++){
+            if(arr[i].length < headers.length) continue;
+            let obj = {};
+            headers.forEach((h, idx) => obj[h] = arr[i][idx]);
+            data.push(obj);
+        }
+        return data;
     }
 };
 
-// --- DRIVE API SERVICE ---
-const Drive = {
-    token: null,
-    
-    init: async () => {
-        return new Promise((resolve) => {
-            gapi.load('client', async () => {
-                await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-                resolve();
-            });
-        });
-    },
+// ==========================================
+// GOOGLE DRIVE SERVICE
+// ==========================================
+class DriveService {
+    constructor() {
+        this.tokenClient = null;
+        this.accessToken = null;
+        this.userEmail = null;
+        this.rootFolderId = null;
+        this.isManager = false;
+    }
 
-    login: () => {
-        return new Promise((resolve, reject) => {
-            const client = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID, scope: SCOPES,
+    init() {
+        gapi.load('client', async () => {
+            await gapi.client.init({
+                apiKey: CONFIG.API_KEY,
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+            });
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.CLIENT_ID,
+                scope: CONFIG.SCOPES,
                 callback: (resp) => {
-                    if (resp.error) reject(resp);
-                    Drive.token = resp.access_token;
-                    resolve(resp);
+                    if (resp.error) return alert("Auth Error");
+                    this.accessToken = resp.access_token;
+                    this.fetchUserInfo();
                 },
             });
-            client.requestAccessToken();
+            document.getElementById('auth-status').innerText = "System Ready. Please Sign In.";
         });
-    },
+    }
 
-    // Find a file/folder by name inside a parent (or root)
-    find: async (name, parentId = 'root', mimeType = null) => {
-        let q = `name = '${name}' and '${parentId}' in parents and trashed = false`;
+    login() { this.tokenClient.requestAccessToken({prompt: 'consent'}); }
+    
+    logout() {
+        const token = gapi.client.getToken();
+        if (token !== null) {
+            google.accounts.oauth2.revoke(token.access_token);
+            gapi.client.setToken('');
+            location.reload();
+        }
+    }
+
+    async fetchUserInfo() {
+        // Fetch email via Drive 'about' (simplest way without extra scopes)
+        try {
+            const res = await gapi.client.drive.about.get({ fields: "user" });
+            this.userEmail = res.result.user.emailAddress;
+            this.isManager = (this.userEmail.toLowerCase() === CONFIG.MANAGER_EMAIL.toLowerCase());
+            
+            app.onLogin(this.userEmail, this.isManager);
+        } catch(e) { console.error(e); alert("Failed to get user info"); }
+    }
+
+    // --- FILE OPERATIONS ---
+
+    async findFile(name, parentId = null, mimeType = null) {
+        let q = `name = '${name}' and trashed = false`;
+        if (parentId) q += ` and '${parentId}' in parents`;
         if (mimeType) q += ` and mimeType = '${mimeType}'`;
+        
         const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
         return res.result.files.length > 0 ? res.result.files[0] : null;
-    },
+    }
 
-    // Create a folder
-    createFolder: async (name, parentId = 'root') => {
-        const metadata = { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] };
-        const res = await gapi.client.drive.files.create({ resource: metadata, fields: 'id' });
+    async createFolder(name, parentId = null) {
+        const meta = { name, mimeType: 'application/vnd.google-apps.folder' };
+        if (parentId) meta.parents = [parentId];
+        const res = await gapi.client.drive.files.create({ resource: meta, fields: 'id' });
         return res.result;
-    },
-
-    // Create a CSV file
-    createFile: async (name, parentId, content) => {
-        const metadata = { name, mimeType: 'text/csv', parents: [parentId] };
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', new Blob([content], { type: 'text/csv' }));
-        
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + Drive.token },
-            body: form
-        });
-    },
-
-    // Update a file
-    updateFile: async (fileId, content) => {
-        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-            method: 'PATCH',
-            headers: { 'Authorization': 'Bearer ' + Drive.token, 'Content-Type': 'text/csv' },
-            body: content
-        });
-    },
-
-    // Read File Content
-    read: async (fileId) => {
-        try {
-            const res = await gapi.client.drive.files.get({ fileId, alt: 'media' });
-            return res.body;
-        } catch (e) { return ''; }
     }
-};
 
-// --- DATA STORE ---
-const Store = {
-    user: null, // { email, role }
-    ids: { root: null, userFolder: null, ordersFolder: null, masterFile: null, userFile: null, ordersFile: null },
-    data: {
-        shops: [], // From shops_master.csv
-        userData: [], // From user_data/{email}.csv
-        orders: [] // From orders/{email}.csv
-    }
-};
+    async uploadFile(name, content, parentId = null, existingId = null) {
+        const meta = { name, mimeType: 'text/csv' };
+        if (parentId && !existingId) meta.parents = [parentId];
 
-// --- APP LOGIC ---
-const app = {
-    init: async () => {
-        await Drive.init();
-        // Check for session? For now, manual login.
-    },
+        const multipart = [
+            '--boundary',
+            'Content-Type: application/json; charset=UTF-8',
+            '',
+            JSON.stringify(meta),
+            '--boundary',
+            'Content-Type: text/csv',
+            '',
+            content,
+            '--boundary--'
+        ].join('\r\n');
 
-    // 1. Authenticate & Setup
-    loginSuccess: async () => {
-        // Get User Info
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { 
-            headers: { Authorization: `Bearer ${Drive.token}` } 
+        const path = existingId ? 
+            `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart` :
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+            
+        const method = existingId ? 'PATCH' : 'POST';
+
+        await fetch(path, {
+            method: method,
+            headers: { 
+                'Authorization': `Bearer ${this.accessToken}`,
+                'Content-Type': 'multipart/related; boundary=boundary'
+            },
+            body: multipart
         });
-        const profile = await res.json();
-        
-        Store.user = {
-            email: profile.email,
-            role: profile.email === MANAGER_EMAIL ? 'MANAGER' : 'SALESMAN'
-        };
+    }
 
-        // UI Update
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('user-email').innerText = Store.user.email;
-        document.getElementById('user-role').innerText = Store.user.role;
+    async readFile(fileId) {
+        const res = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+        return res.body;
+    }
+
+    // --- SYSTEM SPECIFIC LOGIC ---
+
+    async getRootFolder() {
+        // Search for shared folder or owned folder
+        let folder = await this.findFile(CONFIG.ROOT_FOLDER, null, 'application/vnd.google-apps.folder');
         
-        if (Store.user.role === 'SALESMAN') {
-            document.getElementById('btn-add-shop').classList.remove('hidden');
+        if (!folder && this.isManager) {
+            folder = await this.createFolder(CONFIG.ROOT_FOLDER);
+            console.log("Created Root Folder");
+        } else if (!folder && !this.isManager) {
+            throw new Error("Folder 'FreskeyPiyo' not found. Ask Manager to share it with you.");
         }
+        this.rootFolderId = folder.id;
+        return folder.id;
+    }
+}
 
-        // Initialize Map
-        ui.initMap();
+// ==========================================
+// APP LOGIC
+// ==========================================
+class App {
+    constructor() {
+        this.data = { shops: [], userData: [], orders: [] };
+        this.headers = {
+            shops: ['shop_id', 'shop_name', 'address', 'latitude', 'longitude', 'route', 'shop_type', 'created_by', 'created_at'],
+            userData: ['shop_id', 'target', 'visit_status', 'notes', 'due_amount', 'last_visit_date'],
+            orders: ['order_id', 'shop_id', 'quantity', 'order_date', 'payment_status', 'salesman_email'] // added email for manager view
+        };
+        this.currentModalShop = null;
+    }
 
-        // Start Sync
-        app.sync();
-    },
+    onLogin(email, isManager) {
+        document.getElementById('view-auth').classList.add('hide');
+        document.getElementById('user-role-badge').innerText = isManager ? "MANAGER" : "SALESMAN";
+        document.getElementById('user-role-badge').classList.add(isManager ? 'text-brand' : 'text-emerald-400');
+        if (isManager) document.getElementById('manager-panel').classList.remove('hide');
+        
+        this.sync();
+    }
 
-    // 2. Core Sync Logic
-    sync: async () => {
-        ui.status("Syncing...");
+    // --- SYNC ENGINE ---
+    async sync() {
+        const icon = document.getElementById('sync-icon');
+        const status = document.getElementById('sync-status');
+        
         try {
-            // A. Ensure Structure Exists
-            let root = await Drive.find(FOLDER_ROOT);
-            if (!root) {
-                if (Store.user.role === 'MANAGER') {
-                    root = await Drive.createFolder(FOLDER_ROOT);
-                } else {
-                    alert("System not initialized. Ask Manager to run app first.");
-                    return;
-                }
-            }
-            Store.ids.root = root.id;
+            icon.classList.add('animate-spin');
+            status.innerText = "SYNCING...";
+            status.classList.remove('hidden');
 
-            // B. Subfolders
-            let userFolder = await Drive.find(FOLDER_USER, root.id);
-            if (!userFolder) userFolder = await Drive.createFolder(FOLDER_USER, root.id);
-            Store.ids.userFolder = userFolder.id;
-
-            let orderFolder = await Drive.find(FOLDER_ORDERS, root.id);
-            if (!orderFolder) orderFolder = await Drive.createFolder(FOLDER_ORDERS, root.id);
-            Store.ids.ordersFolder = orderFolder.id;
-
-            // C. Load Master File
-            let master = await Drive.find(FILE_MASTER, root.id);
-            if (master) {
-                Store.ids.masterFile = master.id;
-                const csv = await Drive.read(master.id);
-                Store.data.shops = Utils.fromCSV(csv);
-            } else if (Store.user.role === 'MANAGER') {
-                // Initialize Empty Master
-                const initial = [{shop_id:'INIT', shop_name:'Init', address:'-', lat:0, lng:0, created_by:'system'}];
-                await Drive.createFile(FILE_MASTER, root.id, Utils.toCSV(initial));
-                Store.data.shops = initial;
-                // Re-find to get ID
-                master = await Drive.find(FILE_MASTER, root.id);
-                Store.ids.masterFile = master.id;
+            // 1. Get Root
+            const rootId = await driveAuth.getRootFolder();
+            
+            // 2. Handle Subfolders (Create if manager, find if salesman)
+            let userDir = await driveAuth.findFile(CONFIG.FILES.USER_DIR, rootId, 'application/vnd.google-apps.folder');
+            let orderDir = await driveAuth.findFile(CONFIG.FILES.ORDER_DIR, rootId, 'application/vnd.google-apps.folder');
+            
+            if (driveAuth.isManager) {
+                if(!userDir) userDir = await driveAuth.createFolder(CONFIG.FILES.USER_DIR, rootId);
+                if(!orderDir) orderDir = await driveAuth.createFolder(CONFIG.FILES.ORDER_DIR, rootId);
             }
 
-            // D. Load User Specific Data
-            const userFileName = `${Store.user.email}.csv`;
-            let userFile = await Drive.find(userFileName, userFolder.id);
+            // 3. SHOPS MASTER (Read -> Merge -> Write)
+            let masterFile = await driveAuth.findFile(CONFIG.FILES.MASTER, rootId);
+            let driveShops = [];
+            
+            if (masterFile) {
+                const csvContent = await driveAuth.readFile(masterFile.id);
+                driveShops = Utils.csvToObj(Utils.parseCSV(csvContent));
+            } else if (driveAuth.isManager) {
+                // Initialize Master
+                await driveAuth.uploadFile(CONFIG.FILES.MASTER, this.headers.shops.join(','), rootId);
+            }
+
+            // Simple Merge: If we have local new shops not in drive, append them
+            // In a real app, use timestamps. Here: naive append.
+            const localShops = JSON.parse(localStorage.getItem('local_shops') || '[]');
+            const newShops = localShops.filter(ls => !driveShops.find(ds => ds.shop_id === ls.shop_id));
+            
+            if (newShops.length > 0) {
+                const updatedShops = [...driveShops, ...newShops];
+                const csv = Utils.toCSV(updatedShops, this.headers.shops);
+                await driveAuth.uploadFile(CONFIG.FILES.MASTER, csv, rootId, masterFile ? masterFile.id : null);
+                this.data.shops = updatedShops;
+                localStorage.setItem('local_shops', '[]'); // Clear pending queue
+            } else {
+                this.data.shops = driveShops;
+            }
+
+            // 4. USER DATA
+            const userFileName = `${driveAuth.userEmail}.csv`;
+            let userFile = await driveAuth.findFile(userFileName, userDir.id);
             if (userFile) {
-                Store.ids.userFile = userFile.id;
-                const csv = await Drive.read(userFile.id);
-                Store.data.userData = Utils.fromCSV(csv);
+                const content = await driveAuth.readFile(userFile.id);
+                this.data.userData = Utils.csvToObj(Utils.parseCSV(content));
             } else {
-                Store.data.userData = []; // Empty start
+                // Create empty
+                await driveAuth.uploadFile(userFileName, this.headers.userData.join(','), userDir.id);
             }
 
-            // E. Load Orders
-            const orderFileName = `orders_${Store.user.email}.csv`;
-            let orderFile = await Drive.find(orderFileName, orderFolder.id);
+            // 5. ORDERS
+            const orderFileName = `orders_${driveAuth.userEmail}.csv`;
+            let orderFile = await driveAuth.findFile(orderFileName, orderDir.id);
             if (orderFile) {
-                Store.ids.ordersFile = orderFile.id;
-                const csv = await Drive.read(orderFile.id);
-                Store.data.orders = Utils.fromCSV(csv);
+                const content = await driveAuth.readFile(orderFile.id);
+                this.data.orders = Utils.csvToObj(Utils.parseCSV(content));
             } else {
-                Store.data.orders = [];
+                await driveAuth.uploadFile(orderFileName, this.headers.orders.join(','), orderDir.id);
             }
 
-            ui.status("Synced");
-            ui.renderShops();
+            // 6. MANAGER SPECIAL: Read all orders
+            if (driveAuth.isManager) {
+                // List all files in order dir
+                const q = `'${orderDir.id}' in parents and trashed = false`;
+                const res = await gapi.client.drive.files.list({ q, fields: 'files(id)' });
+                let allOrders = [];
+                for (const f of res.result.files) {
+                    const c = await driveAuth.readFile(f.id);
+                    allOrders = [...allOrders, ...Utils.csvToObj(Utils.parseCSV(c))];
+                }
+                this.data.orders = allOrders; // Manager sees all
+            }
 
+            // Render
+            this.renderShops();
+            this.renderOrders();
+            this.updateStats();
+            
+            status.innerText = "ONLINE";
         } catch (e) {
             console.error(e);
-            ui.status("Sync Error");
+            alert("Sync Failed: " + e.message);
+            status.innerText = "ERROR";
+        } finally {
+            icon.classList.remove('animate-spin');
         }
-    },
+    }
 
-    // 3. Add Shop (Salesman)
-    saveNewShop: async () => {
+    // --- UI ACTIONS ---
+
+    async initializeDriveStructure() {
+        if(!driveAuth.isManager) return;
+        await this.sync();
+        alert("Structure Verified");
+    }
+
+    addShop(e) {
+        e.preventDefault();
         const name = document.getElementById('inp-shop-name').value;
         const addr = document.getElementById('inp-shop-addr').value;
+        const route = document.getElementById('inp-shop-route').value;
         const type = document.getElementById('inp-shop-type').value;
 
-        if (!name) return alert("Name required");
+        const newShop = {
+            shop_id: Utils.uuid(),
+            shop_name: name,
+            address: addr,
+            latitude: '0', // In real app, get navigator.geolocation
+            longitude: '0',
+            route: route,
+            shop_type: type,
+            created_by: driveAuth.userEmail,
+            created_at: Utils.fmtDate()
+        };
 
-        // Get Location
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const newShop = {
-                shop_id: 'S' + Utils.uuid(),
-                shop_name: name,
-                address: addr,
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                route: 'Default',
-                shop_type: type,
-                created_by: Store.user.email,
-                created_at: Utils.now()
-            };
-
-            // 1. Update Local
-            Store.data.shops.push(newShop);
-            
-            // 2. Update Drive (Master)
-            // Note: In a real concurrent env, we should download fresh before appending. 
-            // For this Code-only constraint, we overwrite with local state.
-            if (Store.ids.masterFile) {
-                await Drive.updateFile(Store.ids.masterFile, Utils.toCSV(Store.data.shops));
-            }
-
-            ui.closeModals();
-            ui.renderShops();
-            ui.status("Shop Added");
-        }, () => alert("GPS required"));
-    },
-
-    // 4. Update Visit/Target (Personal Data)
-    saveVisit: async () => {
-        const id = document.getElementById('visit-shop-id').innerText;
-        const target = document.getElementById('inp-target').value;
-        const notes = document.getElementById('inp-notes').value;
-        const due = document.getElementById('inp-due').value;
-        const orderQty = document.getElementById('inp-order-qty').value;
-
-        // A. Handle User Data (Target/Notes/Due)
-        let userEntry = Store.data.userData.find(u => u.shop_id === id);
-        if (!userEntry) {
-            userEntry = { shop_id: id };
-            Store.data.userData.push(userEntry);
-        }
-        userEntry.target = target;
-        userEntry.notes = notes;
-        userEntry.due_amount = due;
-        userEntry.visit_status = 'Visited';
-        userEntry.last_visit_date = Utils.now();
-
-        // Save User CSV
-        const userCsv = Utils.toCSV(Store.data.userData);
-        if (Store.ids.userFile) {
-            await Drive.updateFile(Store.ids.userFile, userCsv);
-        } else {
-            await Drive.createFile(`${Store.user.email}.csv`, Store.ids.userFolder, userCsv);
-            // Re-sync to get ID
-            const f = await Drive.find(`${Store.user.email}.csv`, Store.ids.userFolder);
-            Store.ids.userFile = f.id;
-        }
-
-        // B. Handle Order
-        if (orderQty > 0) {
-            const newOrder = {
-                order_id: 'O' + Utils.uuid(),
-                shop_id: id,
-                quantity: orderQty,
-                order_date: Utils.now(),
-                payment_status: 'Pending'
-            };
-            Store.data.orders.push(newOrder);
-            
-            const orderCsv = Utils.toCSV(Store.data.orders);
-            if (Store.ids.ordersFile) {
-                await Drive.updateFile(Store.ids.ordersFile, orderCsv);
-            } else {
-                await Drive.createFile(`orders_${Store.user.email}.csv`, Store.ids.ordersFolder, orderCsv);
-                const f = await Drive.find(`orders_${Store.user.email}.csv`, Store.ids.ordersFolder);
-                Store.ids.ordersFile = f.id;
-            }
-        }
-
-        ui.closeModals();
-        ui.renderShops();
-        ui.status("Updated");
-    }
-};
-
-// --- UI LOGIC ---
-const ui = {
-    map: null,
-    markers: [],
-
-    initMap: () => {
-        if (ui.map) return;
-        ui.map = L.map('map').setView([20.5937, 78.9629], 5);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(ui.map);
-    },
-
-    status: (msg) => { document.getElementById('sync-status').innerText = msg; },
-
-    switchTab: (t) => {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + t).classList.add('active');
-        if (t === 'map') setTimeout(() => ui.map.invalidateSize(), 300);
-    },
-
-    renderShops: () => {
-        const list = document.getElementById('shop-list');
-        list.innerHTML = '';
+        // Optimistic UI
+        this.data.shops.push(newShop);
+        this.renderShops();
         
-        // Clear Map Markers
-        ui.markers.forEach(m => ui.map.removeLayer(m));
-        ui.markers = [];
+        // Save to local queue for sync
+        const queue = JSON.parse(localStorage.getItem('local_shops') || '[]');
+        queue.push(newShop);
+        localStorage.setItem('local_shops', JSON.stringify(queue));
 
-        let totalDue = 0;
+        document.getElementById('form-shop').reset();
+        this.sync(); // Trigger sync
+    }
 
-        Store.data.shops.forEach(shop => {
-            if(shop.shop_id === 'INIT') return; // Skip header/init row
-
-            // Merge with User Data
-            const uData = Store.data.userData.find(u => u.shop_id === shop.shop_id) || {};
-            const due = parseFloat(uData.due_amount || 0);
-            totalDue += due;
-
-            // HTML Item
-            const div = document.createElement('div');
-            div.className = 'bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center';
-            div.innerHTML = `
+    renderShops() {
+        const list = document.getElementById('list-shops');
+        list.innerHTML = this.data.shops.map(shop => {
+            const meta = this.data.userData.find(u => u.shop_id === shop.shop_id) || {};
+            const visited = meta.visit_status === 'Visited';
+            const statusColor = visited ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/50' : 'bg-slate-800 text-slate-500 border-slate-700';
+            
+            return `
+            <div onclick="app.openModal('${shop.shop_id}')" class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex justify-between items-center hover:bg-slate-800 transition-colors cursor-pointer">
                 <div>
-                    <div class="font-bold text-white">${shop.shop_name}</div>
-                    <div class="text-[10px] text-slate-500">${shop.address}</div>
-                    ${uData.visit_status ? '<span class="text-[9px] text-emerald-400">Visited</span>' : ''}
+                    <div class="font-bold text-white text-sm">${shop.shop_name}</div>
+                    <div class="text-[10px] text-slate-400">${shop.address} • ${shop.route}</div>
+                    ${meta.due_amount ? `<div class="text-[10px] text-brand font-bold mt-1">Due: ₹${meta.due_amount}</div>` : ''}
                 </div>
-                <button onclick="ui.openVisit('${shop.shop_id}')" class="px-3 py-1 bg-blue-900 text-blue-400 rounded text-xs border border-blue-800">
-                    Visit
-                </button>
-            `;
-            list.appendChild(div);
+                <div class="flex flex-col items-end gap-1">
+                    <span class="px-2 py-1 text-[10px] rounded border ${statusColor} font-bold">${visited ? 'VISITED' : 'PENDING'}</span>
+                    <i class="ph-bold ph-caret-right text-slate-600"></i>
+                </div>
+            </div>`;
+        }).join('');
+    }
 
-            // Map Marker
-            if (shop.lat && shop.lng) {
-                const marker = L.circleMarker([shop.lat, shop.lng], {
-                    radius: 8, color: '#fff', fillColor: due > 0 ? '#ef4444' : '#10b981', fillOpacity: 0.8
-                }).addTo(ui.map);
-                marker.bindPopup(shop.shop_name);
-                ui.markers.push(marker);
+    renderOrders() {
+        const list = document.getElementById('list-orders');
+        list.innerHTML = this.data.orders.map(ord => {
+            const shop = this.data.shops.find(s => s.shop_id === ord.shop_id);
+            return `
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl mb-2">
+                <div class="flex justify-between mb-1">
+                    <span class="font-bold text-white text-sm">${shop ? shop.shop_name : 'Unknown Shop'}</span>
+                    <span class="text-[10px] text-slate-500">${ord.order_date}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <div class="text-xs text-slate-300">Qty: ${ord.quantity}</div>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 border border-blue-900">${ord.payment_status}</span>
+                </div>
+                ${driveAuth.isManager ? `<div class="text-[10px] text-slate-600 mt-1 text-right">By: ${ord.salesman_email || 'Me'}</div>` : ''}
+            </div>`;
+        }).join('') || '<div class="text-center text-slate-500 text-xs">No Orders</div>';
+    }
+
+    updateStats() {
+        document.getElementById('stat-shops').innerText = this.data.shops.length;
+        document.getElementById('stat-orders').innerText = this.data.orders.length;
+    }
+
+    // --- MODAL LOGIC ---
+
+    openModal(shopId) {
+        const shop = this.data.shops.find(s => s.shop_id === shopId);
+        if(!shop) return;
+        this.currentModalShop = shop;
+        
+        document.getElementById('modal-shop-name').innerText = shop.shop_name;
+        document.getElementById('modal-shop-id').innerText = shop.address;
+        
+        // Load existing user data
+        const meta = this.data.userData.find(u => u.shop_id === shopId) || {};
+        document.getElementById('inp-visit-notes').value = meta.notes || '';
+        document.getElementById('inp-visit-target').value = meta.target || '';
+        document.getElementById('inp-visit-due').value = meta.due_amount || '';
+        document.getElementById('inp-order-qty').value = '';
+
+        const m = document.getElementById('modal-action');
+        m.classList.remove('hidden');
+        setTimeout(() => { m.classList.remove('opacity-0'); document.getElementById('modal-content').classList.remove('scale-95'); }, 10);
+    }
+
+    closeModal() {
+        const m = document.getElementById('modal-action');
+        m.classList.add('opacity-0');
+        document.getElementById('modal-content').classList.add('scale-95');
+        setTimeout(() => m.classList.add('hidden'), 300);
+    }
+
+    switchModalTab(tab) {
+        document.getElementById('m-tab-visit').classList.toggle('hidden', tab !== 'visit');
+        document.getElementById('m-tab-order').classList.toggle('hidden', tab !== 'order');
+        document.querySelectorAll('.modal-tab-btn').forEach(b => {
+            if(b.dataset.tab === tab) {
+                b.classList.remove('text-slate-500'); b.classList.add('text-white', 'bg-slate-800');
+            } else {
+                b.classList.add('text-slate-500'); b.classList.remove('text-white', 'bg-slate-800');
             }
         });
-
-        document.getElementById('dash-shops').innerText = Store.data.shops.length - (Store.data.shops.length > 0 && Store.data.shops[0].shop_id === 'INIT' ? 1 : 0);
-        document.getElementById('dash-due').innerText = '₹' + totalDue;
-    },
-
-    openAddShop: () => document.getElementById('modal-shop').classList.add('open'),
-    
-    openVisit: (id) => {
-        const shop = Store.data.shops.find(s => s.shop_id === id);
-        const uData = Store.data.userData.find(u => u.shop_id === id) || {};
-
-        document.getElementById('visit-shop-name').innerText = shop.shop_name;
-        document.getElementById('visit-shop-id').innerText = shop.shop_id;
-        document.getElementById('inp-target').value = uData.target || '';
-        document.getElementById('inp-notes').value = uData.notes || '';
-        document.getElementById('inp-due').value = uData.due_amount || '';
-        document.getElementById('inp-order-qty').value = ''; // Reset order
-        
-        document.getElementById('modal-visit').classList.add('open');
-    },
-
-    closeModals: () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')),
-    
-    centerMap: () => {
-        navigator.geolocation.getCurrentPosition(pos => {
-            ui.map.setView([pos.coords.latitude, pos.coords.longitude], 15);
-        });
     }
-};
 
-// --- AUTH HANDLER ---
-const auth = {
-    login: async () => {
-        try {
-            document.getElementById('login-status').innerText = 'Authenticating...';
-            await Drive.init();
-            await Drive.login();
-            document.getElementById('login-status').innerText = 'Success!';
-            app.loginSuccess();
-        } catch (e) {
-            console.error(e);
-            document.getElementById('login-status').innerText = 'Login Failed';
+    async saveVisit() {
+        if(!driveAuth.isManager) { // Only salesman edits own data
+            const note = document.getElementById('inp-visit-notes').value;
+            const target = document.getElementById('inp-visit-target').value;
+            const due = document.getElementById('inp-visit-due').value;
+
+            // Update local array
+            const idx = this.data.userData.findIndex(u => u.shop_id === this.currentModalShop.shop_id);
+            const entry = {
+                shop_id: this.currentModalShop.shop_id,
+                target: target,
+                visit_status: 'Visited',
+                notes: note,
+                due_amount: due,
+                last_visit_date: Utils.fmtDate()
+            };
+
+            if(idx > -1) this.data.userData[idx] = entry;
+            else this.data.userData.push(entry);
+
+            // Upload
+            const rootId = await driveAuth.getRootFolder();
+            const userDir = await driveAuth.findFile(CONFIG.FILES.USER_DIR, rootId);
+            const userFileName = `${driveAuth.userEmail}.csv`;
+            const userFile = await driveAuth.findFile(userFileName, userDir.id);
+            
+            const csv = Utils.toCSV(this.data.userData, this.headers.userData);
+            await driveAuth.uploadFile(userFileName, csv, userDir.id, userFile.id);
+            
+            this.renderShops();
+            this.closeModal();
+            alert("Visit Saved");
+        } else {
+            alert("Managers view only for Visit Data (in this demo)");
         }
     }
-};
+
+    async saveOrder() {
+        const qty = document.getElementById('inp-order-qty').value;
+        const status = document.getElementById('inp-order-status').value;
+        if(!qty) return alert("Enter Quantity");
+
+        const newOrder = {
+            order_id: Utils.uuid(),
+            shop_id: this.currentModalShop.shop_id,
+            quantity: qty,
+            order_date: Utils.fmtDate(),
+            payment_status: status,
+            salesman_email: driveAuth.userEmail
+        };
+
+        this.data.orders.push(newOrder);
+
+        // Upload
+        const rootId = await driveAuth.getRootFolder();
+        const orderDir = await driveAuth.findFile(CONFIG.FILES.ORDER_DIR, rootId);
+        const orderFileName = `orders_${driveAuth.userEmail}.csv`;
+        const orderFile = await driveAuth.findFile(orderFileName, orderDir.id);
+
+        // Filter orders to only current user's for this file
+        const myOrders = this.data.orders.filter(o => o.salesman_email === driveAuth.userEmail);
+        const csv = Utils.toCSV(myOrders, this.headers.orders);
+        await driveAuth.uploadFile(orderFileName, csv, orderDir.id, orderFile ? orderFile.id : null);
+
+        this.renderOrders();
+        this.updateStats();
+        this.closeModal();
+        alert("Order Placed");
+    }
+
+    switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hide'));
+        document.getElementById('tab-'+tab).classList.remove('hide');
+        document.querySelectorAll('.nav-btn').forEach(b => {
+            if(b.dataset.target === tab) b.classList.add('text-brand', 'active');
+            else b.classList.remove('text-brand', 'active');
+        });
+    }
+}
+
+// Init
+const app = new App();
+const driveAuth = new DriveService();
+driveAuth.init();
 
 </script>
 </body>
