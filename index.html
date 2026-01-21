@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -233,20 +232,6 @@
                 </div>
             </div>
 
-            <!-- === TAB 5: ADMIN (MANAGER ONLY) === -->
-<div id="tab-admin" class="tab-content space-y-4 hidden">
-    <h2 class="text-lg font-bold text-white border-l-4 border-red-500 pl-3">Pending Approvals</h2>
-    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-        <p class="text-xs text-slate-400 mb-3">Review new shops added by salesmen.</p>
-        <button onclick="drive.fetchPendingRequests()" class="w-full py-2 bg-slate-800 border border-slate-700 rounded text-blue-400 text-xs font-bold mb-4">
-            <i class="ph-bold ph-arrows-clockwise"></i> Refresh List
-        </button>
-        <div id="admin-pending-list" class="space-y-3">
-            <div class="text-center text-slate-500 text-xs py-4">No pending requests</div>
-        </div>
-    </div>
-</div>
-
             <!-- SYNC STATUS -->
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
                 <h3 class="font-bold text-white mb-2 flex items-center gap-2">
@@ -259,6 +244,20 @@
             <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
                 <i class="ph-bold ph-file-csv"></i> EXPORT CSV
             </button>
+        </div>
+
+        <!-- === TAB 5: ADMIN (MANAGER ONLY) === -->
+        <div id="tab-admin" class="tab-content space-y-4 hidden">
+            <h2 class="text-lg font-bold text-white border-l-4 border-red-500 pl-3">Pending Approvals</h2>
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <p class="text-xs text-slate-400 mb-3">Review new shops added by salesmen.</p>
+                <button onclick="drive.fetchPendingRequests()" class="w-full py-2 bg-slate-800 border border-slate-700 rounded text-blue-400 text-xs font-bold mb-4">
+                    <i class="ph-bold ph-arrows-clockwise"></i> Refresh List
+                </button>
+                <div id="admin-pending-list" class="space-y-3">
+                    <div class="text-center text-slate-500 text-xs py-4">No pending requests</div>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -279,8 +278,8 @@
                 <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
             </button>
             <button id="nav-admin-btn" onclick="app.switchTab('admin')" class="nav-btn hidden flex-col items-center gap-1 text-slate-500 w-full" data-target="admin">
-    <i class="ph-bold ph-shield-check text-xl"></i><span class="text-[10px]">Admin</span>
-</button>
+                <i class="ph-bold ph-shield-check text-xl"></i><span class="text-[10px]">Admin</span>
+            </button>
         </div>
     </nav>
 
@@ -369,8 +368,7 @@ const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE';
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-
-// FIX: Only load Drive API here. We will fetch email manually.
+// FIX: Only load Drive API here to prevent hang
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 
 const ROOT_FOLDER_NAME = 'FreskeyPiyo';
@@ -393,9 +391,7 @@ const Utils = {
     fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
 };
 
-// --- GOOGLE CLOUD SERVICE ---
-
-    // --- GOOGLE CLOUD SERVICE (UPDATED FOR FOLDER STRUCTURE) ---
+// --- GOOGLE CLOUD SERVICE (COMPLETED) ---
 class GoogleCloud {
     constructor(storeInstance, appInstance) {
         this.store = storeInstance;
@@ -410,6 +406,7 @@ class GoogleCloud {
         this.shopsFileId = null;
         this.userFileId = null;
         this.ordersFileId = null;
+        this.pendingFolderId = null;
 
         const check = setInterval(() => {
             if (window.google && window.gapi) {
@@ -447,69 +444,127 @@ class GoogleCloud {
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
-     async getUserInfo() {
+    // FIX: Use Fetch to avoid GAPI hang on UserInfo
+    async getUserInfo() {
+        const msg = document.getElementById('login-status');
+        msg.innerText = "🔍 Verifying User...";
+        try {
+            const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            });
+            const data = await response.json();
+            if (!data.email) throw new Error("No email found.");
 
-    // --- FOLDER & FILE LOGIC ---
-    // --- INSERT/REPLACE INSIDE class GoogleCloud { ... } ---
+            this.userEmail = data.email;
+            console.log(`Logged in as: ${this.userEmail}`);
+            this.ensureFolderStructure();
+        } catch (e) {
+            console.error(e);
+            msg.innerText = "❌ Auth Failed. Refresh page.";
+        }
+    }
 
-    // --- ADD/UPDATE INSIDE class GoogleCloud ---
+    async ensureFolderStructure() {
+        const msg = document.getElementById('login-status');
+        msg.innerText = "📂 Connecting to Drive...";
 
-    // 1. Update ensureFolderStructure to create 'pending' folder
-   async ensureFolderStructure() {
+        try {
+            // 1. Root & Subfolders
+            this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
+            const userDataFolderId = await this.findOrCreateFolder('user_data', this.rootId);
+            const ordersFolderId = await this.findOrCreateFolder('orders', this.rootId);
+            this.pendingFolderId = await this.findOrCreateFolder('pending', this.rootId);
 
-    // 2. LOGIC: Salesman Saves Shop -> Goes to Pending File
+            // 2. User Profile (user_data folder)
+            const safeEmail = this.userEmail.replace(/[@.]/g, '_');
+            const userFileName = `${safeEmail}.csv`;
+            this.userFileId = await this.findFileId(userFileName, userDataFolderId);
+            
+            if (this.userFileId) {
+                console.log("Loading Profile...");
+                const content = await this.downloadFile(this.userFileId);
+                if (content) this.store.restoreProfileFromCSV(content);
+            } else {
+                console.log("Creating Profile...");
+                const current = this.store.getProfile();
+                const initialCSV = `NAME,PHONE\n"${current.name}","${current.id}"`;
+                this.userFileId = await this.createFile(userFileName, userDataFolderId, initialCSV);
+            }
+
+            // 3. Admin Check
+            if (this.userEmail === MANAGER_EMAIL) {
+                document.getElementById('nav-admin-btn').classList.remove('hidden');
+                document.getElementById('tab-admin').classList.remove('hidden');
+            }
+
+            // 4. Master Shops
+            const shopsFileName = 'shops_master.csv';
+            this.shopsFileId = await this.findFileId(shopsFileName, this.rootId);
+            if(this.shopsFileId) {
+                const content = await this.downloadFile(this.shopsFileId);
+                if(content) this.store.restoreShopsFromCSV(content);
+            }
+
+            // 5. Orders File
+            const ordersFileName = `orders_${safeEmail}.csv`;
+            this.ordersFileId = await this.findFileId(ordersFileName, ordersFolderId);
+            if(this.ordersFileId) {
+                 const content = await this.downloadFile(this.ordersFileId);
+                 if(content) this.store.restoreLogsFromCSV(content);
+            } else {
+                 this.ordersFileId = await this.createFile(ordersFileName, ordersFolderId, "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n");
+            }
+
+            // Finish
+            this.app.initUI();
+            this.app.initMap();
+            msg.innerText = "✅ System Ready";
+            setTimeout(() => document.getElementById('modal-welcome').classList.add('hidden'), 500);
+
+        } catch (e) { 
+            console.error("Drive Sync Error", e);
+            msg.innerText = "❌ Drive Error. Check Console.";
+        }
+    }
+
+    // --- PENDING / APPROVAL LOGIC ---
     async submitShopForApproval(shopData) {
-        // shopData = { name, lat, lng, address, contact, ... }
         const safeEmail = this.userEmail.replace(/[@.]/g, '_');
         const fileName = `pending_shops_${safeEmail}.csv`;
         
-        // Check if user already has a pending file
         let fileId = await this.findFileId(fileName, this.pendingFolderId);
-        
-        // CSV Format: NAME,LAT,LNG,CONTACT,ADDED_BY_EMAIL,TIMESTAMP
         const line = `"${shopData.name}",${shopData.lat},${shopData.lng},"${shopData.contact}","${this.userEmail}",${Date.now()}`;
         
         if (fileId) {
-            // Append to existing file
             const currentContent = await this.downloadFile(fileId);
-            const newContent = currentContent + '\n' + line;
-            await this.updateFileContent(fileId, newContent);
+            await this.updateFileContent(fileId, currentContent + '\n' + line);
         } else {
-            // Create new file
             const header = "NAME,LAT,LNG,CONTACT,BY,TS\n";
             await this.createFile(fileName, this.pendingFolderId, header + line);
         }
         alert("Shop sent to Manager for Approval!");
     }
 
-    // 3. LOGIC: Manager Fetches Pending List
     async fetchPendingRequests() {
-        if (this.userEmail !== 'freskeypiyo@gmail.com') return;
-
+        if (this.userEmail !== MANAGER_EMAIL) return;
         const listContainer = document.getElementById('admin-pending-list');
         listContainer.innerHTML = '<div class="text-center text-blue-400">Scanning...</div>';
 
-        // List all files in 'pending' folder
         const q = `'${this.pendingFolderId}' in parents and trashed = false`;
         const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
         
         let html = '';
-        let pendingCount = 0;
-
         for (const file of res.result.files) {
             const content = await this.downloadFile(file.id);
             if (!content) continue;
-
-            const lines = content.split('\n').slice(1); // Skip header
+            const lines = content.split('\n').slice(1);
             lines.forEach((line, index) => {
                 if (!line.trim()) return;
-                const cols = line.split(','); // Simple parse
-                // cols: [0]Name, [1]Lat, [2]Lng, [3]Contact, [4]Email, [5]TS
-                
+                const cols = line.split(','); 
+                if(cols.length < 5) return;
                 const shopName = cols[0].replace(/"/g, '');
                 const salesman = cols[4].replace(/"/g, '');
                 
-                // Create Card for UI
                 html += `
                 <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-2">
                     <div class="flex justify-between items-start">
@@ -517,86 +572,65 @@ class GoogleCloud {
                             <div class="font-bold text-white text-sm">${shopName}</div>
                             <div class="text-[10px] text-blue-400">By: ${salesman}</div>
                         </div>
-                        <div class="text-[9px] text-slate-500 font-mono">${new Date(parseInt(cols[5])).toLocaleDateString()}</div>
                     </div>
                     <div class="flex gap-2 mt-1">
                         <button onclick="drive.approveShop('${file.id}', ${index}, '${escape(line)}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded">APPROVE</button>
                         <button onclick="drive.rejectShop('${file.id}', ${index})" class="flex-1 py-1.5 bg-red-900/50 border border-red-800 text-red-400 text-[10px] font-bold rounded">REJECT</button>
                     </div>
                 </div>`;
-                pendingCount++;
             });
         }
-
         listContainer.innerHTML = html || '<div class="text-center text-slate-500 text-xs">No pending requests</div>';
     }
 
-    // 4. LOGIC: Manager Approves Shop
     async approveShop(fileId, lineIndex, lineDataEscaped) {
         const lineData = unescape(lineDataEscaped);
         const cols = lineData.split(',');
-        
-        // 1. Construct Master Shop Entry
-        // Format: ID,NAME,LAT,LNG,TAG
         const name = cols[0].replace(/"/g, '');
         const lat = cols[1];
         const lng = cols[2];
-        const salesman = cols[4].replace(/"/g, ''); // The email
-        
-        // Extract "Name" from email (e.g., "john" from john@gmail.com) for the Tag
+        const salesman = cols[4].replace(/"/g, '');
         const tagName = salesman.split('@')[0];
-        const taggedName = `${name} (By ${tagName})`; // Apply Tag
-        const uuid = Date.now().toString(36); // Generate ID
-
+        const taggedName = `${name} (By ${tagName})`;
+        const uuid = Date.now().toString(36);
         const newMasterLine = `${uuid},"${taggedName}",${lat},${lng},"Approved"`;
 
-        // 2. Append to shops_master.csv
         if (this.shopsFileId) {
             const currentMaster = await this.downloadFile(this.shopsFileId);
             await this.updateFileContent(this.shopsFileId, currentMaster + '\n' + newMasterLine);
         }
-
-        // 3. Remove from Pending File
         await this.removeFromPendingFile(fileId, lineIndex);
-        
-        // 4. Refresh UI
-        alert("Shop Approved & Added to Master List!");
+        alert("Approved!");
         this.fetchPendingRequests();
-        
-        // 5. Force reload Master List locally
+        // Force refresh
         const updatedMaster = await this.downloadFile(this.shopsFileId);
         this.store.restoreShopsFromCSV(updatedMaster);
         this.app.initMap();
     }
 
     async rejectShop(fileId, lineIndex) {
-        if(confirm("Reject and delete this request?")) {
+        if(confirm("Reject?")) {
             await this.removeFromPendingFile(fileId, lineIndex);
             this.fetchPendingRequests();
         }
     }
 
-    // Helper to delete line from CSV in Drive
     async removeFromPendingFile(fileId, lineIndexToRemove) {
         const content = await this.downloadFile(fileId);
         const lines = content.split('\n');
-        // Filter out the line (index + 1 because of header)
+        // lineIndexToRemove + 1 because of header
         const newLines = lines.filter((_, idx) => idx !== (lineIndexToRemove + 1));
         await this.updateFileContent(fileId, newLines.join('\n'));
     }
-    // --- HELPER METHODS ---
 
+    // --- HELPERS ---
     async findOrCreateFolder(name, parentId = null) {
         let q = `mimeType = 'application/vnd.google-apps.folder' and name = '${name}' and trashed = false`;
         if (parentId) q += ` and '${parentId}' in parents`;
-
         const res = await gapi.client.drive.files.list({ q, fields: 'files(id)' });
         if (res.result.files.length > 0) return res.result.files[0].id;
-
-        // Create
         const metadata = { name, mimeType: 'application/vnd.google-apps.folder' };
         if (parentId) metadata.parents = [parentId];
-        
         const createRes = await gapi.client.drive.files.create({ resource: metadata, fields: 'id' });
         return createRes.result.id;
     }
@@ -612,7 +646,6 @@ class GoogleCloud {
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', new Blob([content], { type: mimeType }));
-
         const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + this.accessToken },
@@ -629,33 +662,6 @@ class GoogleCloud {
         } catch(e) { return null; }
     }
 
-    // --- SAVING LOGIC (Role Based) ---
-    async save() {
-        if(!this.ordersFileId) return;
-
-        // 1. SAVE ORDERS (Everyone saves their own orders)
-        const logs = this.store.getLogs();
-        // Convert logs to CSV format
-        const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
-            logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
-        
-        await this.updateFileContent(this.ordersFileId, csvOrders);
-
-        // 2. SAVE SHOPS (Only Manager or if file doesn't exist)
-        // If the user is Manager, we update the master list.
-        // Salesmen usually shouldn't overwrite the master list, but if you want them to add shops:
-        if (this.shopsFileId) {
-            // Re-convert shops to CSV
-            const locs = this.store.getLocs();
-            const csvShops = "ID,NAME,LAT,LNG,ADDRESS\n" + 
-                locs.map(l => `${l.id},"${l.name}",${l.lat},${l.lng},"Address_Placeholder"`).join('\n');
-            
-            await this.updateFileContent(this.shopsFileId, csvShops);
-        }
-
-        console.log("Cloud Saved");
-    }
-
     async updateFileContent(fileId, content) {
         await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
             method: 'PATCH',
@@ -663,83 +669,32 @@ class GoogleCloud {
             body: content
         });
     }
-}
 
+    async save() {
+        if(!this.ordersFileId) return;
+        const logs = this.store.getLogs();
+        const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
+            logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
+        await this.updateFileContent(this.ordersFileId, csvOrders);
+        console.log("Cloud Saved Orders");
+    }
 
-
-    
-// --- STORE ---
-class Store {
-
-// Add inside class Store { ... }
-
-// --- INSERT INSIDE class Store { ... } ---
-
-    restoreProfileFromCSV(csv) {
-        if (!csv) return;
-        const lines = csv.split('\n');
-        // Expecting Format: NAME,PHONE \n "John Doe","9876543210"
-        if (lines.length < 2) return; 
-        
-        const data = lines[1].split(','); // Get second line
-        if (data.length >= 2) {
-            const p = {
-                name: data[0].replace(/"/g, '').trim(),
-                id: data[1].replace(/"/g, '').trim()
-            };
-            this.saveProfile(p); // Save to LocalStorage
+    async syncProfile() {
+        if (!this.userFileId) return;
+        const p = this.store.getProfile();
+        const csvContent = `NAME,PHONE\n"${p.name}","${p.id}"`;
+        await this.updateFileContent(this.userFileId, csvContent);
+        console.log("Profile Auto-Saved");
+        const status = document.getElementById('drive-msg');
+        if(status) {
+            status.innerText = "Saving Profile...";
+            setTimeout(() => status.innerText = "Sync Active", 2000);
         }
     }
-    
-    // Convert CSV string back to Shop Array
-    restoreShopsFromCSV(csv) {
-        if(!csv) return;
-        const lines = csv.split('\n').slice(1); // Skip header
-        const locs = [];
-        lines.forEach(line => {
-            if(!line.trim()) return;
-            // Basic CSV parsing (assuming no commas in names for simplicity, strictly regex is better)
-            const cols = line.split(','); 
-            if(cols.length >= 4) {
-                // Handling quotes in names roughly
-                const name = cols[1].replace(/"/g, '');
-                locs.push({
-                    id: cols[0],
-                    name: name,
-                    lat: parseFloat(cols[2]),
-                    lng: parseFloat(cols[3]),
-                    isInside: false
-                });
-            }
-        });
-        if(locs.length > 0) localStorage.setItem(this.LOCS, JSON.stringify(locs));
-    }
+}
 
-    // Convert CSV string back to Logs Array
-    restoreLogsFromCSV(csv) {
-        if(!csv) return;
-        const lines = csv.split('\n').slice(1);
-        const logs = [];
-        lines.forEach(line => {
-            if(!line.trim()) return;
-            const cols = line.split(',');
-            if(cols.length >= 5) {
-                logs.push({
-                    id: Utils.uuid(), // Generate new ID as CSV doesn't store it
-                    type: cols[0],
-                    loc: cols[1].replace(/"/g, ''),
-                    date: cols[2],
-                    desc: cols[3].replace(/"/g, ''),
-                    amt: parseFloat(cols[4]),
-                    q1: parseInt(cols[5] || 0),
-                    q5: parseInt(cols[6] || 0),
-                    ts: Date.now()
-                });
-            }
-        });
-        if(logs.length > 0) localStorage.setItem(this.LOGS, JSON.stringify(logs));
-    }
-    
+// --- STORE ---
+class Store {
     constructor() {
         this.LOCS = 'geo_shops'; this.LOGS = 'geo_activity'; this.PROF = 'geo_profile';
     }
@@ -769,20 +724,77 @@ class Store {
         if(data.locations) localStorage.setItem(this.LOCS, JSON.stringify(data.locations));
         if(data.logs) localStorage.setItem(this.LOGS, JSON.stringify(data.logs));
     }
+
+    restoreProfileFromCSV(csv) {
+        if (!csv) return;
+        const lines = csv.split('\n');
+        if (lines.length < 2) return; 
+        const data = lines[1].split(','); 
+        if (data.length >= 2) {
+            const p = {
+                name: data[0].replace(/"/g, '').trim(),
+                id: data[1].replace(/"/g, '').trim()
+            };
+            this.saveProfile(p);
+        }
+    }
+
+    restoreShopsFromCSV(csv) {
+        if(!csv) return;
+        const lines = csv.split('\n').slice(1);
+        const locs = [];
+        lines.forEach(line => {
+            if(!line.trim()) return;
+            const cols = line.split(','); 
+            if(cols.length >= 4) {
+                const name = cols[1].replace(/"/g, '');
+                locs.push({
+                    id: cols[0],
+                    name: name,
+                    lat: parseFloat(cols[2]),
+                    lng: parseFloat(cols[3]),
+                    isInside: false
+                });
+            }
+        });
+        if(locs.length > 0) localStorage.setItem(this.LOCS, JSON.stringify(locs));
+    }
+
+    restoreLogsFromCSV(csv) {
+        if(!csv) return;
+        const lines = csv.split('\n').slice(1);
+        const logs = [];
+        lines.forEach(line => {
+            if(!line.trim()) return;
+            const cols = line.split(',');
+            if(cols.length >= 5) {
+                logs.push({
+                    id: Utils.uuid(),
+                    type: cols[0],
+                    loc: cols[1].replace(/"/g, ''),
+                    date: cols[2],
+                    desc: cols[3].replace(/"/g, ''),
+                    amt: parseFloat(cols[4]),
+                    q1: parseInt(cols[5] || 0),
+                    q5: parseInt(cols[6] || 0),
+                    ts: Date.now()
+                });
+            }
+        });
+        if(logs.length > 0) localStorage.setItem(this.LOGS, JSON.stringify(logs));
+    }
 }
 
 // --- APP ---
 class App {
     constructor() {
         this.store = new Store();
-        // Pass app instance to Drive so it can refresh UI after load
         this.drive = new GoogleCloud(this.store, this);
         window.drive = this.drive;
         this.latK = {x:NaN,p:1,q:0.001,r:0.01}; 
         this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
         this.pos = null; this.targetLoc = null; this.locs = this.store.getLocs();
         
-        // Initial setup (UI might change after Google Login)
         this.initUI();
         this.initMap();
         this.startGeo();
@@ -790,20 +802,16 @@ class App {
 
     kalman(k, z) { if(isNaN(k.x)){k.x=z;return z} k.p+=k.q; const kg=k.p/(k.p+k.r); k.x+=kg*(z-k.x); k.p=(1-kg)*k.p; return k.x; }
 
-    // --- INSERT/REPLACE INSIDE class App { ... } ---
-
     initUI() {
         const p = this.store.getProfile();
         this.locs = this.store.getLocs();
         
-        // Set values
         const nameInput = document.getElementById('prof-name');
         const idInput = document.getElementById('prof-id');
         nameInput.value = p.name;
         idInput.value = p.id;
 
-        // --- NEW: Continuous Sync Listeners ---
-        // Auto-save when user finishes typing (on blur) to save API quota
+        // Auto-save listeners
         [nameInput, idInput].forEach(el => {
             el.addEventListener('change', () => this.saveProfile(true)); 
         });
@@ -814,18 +822,13 @@ class App {
         this.updateTargets();
     }
 
-    // Updated Save Function
     saveProfile(silent = false) { 
         const name = document.getElementById('prof-name').value;
         const id = document.getElementById('prof-id').value;
-        
         this.store.saveProfile({ name, id }); 
-        
-        // Trigger Cloud Sync
         if(this.drive && this.drive.isReady) {
             this.drive.syncProfile();
         }
-
         if(!silent) alert("Profile Updated & Synced!"); 
     }
 
@@ -848,7 +851,7 @@ class App {
     }
 
     startGeo() {
-        if(!navigator.geolocation) return; // Don't alert yet, wait for login
+        if(!navigator.geolocation) return; 
         navigator.geolocation.watchPosition(p => {
             const lat = this.kalman(this.latK, p.coords.latitude);
             const lng = this.kalman(this.lngK, p.coords.longitude);
@@ -889,13 +892,13 @@ class App {
                 l.isInside = true; l.entryTime = Date.now();
                 this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
                 this.store.updateLoc(l);
-                this.drive.save(); // AUTO SAVE
+                this.drive.save(); 
             } else if (l.isInside && dist > 15) { 
                 l.isInside = false;
                 const dur = Math.round((Date.now() - l.entryTime)/60000);
                 this.store.log('VISIT_OUT', l.name, `Duration: ${dur} min`);
                 this.store.updateLoc(l);
-                this.drive.save(); // AUTO SAVE
+                this.drive.save(); 
             }
             if (l.isInside) {
                 inside = true;
@@ -978,7 +981,7 @@ class App {
             ['inp-qty-1ltr','inp-qty-500ml','input-order-details','input-order-amt'].forEach(id=>document.getElementById(id).value='');
             this.updateTargets();
             this.renderOrders();
-            this.drive.save(); // AUTO SAVE
+            this.drive.save(); 
             alert("Order Saved!");
         } else { alert("Enter Qty or Details"); }
     }
@@ -995,8 +998,6 @@ class App {
         if(t==='store') this.renderStores();
     }
 
-// --- UPDATE INSIDE class App { ... } ---
-
     saveLocation() {
         const name = document.getElementById('inp-name').value;
         const contact = document.getElementById('inp-contact').value;
@@ -1011,7 +1012,7 @@ class App {
         };
 
         // IF MANAGER: Save Directly
-        if (this.drive.userEmail === 'freskeypiyo@gmail.com') {
+        if (this.drive.userEmail === MANAGER_EMAIL) {
             const id = Utils.uuid();
             this.store.saveLoc({ ...shopData, id, isInside: true });
             this.drive.save(); // Syncs to master
@@ -1037,7 +1038,7 @@ class App {
             this.locs = this.store.getLocs();
             this.renderStores();
             this.updateMapMarkers();
-            this.drive.save(); // AUTO SAVE
+            this.drive.save(); 
         }
     }
 
@@ -1045,12 +1046,6 @@ class App {
         const h = '<option value="">-- Select --</option>' + this.locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
         document.getElementById('select-target').innerHTML = h;
         document.getElementById('filter-shop').innerHTML = '<option value="all">All Shops</option>' + this.locs.map(l=>`<option value="${l.name}">${l.name}</option>`).join('');
-    }
-
-    saveProfile() { 
-        this.store.saveProfile({name:document.getElementById('prof-name').value, id:document.getElementById('prof-id').value}); 
-        this.drive.save(); // AUTO SAVE
-        alert("Saved"); 
     }
     
     exportData() {
