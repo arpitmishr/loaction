@@ -387,67 +387,76 @@
  * ==========================================================================================
  */
 
+
+
+    
 // --- CONFIGURATION ---
+// --- UPDATED GOOGLE DRIVE SERVICE ---
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DB_FILE_NAME = 'geoguard_db.json';
 
-// --- UTILS ---
-const Utils = {
-    getDist: (lat1, lon1, lat2, lon2) => {
-        const R = 6371e3; const rad = Math.PI/180;
-        const a = Math.sin((lat2-lat1)*rad/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin((lon2-lon1)*rad/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    },
-    getBearing: (lat1, lon1, lat2, lon2) => {
-        const rad = Math.PI/180; const deg = 180/Math.PI;
-        const y = Math.sin((lon2-lon1)*rad) * Math.cos(lat2*rad);
-        const x = Math.cos(lat1*rad)*Math.sin(lat2*rad) - Math.sin(lat1*rad)*Math.cos(lat2*rad)*Math.cos((lon2-lon1)*rad);
-        return (Math.atan2(y, x) * deg + 360) % 360;
-    },
-    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
-    fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
-};
-
-// --- GOOGLE DRIVE SERVICE ---
 class GoogleCloud {
     constructor(storeInstance) {
         this.store = storeInstance;
         this.tokenClient = null;
         this.accessToken = null;
         this.isReady = false;
-        this.init();
+        
+        // Auto-load libraries
+        this.loadLibs();
     }
 
-    init() {
-        const check = setInterval(() => {
-            if (window.google && window.gapi) {
-                clearInterval(check);
-                this.initGapi();
-            }
-        }, 500);
+    loadLibs() {
+        const script1 = document.createElement('script');
+        script1.src = "https://accounts.google.com/gsi/client";
+        script1.async = true;
+        script1.defer = true;
+        document.body.appendChild(script1);
+
+        const script2 = document.createElement('script');
+        script2.src = "https://apis.google.com/js/api.js";
+        script2.async = true;
+        script2.defer = true;
+        script2.onload = () => this.initGapi();
+        document.body.appendChild(script2);
     }
 
     initGapi() {
         gapi.load('client', async () => {
-            await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-            this.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID, scope: SCOPES,
-                callback: (resp) => {
-                    if (resp.error) throw resp;
-                    this.accessToken = resp.access_token;
-                    this.updateUI(true);
-                    this.sync();
-                },
-            });
-            this.isReady = true;
+            try {
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                });
+
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (resp) => {
+                        if (resp.error !== undefined) {
+                            throw (resp);
+                        }
+                        this.accessToken = resp.access_token;
+                        this.updateUI(true);
+                        this.sync(); // Auto-sync after login
+                    },
+                });
+
+                this.isReady = true;
+                console.log("Google API Ready");
+            } catch (err) {
+                console.error("GAPI Init Error:", err);
+                document.getElementById('drive-msg').innerText = "API Error: Check Console";
+            }
         });
     }
 
     login() {
-        if(!this.isReady) return alert("Google API loading...");
-        this.tokenClient.requestAccessToken({prompt: 'consent'});
+        if (!this.isReady) return alert("Google Services loading... Wait 5s");
+        // Request token
+        this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
     updateUI(isLoggedIn) {
@@ -457,51 +466,73 @@ class GoogleCloud {
         const dot = document.getElementById('cloud-dot');
         const msg = document.getElementById('drive-msg');
 
-        if(isLoggedIn) {
+        if (isLoggedIn) {
             btnLogin.classList.add('hidden');
             btnSync.disabled = false;
             btnSync.classList.replace('text-slate-500', 'text-white');
-            status.innerText = "CONNECTED";
-            dot.classList.replace('bg-slate-500', 'bg-emerald-500');
-            msg.innerText = "Ready to Sync";
+            btnSync.classList.replace('bg-slate-800', 'bg-blue-600');
+            status.innerText = "ONLINE";
+            status.classList.add('text-blue-400');
+            dot.classList.replace('bg-slate-500', 'bg-blue-500');
+            dot.classList.add('animate-pulse');
+            msg.innerText = "Connected. Ready to Sync.";
         }
     }
 
     async sync() {
         const msg = document.getElementById('drive-msg');
-        msg.innerText = "Syncing...";
+        const btnSync = document.getElementById('btn-gsync');
         
+        msg.innerText = "⏳ Syncing Data...";
+        btnSync.disabled = true;
+
         try {
+            // 1. Prepare Data
+            const localData = this.store.dump();
+            const fileContent = JSON.stringify(localData, null, 2);
+            const fileObj = new Blob([fileContent], { type: 'application/json' });
+
+            // 2. Check if file exists
             const q = `name = '${DB_FILE_NAME}' and trashed = false`;
             const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
             const files = res.result.files;
-            const localData = this.store.dump();
 
             if (files && files.length > 0) {
+                // UPDATE Existing File
                 const fileId = files[0].id;
-                await gapi.client.request({
-                    path: `/upload/drive/v3/files/${fileId}`,
+                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
                     method: 'PATCH',
-                    params: { uploadType: 'media' },
-                    body: JSON.stringify(localData)
+                    headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json' },
+                    body: fileContent
                 });
-                msg.innerText = "Sync Complete (Updated)";
+                msg.innerText = "✅ Sync Complete (Updated)";
             } else {
+                // CREATE New File
                 const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
                 const form = new FormData();
                 form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', new Blob([JSON.stringify(localData)], { type: 'application/json' }));
+                form.append('file', fileObj);
 
                 await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + this.accessToken },
                     body: form
                 });
-                msg.innerText = "Sync Complete (Created)";
+                msg.innerText = "✅ Sync Complete (Created)";
             }
+            
+            // Optional: Save timestamp of last sync locally
+            localStorage.setItem('last_sync_ts', new Date().toLocaleTimeString());
+
         } catch (e) {
             console.error(e);
-            msg.innerText = "Sync Failed";
+            msg.innerText = "❌ Sync Failed (See Console)";
+            if(e.status === 401) {
+                alert("Session Expired. Please Login Again.");
+                window.location.reload();
+            }
+        } finally {
+            btnSync.disabled = false;
         }
     }
 }
