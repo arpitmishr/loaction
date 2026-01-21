@@ -257,8 +257,6 @@
             </button>
         </div>
 
-        
-
     </main>
 
     <!-- BOTTOM NAV -->
@@ -276,7 +274,6 @@
             <button onclick="app.switchTab('profile')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="profile">
                 <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
             </button>
-            
         </div>
     </nav>
 
@@ -365,6 +362,7 @@ const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE';
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
+// FIX: Only load Drive API here to prevent hang
 const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 
 const ROOT_FOLDER_NAME = 'FreskeyPiyo';
@@ -387,12 +385,209 @@ const Utils = {
     fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
 };
 
-// --- GOOGLE CLOUD SERVICE (COMPLETED) ---
+// --- GOOGLE CLOUD SERVICE (COMPLETED & CORRECTED) ---
 class GoogleCloud {
+    constructor(storeInstance, appInstance) {
+        this.store = storeInstance;
+        this.app = appInstance;
+        this.tokenClient = null;
+        this.accessToken = null;
+        this.userEmail = null;
+        this.isReady = false;
+        
+        // IDs for folders and files
+        this.rootId = null;
+        this.shopsFileId = null;
+        this.userFileId = null;
+        this.ordersFileId = null;
+
+        const check = setInterval(() => {
+            if (window.google && window.gapi) {
+                clearInterval(check);
+                this.initGapi();
+            }
+        }, 500);
+    }
+
+    initGapi() {
+        if(GOOGLE_API_KEY.includes('PASTE')) return; 
+        gapi.load('client', async () => {
+            try {
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (resp) => {
+                        if (resp.error) return alert("Auth Error: " + resp.error);
+                        this.accessToken = resp.access_token;
+                        this.getUserInfo(); 
+                    },
+                });
+                this.isReady = true;
+                console.log("GAPI Ready");
+            } catch (err) { console.error("GAPI Error", err); }
+        });
+    }
+
+    login() {
+        if (!this.isReady) return alert("System loading or API Key Missing");
+        this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+
+    // FIX: Use Fetch to avoid GAPI hang on UserInfo
+    async getUserInfo() {
+        const msg = document.getElementById('login-status');
+        msg.innerText = "🔍 Verifying User...";
+        try {
+            const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            });
+            const data = await response.json();
+            if (!data.email) throw new Error("No email found.");
+
+            this.userEmail = data.email;
+            console.log(`Logged in as: ${this.userEmail}`);
+            this.ensureFolderStructure();
+        } catch (e) {
+            console.error(e);
+            msg.innerText = "❌ Auth Failed. Refresh page.";
+        }
+    }
+
+    async ensureFolderStructure() {
+        const msg = document.getElementById('login-status');
+        msg.innerText = "📂 Connecting to Drive...";
+
+        try {
+            // 1. Root & Subfolders
+            this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
+            const userDataFolderId = await this.findOrCreateFolder('user_data', this.rootId);
+            const ordersFolderId = await this.findOrCreateFolder('orders', this.rootId);
+
+            // 2. User Profile (user_data folder)
+            const safeEmail = this.userEmail.replace(/[@.]/g, '_');
+            const userFileName = `${safeEmail}.csv`;
+            this.userFileId = await this.findFileId(userFileName, userDataFolderId);
+            
+            if (this.userFileId) {
+                console.log("Loading Profile...");
+                const content = await this.downloadFile(this.userFileId);
+                if (content) this.store.restoreProfileFromCSV(content);
+            } else {
+                console.log("Creating Profile...");
+                const current = this.store.getProfile();
+                const initialCSV = `NAME,PHONE\n"${current.name}","${current.id}"`;
+                this.userFileId = await this.createFile(userFileName, userDataFolderId, initialCSV);
+            }
+
+            // 3. Master Shops (Everyone accesses this)
+            const shopsFileName = 'shops_master.csv';
+            this.shopsFileId = await this.findFileId(shopsFileName, this.rootId);
+            if(this.shopsFileId) {
+                const content = await this.downloadFile(this.shopsFileId);
+                if(content) this.store.restoreShopsFromCSV(content);
+            } else {
+                // Create if it doesn't exist
+                const header = "ID,NAME,LAT,LNG,TAG\n";
+                this.shopsFileId = await this.createFile(shopsFileName, this.rootId, header);
+            }
+
+            // 4. Orders File
+            const ordersFileName = `orders_${safeEmail}.csv`;
+            this.ordersFileId = await this.findFileId(ordersFileName, ordersFolderId);
+            if(this.ordersFileId) {
+                 const content = await this.downloadFile(this.ordersFileId);
+                 if(content) this.store.restoreLogsFromCSV(content);
+            } else {
+                 this.ordersFileId = await this.createFile(ordersFileName, ordersFolderId, "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n");
+            }
+
+            // Finish
+            this.app.initUI();
+            this.app.initMap();
+            msg.innerText = "✅ System Ready";
+            setTimeout(() => document.getElementById('modal-welcome').classList.add('hidden'), 500);
+
+        } catch (e) { 
+            console.error("Drive Sync Error", e);
+            msg.innerText = "❌ Drive Error. Check Console.";
+        }
+    }
+
+    // --- DIRECT SAVE TO MASTER LIST ---
+    async addShopToMaster(shop) {
+        if (!this.shopsFileId) {
+            console.warn("Master Shop File not ready");
+            return;
+        }
+
+        try {
+            // 1. Download latest content to avoid overwriting others
+            const currentContent = await this.downloadFile(this.shopsFileId);
+            
+            // 2. Prepare new line
+            // CSV Format: ID, "Name (By User)", Lat, Lng, "Tag"
+            const userTag = this.userEmail.split('@')[0];
+            const displayName = `${shop.name} (By ${userTag})`;
+            // Remove quotes from name to prevent CSV break
+            const safeName = displayName.replace(/"/g, ''); 
+            const newLine = `${shop.id},"${safeName}",${shop.lat},${shop.lng},"DirectSave"`;
+            
+            // 3. Append and Upload
+            const newContent = currentContent + '\n' + newLine;
+            await this.updateFileContent(this.shopsFileId, newContent);
+            console.log("✅ Shop added to Cloud Master List");
+
+        } catch (e) {
+            console.error("Save Shop Error", e);
+        }
+    }
+
+    // --- SYNC METHODS ---
+    async forceSync() {
+        const btnIcon = document.getElementById('sync-icon');
+        btnIcon.classList.remove('ph-cloud-arrow-up');
+        btnIcon.classList.add('ph-spinner', 'spin-slow');
+        
+        try {
+            // 1. Save Orders
+            if(this.ordersFileId) {
+                const logs = this.store.getLogs();
+                const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
+                    logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
+                await this.updateFileContent(this.ordersFileId, csvOrders);
+            }
+
+            // 2. Save Profile
+            if(this.userFileId) {
+                const p = this.store.getProfile();
+                const csvContent = `NAME,PHONE\n"${p.name}","${p.id}"`;
+                await this.updateFileContent(this.userFileId, csvContent);
+            }
+
+            // 3. Re-Download Master Shops (To see other people's additions)
+            if(this.shopsFileId) {
+                const content = await this.downloadFile(this.shopsFileId);
+                if(content) this.store.restoreShopsFromCSV(content);
+            }
+
+            alert("✅ Synced Successfully!\nOrders Uploaded & Shop List Updated.");
+            this.app.initMap(); 
+
+        } catch(e) {
+            console.error(e);
+            alert("❌ Sync Failed: " + e.message);
+        } finally {
+            btnIcon.classList.remove('ph-spinner', 'spin-slow');
+            btnIcon.classList.add('ph-cloud-arrow-up');
+        }
+    }
 
     async save() {
         if(!this.ordersFileId) return;
-        // Background Save (non-blocking)
         const logs = this.store.getLogs();
         const csvOrders = "TYPE,LOC,DATE,DESC,AMT,Q1,Q5\n" + 
             logs.map(l => `${l.type},"${l.loc}",${l.date},"${l.desc}",${l.amt},${l.q1||0},${l.q5||0}`).join('\n');
@@ -410,6 +605,53 @@ class GoogleCloud {
             status.innerText = "Saving Profile...";
             setTimeout(() => status.innerText = "Sync Active", 2000);
         }
+    }
+
+    // --- HELPERS ---
+    async findOrCreateFolder(name, parentId = null) {
+        let q = `mimeType = 'application/vnd.google-apps.folder' and name = '${name}' and trashed = false`;
+        if (parentId) q += ` and '${parentId}' in parents`;
+        const res = await gapi.client.drive.files.list({ q, fields: 'files(id)' });
+        if (res.result.files.length > 0) return res.result.files[0].id;
+        const metadata = { name, mimeType: 'application/vnd.google-apps.folder' };
+        if (parentId) metadata.parents = [parentId];
+        const createRes = await gapi.client.drive.files.create({ resource: metadata, fields: 'id' });
+        return createRes.result.id;
+    }
+
+    async findFileId(name, parentId) {
+        const q = `name = '${name}' and '${parentId}' in parents and trashed = false`;
+        const res = await gapi.client.drive.files.list({ q, fields: 'files(id)' });
+        return res.result.files.length > 0 ? res.result.files[0].id : null;
+    }
+
+    async createFile(name, parentId, content, mimeType='text/csv') {
+        const metadata = { name, parents: [parentId] };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', new Blob([content], { type: mimeType }));
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + this.accessToken },
+            body: form
+        });
+        const json = await res.json();
+        return json.id;
+    }
+
+    async downloadFile(fileId) {
+        try {
+            const res = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+            return res.body; 
+        } catch(e) { return null; }
+    }
+
+    async updateFileContent(fileId, content) {
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'text/csv' },
+            body: content
+        });
     }
 }
 
@@ -463,10 +705,6 @@ class Store {
         if(!csv) return;
         const lines = csv.split('\n').slice(1);
         const locs = [];
-        // Preserve local pending shops that are NOT in the Master list yet
-        const currentLocs = this.getLocs();
-        const pendingLocs = currentLocs.filter(l => l.pending === true);
-
         lines.forEach(line => {
             if(!line.trim()) return;
             const cols = line.split(','); 
@@ -477,19 +715,10 @@ class Store {
                     name: name,
                     lat: parseFloat(cols[2]),
                     lng: parseFloat(cols[3]),
-                    isInside: false,
-                    pending: false // It's from master, so it's approved
+                    isInside: false
                 });
             }
         });
-
-        // Merge: Add pending shops back to list if they aren't already in Master (by ID)
-        pendingLocs.forEach(pl => {
-            if(!locs.find(ml => ml.id === pl.id)) {
-                locs.push(pl);
-            }
-        });
-
         if(locs.length > 0) localStorage.setItem(this.LOCS, JSON.stringify(locs));
     }
 
@@ -583,20 +812,14 @@ class App {
 
     updateMapMarkers() {
         this.shopLayer.clearLayers();
-        this.locs = this.store.getLocs(); // Ensure fresh data
+        this.locs = this.store.getLocs(); 
         this.locs.forEach(l => {
-            let fillColor = '#3b82f6'; // Default Blue (Approved)
-            if (l.pending) fillColor = '#f59e0b'; // Orange (Pending)
-            if (l.isInside) fillColor = '#10b981'; // Green (Inside)
+            let fillColor = '#3b82f6'; // Blue
+            if (l.isInside) fillColor = '#10b981'; // Green
             if (l.id === this.targetLoc?.id) fillColor = '#f59e0b'; // Target
             
             const m = L.circleMarker([l.lat, l.lng], { radius: 8, fillColor: fillColor, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8 });
-            
-            let popup = `<div class="text-slate-900 font-bold">${l.name}</div>`;
-            if(l.pending) popup += `<div class="text-[10px] text-orange-600 font-bold">(Pending Approval)</div>`;
-            popup += `<button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`;
-            
-            m.bindPopup(popup);
+            m.bindPopup(`<div class="text-slate-900 font-bold">${l.name}</div><button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`);
             m.addTo(this.shopLayer);
         });
     }
@@ -749,8 +972,6 @@ class App {
         if(t==='store') this.renderStores();
     }
 
-    // --- UPDATE INSIDE class App { ... } ---
-
     saveLocation() {
         const name = document.getElementById('inp-name').value;
         const contact = document.getElementById('inp-contact').value;
@@ -758,7 +979,6 @@ class App {
         if (!name || !this.pos) return alert("Name & GPS Required");
         
         const shopId = Utils.uuid();
-
         const shopData = {
             id: shopId,
             name: name,
@@ -766,18 +986,17 @@ class App {
             lat: this.pos.lat,
             lng: this.pos.lng,
             isInside: true,
-            pending: false // No longer used, but kept for compatibility
         };
 
         // 1. Save Locally
         this.store.saveLoc(shopData);
         
-        // 2. Save Directly to Cloud Master List (For Everyone)
+        // 2. Save Directly to Cloud Master List
         if(this.drive && this.drive.isReady) {
             this.drive.addShopToMaster(shopData);
-            alert("Shop Saved! Syncing to Master List...");
+            alert("Shop Saved! Syncing to Cloud...");
         } else {
-            alert("Shop Saved Locally. Connect to Internet to Sync.");
+            alert("Shop Saved Locally. Click Sync Button in header later.");
         }
 
         // 3. UI Updates
@@ -790,7 +1009,7 @@ class App {
         document.getElementById('store-list').innerHTML = this.locs.map(l => 
             `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
                 <div>
-                    <div class="font-bold text-white">${l.name} ${l.pending ? '<span class="text-orange-500 text-[10px]">(Pending)</span>' : ''}</div>
+                    <div class="font-bold text-white">${l.name}</div>
                     <div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div>
                 </div>
                 <button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button>
@@ -799,12 +1018,11 @@ class App {
     }
 
     delStore(id) {
-        if(confirm("Delete this store?")) {
+        if(confirm("Delete this store from local view?")) {
             this.store.deleteLoc(id);
             this.locs = this.store.getLocs();
             this.renderStores();
             this.updateMapMarkers();
-            this.drive.save(); 
         }
     }
 
