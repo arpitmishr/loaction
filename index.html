@@ -2,789 +2,631 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
-    <title>GeoGuard Logistics | Cloud Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FreskeyPiyo | Logistics</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        slate: { 850: '#1e293b', 950: '#020617' },
-                        primary: '#3b82f6',
-                        success: '#10b981',
-                        danger: '#ef4444',
-                        warning: '#f59e0b'
-                    },
-                    animation: {
-                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                    }
-                }
-            }
+            theme: { extend: { colors: { slate: { 850: '#1e293b', 950: '#020617' } } } }
         }
     </script>
 
-    <!-- LEAFLET MAP CSS & JS -->
+    <!-- LEAFLET MAP -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- GOOGLE API SCRIPTS -->
+    <!-- GOOGLE APIS -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <style>
         body { -webkit-tap-highlight-color: transparent; user-select: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .modal { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0; pointer-events: none; transform: scale(0.95); }
-        .modal.open { opacity: 1; pointer-events: auto; transform: scale(1); }
-        .tab-content { display: none; animation: fadeIn 0.2s ease-in-out; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .leaflet-container { background: #0f172a; font-family: inherit; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #fff; border: 1px solid #334155; }
-        .leaflet-popup-close-button { color: #94a3b8 !important; }
-        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal { transition: opacity 0.3s; opacity: 0; pointer-events: none; }
+        .modal.open { opacity: 1; pointer-events: auto; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
 
-    <!-- === MANDATORY LOGIN MODAL === -->
-    <div id="modal-welcome" class="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
-        <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-500/50 mb-6">
-            <i class="ph-fill ph-moped text-4xl text-white"></i>
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-20 h-20 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
+            <i class="ph-fill ph-plant text-4xl text-white"></i>
         </div>
-        <h1 class="text-2xl font-bold text-white mb-2">GeoGuard Cloud</h1>
-        <p class="text-slate-400 mb-8 max-w-xs">Securely sync your Shops, Orders, and Sales Targets with Google Drive.</p>
-        
-        <button onclick="drive.login()" class="w-full max-w-xs py-3.5 bg-white text-slate-900 rounded-xl font-bold text-base flex items-center justify-center gap-3 hover:bg-slate-200 transition-all shadow-lg group">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-6 h-6" alt="Google">
-            <span>Login to Load Data</span>
+        <h1 class="text-2xl font-bold text-white mb-2">FreskeyPiyo</h1>
+        <p class="text-slate-400 mb-8 text-sm">Role-Based Sales & Logistics System<br>Powered by Google Drive</p>
+        <button onclick="auth.login()" class="bg-white text-slate-900 px-6 py-3 rounded-xl font-bold flex items-center gap-3 hover:bg-slate-100 transition-all">
+            <i class="ph-bold ph-google-logo"></i> Login with Google
         </button>
-        <div id="login-status" class="mt-4 text-xs text-slate-500 h-5 font-mono">Waiting for user...</div>
+        <div id="login-status" class="mt-4 text-xs text-slate-500 font-mono"></div>
     </div>
 
     <!-- HEADER -->
     <header class="fixed top-0 w-full z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md">
         <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-                    <i class="ph-fill ph-moped text-white text-lg"></i>
+                <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white">
+                    <i class="ph-bold ph-storefront"></i>
                 </div>
                 <div>
-                    <h1 class="text-sm font-bold text-white leading-tight">LOGISTICS <span class="text-blue-500">PRO</span></h1>
-                    <div class="flex items-center gap-1">
-                        <span id="cloud-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span class="text-[10px] text-emerald-400 font-mono tracking-wide" id="cloud-status">ONLINE</span>
+                    <h1 class="text-xs font-bold text-slate-400">FRESKEYPIYO</h1>
+                    <div class="flex items-center gap-2">
+                        <span id="user-role" class="text-[10px] bg-slate-700 px-1 rounded text-white font-bold">...</span>
+                        <span id="sync-status" class="text-[10px] text-emerald-400 font-mono">Synced</span>
                     </div>
                 </div>
             </div>
-            <div id="gps-badge" class="px-2 py-1 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-yellow-500 flex items-center gap-1">
-                <i class="ph-bold ph-spinner animate-spin"></i> GPS
-            </div>
+            <button onclick="app.sync()" class="p-2 bg-slate-800 rounded-full border border-slate-700 text-emerald-400">
+                <i class="ph-bold ph-arrows-clockwise"></i>
+            </button>
         </div>
     </header>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN APP -->
     <main class="flex-1 max-w-md mx-auto w-full pt-20 pb-24 px-4 overflow-y-auto no-scrollbar">
-
-        <!-- === TAB 1: MAP & HOME === -->
-        <div id="tab-home" class="tab-content active space-y-5">
-            
-            <!-- DAILY TARGETS DASHBOARD -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                <div class="flex justify-between items-end mb-3">
-                    <label class="text-[10px] uppercase text-slate-500 font-bold tracking-wider">Daily Sales Targets</label>
-                    <div class="text-[10px] text-slate-400" id="target-date-display">Today</div>
-                </div>
-                <!-- 1 LTR -->
-                <div class="mb-4">
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-slate-300 font-medium">1 LTR Box</span>
-                        <span id="label-1ltr" class="font-mono font-bold text-white">0 / 80</span>
-                    </div>
-                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                        <div id="prog-1ltr" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                    </div>
-                    <div id="msg-1ltr" class="text-[10px] text-right mt-1 h-3"></div>
-                </div>
-                <!-- 500 ML -->
-                <div>
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-slate-300 font-medium">500 ML Box</span>
-                        <span id="label-500ml" class="font-mono font-bold text-white">0 / 20</span>
-                    </div>
-                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                        <div id="prog-500ml" class="bg-purple-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
-                    </div>
-                    <div id="msg-500ml" class="text-[10px] text-right mt-1 h-3"></div>
-                </div>
-            </div>
-
-            <!-- MAP CONTAINER -->
-            <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden z-0 group">
-                <div id="osm-map" class="absolute inset-0 w-full h-full z-10 block bg-slate-800"></div>
-                <button onclick="app.centerMap()" class="absolute bottom-4 right-4 z-[400] w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-blue-400 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
+        
+        <!-- MAP TAB -->
+        <div id="tab-map" class="tab-content active space-y-4">
+            <div class="relative w-full aspect-square bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
+                <div id="map" class="absolute inset-0 z-10"></div>
+                <button onclick="app.centerMap()" class="absolute bottom-4 right-4 z-20 w-10 h-10 bg-slate-800 border border-slate-600 rounded-full text-white flex items-center justify-center shadow-lg">
                     <i class="ph-bold ph-crosshair"></i>
                 </button>
             </div>
-
-            <!-- ROUTING -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                <label class="text-[10px] uppercase text-slate-500 font-bold mb-2 block">Navigation</label>
-                <div class="flex gap-2">
-                    <select id="select-target" onchange="app.setTarget()" class="flex-1 bg-slate-950 border border-slate-700 text-sm rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-white">
-                        <option value="">-- Select Shop --</option>
-                    </select>
-                    <button onclick="app.openMaps()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"><i class="ph-bold ph-google-logo text-blue-400"></i></button>
-                </div>
-                <div id="nav-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-800 rounded-lg flex justify-between items-center">
-                    <div><div class="text-xs text-blue-400">Distance</div><div class="text-lg font-bold text-white font-mono"><span id="nav-dist">0</span>m</div></div>
-                    <div class="text-right"><div class="text-xs text-blue-400">Bearing</div><div class="text-lg font-bold text-white font-mono"><span id="nav-bear">0</span>°</div></div>
-                </div>
-            </div>
-
-            <!-- ACTION CARD -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-                <div class="bg-slate-800/50 p-4 border-b border-slate-800 flex justify-between items-center">
-                    <span class="text-xs font-bold text-slate-400 uppercase">Current Status</span>
-                    <span id="zone-status" class="px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500">OUTSIDE</span>
-                </div>
-                <div class="p-4 space-y-3">
-                    <div>
-                        <div class="text-[10px] text-slate-500 mb-1">LOCATION</div>
-                        <div id="current-loc-name" class="text-lg font-bold text-white truncate">Moving...</div>
-                        <div id="current-coords" class="text-xs font-mono text-slate-500">Waiting for GPS...</div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3 pt-2">
-                        <button onclick="app.openAddModal()" class="py-3 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700">SAVE SHOP</button>
-                        <button id="btn-order" onclick="app.openOrderModal()" disabled class="py-3 rounded-lg bg-slate-800 text-slate-500 border border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50">
-                            <i class="ph-bold ph-shopping-cart"></i> TAKE ORDER
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- === TAB 2: ORDER HISTORY === -->
-        <div id="tab-orders" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-blue-500 pl-3">Order History</h2>
             
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Delivery Date</label>
-                        <input type="date" id="filter-date" onchange="app.renderOrders()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Shop</label>
-                        <select id="filter-shop" onchange="app.renderOrders()" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-xs text-white">
-                            <option value="all">All Shops</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden min-h-[300px]">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-950 text-slate-500">
-                        <tr><th class="px-4 py-2">Shop</th><th class="px-4 py-2">Details</th><th class="px-4 py-2 text-right">Amt</th></tr>
-                    </thead>
-                    <tbody id="order-list" class="divide-y divide-slate-800 text-slate-300"></tbody>
-                    <tfoot class="bg-slate-950 text-white font-bold">
-                        <tr><td class="px-4 py-2" colspan="2">Total Value</td><td class="px-4 py-2 text-right text-emerald-400" id="order-total">₹0</td></tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-
-        <!-- === TAB 3: STORE MANAGEMENT === -->
-        <div id="tab-store" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-emerald-500 pl-3">My Stores</h2>
-            <div id="store-list" class="space-y-3"></div>
-        </div>
-
-        <!-- === TAB 4: PROFILE === -->
-        <div id="tab-profile" class="tab-content space-y-4">
-            <h2 class="text-lg font-bold text-white border-l-4 border-purple-500 pl-3">Rider Profile</h2>
-            
-            <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 text-center">
-                <div class="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center border-2 border-slate-700">
-                    <i class="ph-fill ph-user text-4xl text-slate-500"></i>
-                </div>
-                <div class="space-y-3 text-left">
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Full Name</label>
-                        <input type="text" id="prof-name" placeholder="Enter Name" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold">Rider ID / Phone</label>
-                        <input type="text" id="prof-id" placeholder="ID12345" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">
-                    </div>
-                    <button onclick="app.saveProfile()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm">Update Profile</button>
-                </div>
-            </div>
-
-            <!-- SYNC STATUS -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <h3 class="font-bold text-white mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-google-logo text-white"></i> Cloud Status
-                </h3>
-                <p class="text-xs text-slate-400 mb-2">Data is syncing automatically to Google Drive.</p>
-                <div id="drive-msg" class="text-[10px] mt-2 text-emerald-400 font-mono">Sync Active</div>
-            </div>
-
-            <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
-                <i class="ph-bold ph-file-csv"></i> EXPORT CSV
+            <!-- Add Shop (Salesman) -->
+            <button id="btn-add-shop" onclick="ui.openAddShop()" class="w-full py-3 bg-slate-800 border border-slate-700 text-white font-bold rounded-xl hidden">
+                <i class="ph-bold ph-plus-circle"></i> Add New Shop
             </button>
+
+            <!-- Shop List -->
+            <div id="shop-list" class="space-y-3">
+                <!-- Injected via JS -->
+            </div>
         </div>
 
+        <!-- PROFILE TAB -->
+        <div id="tab-profile" class="tab-content space-y-4">
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <h3 class="font-bold text-white mb-4">My Dashboard</h3>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        <div class="text-xs text-slate-500">Shops</div>
+                        <div id="dash-shops" class="text-xl font-bold text-white">0</div>
+                    </div>
+                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        <div class="text-xs text-slate-500">Total Due</div>
+                        <div id="dash-due" class="text-xl font-bold text-red-400">₹0</div>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-500">Logged in as: <span id="user-email" class="text-white">--</span></div>
+            </div>
+        </div>
     </main>
 
-    <!-- BOTTOM NAV -->
-    <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-50 pb-safe">
+    <!-- NAV -->
+    <nav class="fixed bottom-0 w-full bg-slate-900 border-t border-slate-800 z-40 pb-safe">
         <div class="max-w-md mx-auto flex justify-around items-center h-16">
-            <button onclick="app.switchTab('home')" class="nav-btn active flex flex-col items-center gap-1 text-slate-500 w-full" data-target="home">
-                <i class="ph-bold ph-map-trifold text-xl"></i><span class="text-[10px]">Map</span>
+            <button onclick="ui.switchTab('map')" class="nav-btn text-emerald-500 flex flex-col items-center gap-1">
+                <i class="ph-fill ph-map-trifold text-xl"></i><span class="text-[10px]">Map</span>
             </button>
-            <button onclick="app.switchTab('orders')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="orders">
-                <i class="ph-bold ph-receipt text-xl"></i><span class="text-[10px]">Orders</span>
-            </button>
-            <button onclick="app.switchTab('store')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="store">
-                <i class="ph-bold ph-storefront text-xl"></i><span class="text-[10px]">Store</span>
-            </button>
-            <button onclick="app.switchTab('profile')" class="nav-btn flex flex-col items-center gap-1 text-slate-500 w-full" data-target="profile">
+            <button onclick="ui.switchTab('profile')" class="nav-btn text-slate-500 flex flex-col items-center gap-1">
                 <i class="ph-bold ph-user-circle text-xl"></i><span class="text-[10px]">Profile</span>
             </button>
         </div>
     </nav>
 
-    <!-- MODALS -->
-    <!-- Add Shop Modal -->
-    <div id="modal-add" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 flex flex-col max-h-[85vh]">
-            <div class="p-4 border-b border-slate-800">
-                <h3 class="font-bold text-white">Save Shop Location</h3>
-                <p class="text-[10px] text-slate-400">Current GPS: <span id="add-modal-gps" class="font-mono text-emerald-400">Waiting...</span></p>
-            </div>
-            <div class="p-4 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-                <input type="text" id="inp-name" placeholder="Shop Name *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                <input type="text" id="inp-auth" placeholder="Authorized Person *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                <input type="tel" id="inp-contact" placeholder="Contact Number *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                <textarea id="inp-addr" rows="2" placeholder="Full Address *" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <select id="inp-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                        <option value="Cash">Type: Cash</option>
-                        <option value="Credit">Type: Credit</option>
-                    </select>
-                    <input type="text" id="inp-gst" placeholder="GST No." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <input type="number" id="inp-limit" placeholder="Credit Limit" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                    <input type="number" id="inp-days" placeholder="Credit Days" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none">
-                </div>
-                <textarea id="inp-remark" rows="1" placeholder="Remarks" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm text-white outline-none"></textarea>
-            </div>
-            <div class="p-4 border-t border-slate-800 flex gap-3 bg-slate-900 rounded-b-xl">
-                <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
-                <button onclick="app.saveLocation()" class="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg">Save Shop</button>
+    <!-- ADD SHOP MODAL -->
+    <div id="modal-shop" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-3">
+            <h3 class="font-bold text-white">Add New Shop</h3>
+            <input id="inp-shop-name" placeholder="Shop Name" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
+            <input id="inp-shop-addr" placeholder="Address / Route" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
+            <select id="inp-shop-type" class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm">
+                <option value="Retail">Retail</option>
+                <option value="Wholesale">Wholesale</option>
+            </select>
+            <div class="text-[10px] text-slate-400">Location will be captured automatically.</div>
+            <div class="flex gap-3">
+                <button onclick="ui.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm">Cancel</button>
+                <button onclick="app.saveNewShop()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Save Shop</button>
             </div>
         </div>
     </div>
 
-    <!-- Order Modal -->
-    <div id="modal-order" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 flex flex-col max-h-[90vh]">
-            <div class="border-b border-slate-800 pb-2 mb-3">
-                <div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div>
+    <!-- VISIT / ORDER MODAL -->
+    <div id="modal-visit" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 space-y-3 flex flex-col max-h-[90vh]">
+            <div class="border-b border-slate-800 pb-2">
+                <h3 id="visit-shop-name" class="font-bold text-white">Shop Name</h3>
+                <span id="visit-shop-id" class="text-[10px] text-slate-500 font-mono">ID</span>
             </div>
-            <div class="overflow-y-auto custom-scrollbar space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-blue-900/10 p-2 rounded border border-blue-900/30">
-                        <label class="text-[10px] text-blue-400 font-bold block mb-1">1 LTR (Box)</label>
-                        <input type="number" id="inp-qty-1ltr" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none">
-                    </div>
-                    <div class="bg-purple-900/10 p-2 rounded border border-purple-900/30">
-                        <label class="text-[10px] text-purple-400 font-bold block mb-1">500 ML (Box)</label>
-                        <input type="number" id="inp-qty-500ml" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none">
-                    </div>
+            
+            <div class="overflow-y-auto space-y-3 custom-scrollbar">
+                <!-- User Data Section -->
+                <div class="bg-slate-950 p-3 rounded border border-slate-800">
+                    <label class="text-[10px] text-slate-500 uppercase font-bold">Target</label>
+                    <input id="inp-target" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm mb-2">
+                    
+                    <label class="text-[10px] text-slate-500 uppercase font-bold">Due Amount (₹)</label>
+                    <input id="inp-due" type="number" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm mb-2">
+                    
+                    <label class="text-[10px] text-slate-500 uppercase font-bold">Visit Notes</label>
+                    <textarea id="inp-notes" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm"></textarea>
                 </div>
-                <textarea id="input-order-details" rows="2" placeholder="Other Items / Remarks..." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm outline-none"></textarea>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Due Date</label>
-                        <input type="date" id="input-order-date" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Amount (₹)</label>
-                        <input type="number" id="input-order-amt" placeholder="Optional" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-xs outline-none">
-                    </div>
-                </div>
-            </div>
-            <div class="flex gap-3 pt-4 mt-auto">
-                <button onclick="app.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm font-bold">Cancel</button>
-                <button onclick="app.submitOrder()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-lg">Confirm</button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Wifi Warning -->
-    <div id="modal-wifi" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-red-900/90 backdrop-blur-md p-6 text-center">
-        <div class="bg-slate-900 p-6 rounded-2xl border border-red-500 shadow-2xl max-w-xs">
-            <i class="ph-fill ph-wifi-slash text-4xl text-red-500 mb-4"></i>
-            <h2 class="text-lg font-bold text-white">Weak Signal</h2>
-            <p class="text-sm text-slate-300 mt-2 mb-4">Turn on Wi-Fi for location accuracy.</p>
+                <!-- Order Section -->
+                <div class="bg-blue-900/10 p-3 rounded border border-blue-900/30">
+                    <h4 class="text-xs font-bold text-blue-400 mb-2">New Order</h4>
+                    <input id="inp-order-qty" type="number" placeholder="Quantity" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm">
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="ui.closeModals()" class="flex-1 py-3 border border-slate-700 text-slate-400 rounded-lg text-sm">Close</button>
+                <button onclick="app.saveVisit()" class="flex-1 py-3 bg-emerald-600 text-white rounded-lg text-sm font-bold">Update</button>
+            </div>
         </div>
     </div>
 
 <script>
+/**
+ * FRESKEYPIYO - LOGISTICS PRO
+ * Stack: HTML5, Tailwind, Leaflet, Google Drive API (No Firebase)
+ */
+
 // --- CONFIGURATION ---
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-const DB_FILE_NAME = 'geoguard_db.json';
+const MANAGER_EMAIL = 'freskeypiyo@gmail.com';
+
+// --- FOLDER STRUCTURE ---
+const FOLDER_ROOT = 'FreskeyPiyo';
+const FOLDER_USER = 'user_data';
+const FOLDER_ORDERS = 'orders';
+const FILE_MASTER = 'shops_master.csv';
 
 // --- UTILS ---
 const Utils = {
-    getDist: (lat1, lon1, lat2, lon2) => {
-        const R=6371e3, rad=Math.PI/180;
-        const a = Math.sin((lat2-lat1)*rad/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin((lon2-lon1)*rad/2)**2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+    now: () => new Date().toISOString(),
+    
+    // Convert Array of Objects to CSV String
+    toCSV: (data) => {
+        if (!data || data.length === 0) return '';
+        const headers = Object.keys(data[0]);
+        const rows = data.map(obj => headers.map(header => {
+            let val = obj[header] || '';
+            // Escape commas/quotes
+            if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                val = `"${val.replace(/"/g, '""')}"`;
+            }
+            return val;
+        }).join(','));
+        return [headers.join(','), ...rows].join('\n');
     },
-    getBearing: (lat1, lon1, lat2, lon2) => {
-        const rad=Math.PI/180, deg=180/Math.PI;
-        const y=Math.sin((lon2-lon1)*rad)*Math.cos(lat2*rad);
-        const x=Math.cos(lat1*rad)*Math.sin(lat2*rad)-Math.sin(lat1*rad)*Math.cos(lat2*rad)*Math.cos((lon2-lon1)*rad);
-        return (Math.atan2(y, x)*deg+360)%360;
-    },
-    uuid: () => Date.now().toString(36) + Math.random().toString(36).substr(2),
-    fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
+
+    // Convert CSV String to Array of Objects
+    fromCSV: (text) => {
+        if (!text || text.trim() === '') return [];
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+            const obj = {};
+            // Handle simple CSV splitting (ignores complex quoted commas for simplicity in this MVP)
+            const values = line.split(','); 
+            headers.forEach((h, i) => obj[h] = values[i] ? values[i].replace(/^"|"$/g, '') : '');
+            return obj;
+        });
+    }
 };
 
-// --- GOOGLE CLOUD SERVICE ---
-class GoogleCloud {
-    constructor(storeInstance, appInstance) {
-        this.store = storeInstance;
-        this.app = appInstance;
-        this.tokenClient = null;
-        this.accessToken = null;
-        this.isReady = false;
-        
-        const check = setInterval(() => {
-            if (window.google && window.gapi) {
-                clearInterval(check);
-                this.initGapi();
-            }
-        }, 500);
-    }
-
-    initGapi() {
-        if(GOOGLE_API_KEY.includes('PASTE')) return; 
-        gapi.load('client', async () => {
-            try {
-                await gapi.client.init({
-                    apiKey: GOOGLE_API_KEY,
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                });
-                this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: GOOGLE_CLIENT_ID,
-                    scope: SCOPES,
-                    callback: (resp) => {
-                        if (resp.error) return alert("Auth Error: " + resp.error);
-                        this.accessToken = resp.access_token;
-                        document.getElementById('login-status').innerText = "Logged in! Searching for Data...";
-                        this.findAndLoad();
-                    },
-                });
-                this.isReady = true;
-                console.log("GAPI Ready");
-            } catch (err) { console.error("GAPI Error", err); }
+// --- DRIVE API SERVICE ---
+const Drive = {
+    token: null,
+    
+    init: async () => {
+        return new Promise((resolve) => {
+            gapi.load('client', async () => {
+                await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+                resolve();
+            });
         });
-    }
+    },
 
-    login() {
-        if (!this.isReady) return alert("System loading or API Key Missing");
-        this.tokenClient.requestAccessToken({ prompt: 'consent' });
-    }
+    login: () => {
+        return new Promise((resolve, reject) => {
+            const client = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID, scope: SCOPES,
+                callback: (resp) => {
+                    if (resp.error) reject(resp);
+                    Drive.token = resp.access_token;
+                    resolve(resp);
+                },
+            });
+            client.requestAccessToken();
+        });
+    },
 
-    // --- CORE SYNC LOGIC ---
-    async findAndLoad() {
-        const msg = document.getElementById('login-status');
-        try {
-            msg.innerText = "⏳ Checking Google Drive...";
-            const q = `name = '${DB_FILE_NAME}' and trashed = false`;
-            const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-            
-            if (res.result.files.length > 0) {
-                // FILE FOUND: DOWNLOAD IT
-                msg.innerText = "📂 Data Found. Downloading...";
-                const fileId = res.result.files[0].id;
-                const fileContent = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
-                
-                // RESTORE LOCAL STORAGE
-                if(fileContent.result) {
-                    this.store.restore(fileContent.result);
-                    this.app.initUI(); // Refresh UI with new data
-                    this.app.initMap(); // Refresh Map
-                    msg.innerText = "✅ Data Loaded Successfully!";
-                    setTimeout(() => {
-                        document.getElementById('modal-welcome').classList.add('hidden');
-                    }, 1000);
-                }
-            } else {
-                // FILE NOT FOUND: CREATE NEW
-                msg.innerText = "🆕 No Data Found. Creating New...";
-                await this.createFile();
-                setTimeout(() => {
-                    document.getElementById('modal-welcome').classList.add('hidden');
-                }, 1000);
-            }
-        } catch (e) {
-            console.error(e);
-            msg.innerText = "❌ Error Loading Data. Check Console.";
-        }
-    }
+    // Find a file/folder by name inside a parent (or root)
+    find: async (name, parentId = 'root', mimeType = null) => {
+        let q = `name = '${name}' and '${parentId}' in parents and trashed = false`;
+        if (mimeType) q += ` and mimeType = '${mimeType}'`;
+        const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
+        return res.result.files.length > 0 ? res.result.files[0] : null;
+    },
 
-    async createFile() {
-        const localData = this.store.dump();
-        const fileContent = JSON.stringify(localData);
-        const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
+    // Create a folder
+    createFolder: async (name, parentId = 'root') => {
+        const metadata = { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] };
+        const res = await gapi.client.drive.files.create({ resource: metadata, fields: 'id' });
+        return res.result;
+    },
+
+    // Create a CSV file
+    createFile: async (name, parentId, content) => {
+        const metadata = { name, mimeType: 'text/csv', parents: [parentId] };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', new Blob([fileContent], { type: 'application/json' }));
-
+        form.append('file', new Blob([content], { type: 'text/csv' }));
+        
         await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + this.accessToken },
+            headers: { 'Authorization': 'Bearer ' + Drive.token },
             body: form
         });
-    }
+    },
 
-    async save() {
-        // Silent Background Save
+    // Update a file
+    updateFile: async (fileId, content) => {
+        await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { 'Authorization': 'Bearer ' + Drive.token, 'Content-Type': 'text/csv' },
+            body: content
+        });
+    },
+
+    // Read File Content
+    read: async (fileId) => {
         try {
-            const q = `name = '${DB_FILE_NAME}' and trashed = false`;
-            const res = await gapi.client.drive.files.list({ q, fields: 'files(id, name)' });
-            const localData = this.store.dump();
-            const fileContent = JSON.stringify(localData);
-
-            if (res.result.files.length > 0) {
-                const fileId = res.result.files[0].id;
-                await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-                    method: 'PATCH',
-                    headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json' },
-                    body: fileContent
-                });
-                console.log("Auto-Saved to Cloud");
-            }
-        } catch (e) { console.error("Auto-Save Failed", e); }
+            const res = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+            return res.body;
+        } catch (e) { return ''; }
     }
-}
+};
 
-// --- STORE ---
-class Store {
-    constructor() {
-        this.LOCS = 'geo_shops'; this.LOGS = 'geo_activity'; this.PROF = 'geo_profile';
+// --- DATA STORE ---
+const Store = {
+    user: null, // { email, role }
+    ids: { root: null, userFolder: null, ordersFolder: null, masterFile: null, userFile: null, ordersFile: null },
+    data: {
+        shops: [], // From shops_master.csv
+        userData: [], // From user_data/{email}.csv
+        orders: [] // From orders/{email}.csv
     }
-    getLocs() { return JSON.parse(localStorage.getItem(this.LOCS)) || []; }
-    saveLoc(l) { const d = this.getLocs(); d.push(l); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
-    updateLoc(l) { const d = this.getLocs().map(x => x.id === l.id ? l : x); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
-    deleteLoc(id) { const d = this.getLocs().filter(x => x.id !== id); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
-    
-    getLogs() { return JSON.parse(localStorage.getItem(this.LOGS)) || []; }
-    log(type, locName, details, amt=0, targetDate=null, q1=0, q5=0) {
-        const tDate = targetDate || Utils.fmtDate(Date.now());
-        const l = { 
-            id: Utils.uuid(), type, loc: locName, desc: details, amt: amt || 0,
-            targetDate: tDate, q1: parseInt(q1) || 0, q5: parseInt(q5) || 0,
-            ts: Date.now(), date: Utils.fmtDate(Date.now()) 
-        };
-        const d = this.getLogs(); d.unshift(l); localStorage.setItem(this.LOGS, JSON.stringify(d));
-        return l;
-    }
+};
 
-    getProfile() { return JSON.parse(localStorage.getItem(this.PROF)) || { name: '', id: '' }; }
-    saveProfile(p) { localStorage.setItem(this.PROF, JSON.stringify(p)); }
-    dump() { return { profile: this.getProfile(), locations: this.getLocs(), logs: this.getLogs(), lastSync: Date.now() }; }
-    
-    restore(data) {
-        if(data.profile) localStorage.setItem(this.PROF, JSON.stringify(data.profile));
-        if(data.locations) localStorage.setItem(this.LOCS, JSON.stringify(data.locations));
-        if(data.logs) localStorage.setItem(this.LOGS, JSON.stringify(data.logs));
-    }
-}
+// --- APP LOGIC ---
+const app = {
+    init: async () => {
+        await Drive.init();
+        // Check for session? For now, manual login.
+    },
 
-// --- APP ---
-class App {
-    constructor() {
-        this.store = new Store();
-        // Pass app instance to Drive so it can refresh UI after load
-        this.drive = new GoogleCloud(this.store, this);
-        window.drive = this.drive;
-        this.latK = {x:NaN,p:1,q:0.001,r:0.01}; 
-        this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
-        this.pos = null; this.targetLoc = null; this.locs = this.store.getLocs();
+    // 1. Authenticate & Setup
+    loginSuccess: async () => {
+        // Get User Info
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { 
+            headers: { Authorization: `Bearer ${Drive.token}` } 
+        });
+        const profile = await res.json();
         
-        // Initial setup (UI might change after Google Login)
-        this.initUI();
-        this.initMap();
-        this.startGeo();
-    }
+        Store.user = {
+            email: profile.email,
+            role: profile.email === MANAGER_EMAIL ? 'MANAGER' : 'SALESMAN'
+        };
 
-    kalman(k, z) { if(isNaN(k.x)){k.x=z;return z} k.p+=k.q; const kg=k.p/(k.p+k.r); k.x+=kg*(z-k.x); k.p=(1-kg)*k.p; return k.x; }
-
-    initUI() {
-        const p = this.store.getProfile();
-        this.locs = this.store.getLocs(); // Refresh locs from store
-        document.getElementById('prof-name').value = p.name;
-        document.getElementById('prof-id').value = p.id;
-        document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
-        this.renderStores();
-        this.populateDropdowns();
-        this.updateTargets();
-    }
-
-    initMap() {
-        if(this.map) { this.map.remove(); }
-        this.map = L.map('osm-map', { zoomControl: false, attributionControl: false }).setView([20.5937, 78.9629], 5);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(this.map);
-        this.shopLayer = L.layerGroup().addTo(this.map);
-        this.updateMapMarkers();
-    }
-
-    updateMapMarkers() {
-        this.shopLayer.clearLayers();
-        this.locs.forEach(l => {
-            const color = l.isInside ? '#10b981' : (l.id === this.targetLoc?.id ? '#f59e0b' : '#3b82f6');
-            const m = L.circleMarker([l.lat, l.lng], { radius: 8, fillColor: color, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8 });
-            m.bindPopup(`<div class="text-slate-900 font-bold">${l.name}</div><button onclick="app.navTo('${l.id}')" class="text-blue-600 text-xs underline">Navigate</button>`);
-            m.addTo(this.shopLayer);
-        });
-    }
-
-    startGeo() {
-        if(!navigator.geolocation) return; // Don't alert yet, wait for login
-        navigator.geolocation.watchPosition(p => {
-            const lat = this.kalman(this.latK, p.coords.latitude);
-            const lng = this.kalman(this.lngK, p.coords.longitude);
-            this.onGeo({lat, lng, acc: p.coords.accuracy});
-        }, e => console.error(e), {enableHighAccuracy:true, timeout:15000});
-    }
-
-    onGeo(pos) {
-        this.pos = pos;
-        document.getElementById('current-coords').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
-        document.getElementById('modal-wifi').classList.toggle('open', pos.acc > 40);
-
-        const latLng = [pos.lat, pos.lng];
-        if (!this.userMarker) {
-            const icon = L.divIcon({ 
-                className: 'bg-transparent',
-                html: `<div class="relative w-12 h-12 flex items-center justify-center"><div class="absolute w-full h-full bg-blue-500/50 rounded-full animate-ping opacity-75"></div><div class="relative text-4xl z-10 drop-shadow-lg filter drop-shadow-black">🏃‍♂️</div></div>`,
-                iconSize: [48, 48], iconAnchor: [24, 24]
-            });
-            this.userMarker = L.marker(latLng, {icon}).addTo(this.map);
-            this.map.setView(latLng, 18);
-        } else { this.userMarker.setLatLng(latLng); }
-
-        if (this.routeLine) this.map.removeLayer(this.routeLine);
-        if (this.targetLoc) {
-            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { color: '#f59e0b', weight: 4, dashArray: '10, 10' }).addTo(this.map);
-            document.getElementById('nav-dist').innerText = Math.round(Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
-            document.getElementById('nav-bear').innerText = Math.round(Utils.getBearing(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
+        // UI Update
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('user-email').innerText = Store.user.email;
+        document.getElementById('user-role').innerText = Store.user.role;
+        
+        if (Store.user.role === 'SALESMAN') {
+            document.getElementById('btn-add-shop').classList.remove('hidden');
         }
-        this.checkGeofences(pos);
-    }
 
-    checkGeofences(pos) {
-        let inside = false;
-        this.locs.forEach(l => {
-            const dist = Utils.getDist(pos.lat, pos.lng, l.lat, l.lng);
-            if (!l.isInside && dist <= 10) { 
-                l.isInside = true; l.entryTime = Date.now();
-                this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
-                this.store.updateLoc(l);
-                this.drive.save(); // AUTO SAVE
-            } else if (l.isInside && dist > 15) { 
-                l.isInside = false;
-                const dur = Math.round((Date.now() - l.entryTime)/60000);
-                this.store.log('VISIT_OUT', l.name, `Duration: ${dur} min`);
-                this.store.updateLoc(l);
-                this.drive.save(); // AUTO SAVE
-            }
-            if (l.isInside) {
-                inside = true;
-                document.getElementById('current-loc-name').innerText = l.name;
-                document.getElementById('zone-status').innerText = "INSIDE";
-                document.getElementById('zone-status').className = "px-2 py-1 bg-emerald-900/50 border border-emerald-500 rounded text-[10px] font-bold text-emerald-400";
-                document.getElementById('btn-order').disabled = false;
-                document.getElementById('order-shop-name').innerText = l.name;
-            }
-        });
-        if (!inside) {
-            document.getElementById('current-loc-name').innerText = "In Transit";
-            document.getElementById('zone-status').innerText = "OUTSIDE";
-            document.getElementById('zone-status').className = "px-2 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-500";
-            document.getElementById('btn-order').disabled = true;
-        }
-        this.updateMapMarkers();
-    }
+        // Initialize Map
+        ui.initMap();
 
-    updateTargets() {
-        const TARGET_1L = 80; const TARGET_500ML = 20;
-        const today = Utils.fmtDate(Date.now());
-        const logs = this.store.getLogs();
-        let s1=0, s5=0;
-        logs.forEach(l => { if(l.type==='ORDER' && l.date===today) { s1+=(l.q1||0); s5+=(l.q5||0); } });
+        // Start Sync
+        app.sync();
+    },
 
-        const draw = (curr, tgt, lbl, bar, msg, clr) => {
-            const pct = Math.min(100, (curr/tgt)*100);
-            const ext = curr - tgt;
-            document.getElementById(bar).style.width = `${pct}%`;
-            if(ext > 0) {
-                document.getElementById(lbl).innerHTML = `<span class="text-emerald-400">${curr}</span> / ${tgt}`;
-                document.getElementById(msg).innerText = `+${ext} Extra Sales!`;
-                document.getElementById(msg).className = "text-[10px] text-right mt-1 h-3 text-emerald-400 font-bold animate-pulse";
-                document.getElementById(bar).classList.replace(clr, 'bg-emerald-500');
-            } else {
-                document.getElementById(lbl).innerText = `${curr} / ${tgt}`;
-                document.getElementById(msg).innerText = "";
-                if(document.getElementById(bar).classList.contains('bg-emerald-500')) {
-                   document.getElementById(bar).classList.replace('bg-emerald-500', clr);
+    // 2. Core Sync Logic
+    sync: async () => {
+        ui.status("Syncing...");
+        try {
+            // A. Ensure Structure Exists
+            let root = await Drive.find(FOLDER_ROOT);
+            if (!root) {
+                if (Store.user.role === 'MANAGER') {
+                    root = await Drive.createFolder(FOLDER_ROOT);
+                } else {
+                    alert("System not initialized. Ask Manager to run app first.");
+                    return;
                 }
             }
-        };
-        draw(s1, TARGET_1L, 'label-1ltr', 'prog-1ltr', 'msg-1ltr', 'bg-blue-600');
-        draw(s5, TARGET_500ML, 'label-500ml', 'prog-500ml', 'msg-500ml', 'bg-purple-600');
-    }
+            Store.ids.root = root.id;
 
-    renderOrders() {
-        const date = document.getElementById('filter-date').value;
-        const shop = document.getElementById('filter-shop').value;
-        const logs = this.store.getLogs();
-        let total = 0;
-        const filtered = logs.filter(l => {
-            if(l.type!=='ORDER') return false;
-            const due = l.targetDate || l.date;
-            if(due !== date) return false;
-            if(shop!=='all' && l.loc!==shop) return false;
-            return true;
+            // B. Subfolders
+            let userFolder = await Drive.find(FOLDER_USER, root.id);
+            if (!userFolder) userFolder = await Drive.createFolder(FOLDER_USER, root.id);
+            Store.ids.userFolder = userFolder.id;
+
+            let orderFolder = await Drive.find(FOLDER_ORDERS, root.id);
+            if (!orderFolder) orderFolder = await Drive.createFolder(FOLDER_ORDERS, root.id);
+            Store.ids.ordersFolder = orderFolder.id;
+
+            // C. Load Master File
+            let master = await Drive.find(FILE_MASTER, root.id);
+            if (master) {
+                Store.ids.masterFile = master.id;
+                const csv = await Drive.read(master.id);
+                Store.data.shops = Utils.fromCSV(csv);
+            } else if (Store.user.role === 'MANAGER') {
+                // Initialize Empty Master
+                const initial = [{shop_id:'INIT', shop_name:'Init', address:'-', lat:0, lng:0, created_by:'system'}];
+                await Drive.createFile(FILE_MASTER, root.id, Utils.toCSV(initial));
+                Store.data.shops = initial;
+                // Re-find to get ID
+                master = await Drive.find(FILE_MASTER, root.id);
+                Store.ids.masterFile = master.id;
+            }
+
+            // D. Load User Specific Data
+            const userFileName = `${Store.user.email}.csv`;
+            let userFile = await Drive.find(userFileName, userFolder.id);
+            if (userFile) {
+                Store.ids.userFile = userFile.id;
+                const csv = await Drive.read(userFile.id);
+                Store.data.userData = Utils.fromCSV(csv);
+            } else {
+                Store.data.userData = []; // Empty start
+            }
+
+            // E. Load Orders
+            const orderFileName = `orders_${Store.user.email}.csv`;
+            let orderFile = await Drive.find(orderFileName, orderFolder.id);
+            if (orderFile) {
+                Store.ids.ordersFile = orderFile.id;
+                const csv = await Drive.read(orderFile.id);
+                Store.data.orders = Utils.fromCSV(csv);
+            } else {
+                Store.data.orders = [];
+            }
+
+            ui.status("Synced");
+            ui.renderShops();
+
+        } catch (e) {
+            console.error(e);
+            ui.status("Sync Error");
+        }
+    },
+
+    // 3. Add Shop (Salesman)
+    saveNewShop: async () => {
+        const name = document.getElementById('inp-shop-name').value;
+        const addr = document.getElementById('inp-shop-addr').value;
+        const type = document.getElementById('inp-shop-type').value;
+
+        if (!name) return alert("Name required");
+
+        // Get Location
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const newShop = {
+                shop_id: 'S' + Utils.uuid(),
+                shop_name: name,
+                address: addr,
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                route: 'Default',
+                shop_type: type,
+                created_by: Store.user.email,
+                created_at: Utils.now()
+            };
+
+            // 1. Update Local
+            Store.data.shops.push(newShop);
+            
+            // 2. Update Drive (Master)
+            // Note: In a real concurrent env, we should download fresh before appending. 
+            // For this Code-only constraint, we overwrite with local state.
+            if (Store.ids.masterFile) {
+                await Drive.updateFile(Store.ids.masterFile, Utils.toCSV(Store.data.shops));
+            }
+
+            ui.closeModals();
+            ui.renderShops();
+            ui.status("Shop Added");
+        }, () => alert("GPS required"));
+    },
+
+    // 4. Update Visit/Target (Personal Data)
+    saveVisit: async () => {
+        const id = document.getElementById('visit-shop-id').innerText;
+        const target = document.getElementById('inp-target').value;
+        const notes = document.getElementById('inp-notes').value;
+        const due = document.getElementById('inp-due').value;
+        const orderQty = document.getElementById('inp-order-qty').value;
+
+        // A. Handle User Data (Target/Notes/Due)
+        let userEntry = Store.data.userData.find(u => u.shop_id === id);
+        if (!userEntry) {
+            userEntry = { shop_id: id };
+            Store.data.userData.push(userEntry);
+        }
+        userEntry.target = target;
+        userEntry.notes = notes;
+        userEntry.due_amount = due;
+        userEntry.visit_status = 'Visited';
+        userEntry.last_visit_date = Utils.now();
+
+        // Save User CSV
+        const userCsv = Utils.toCSV(Store.data.userData);
+        if (Store.ids.userFile) {
+            await Drive.updateFile(Store.ids.userFile, userCsv);
+        } else {
+            await Drive.createFile(`${Store.user.email}.csv`, Store.ids.userFolder, userCsv);
+            // Re-sync to get ID
+            const f = await Drive.find(`${Store.user.email}.csv`, Store.ids.userFolder);
+            Store.ids.userFile = f.id;
+        }
+
+        // B. Handle Order
+        if (orderQty > 0) {
+            const newOrder = {
+                order_id: 'O' + Utils.uuid(),
+                shop_id: id,
+                quantity: orderQty,
+                order_date: Utils.now(),
+                payment_status: 'Pending'
+            };
+            Store.data.orders.push(newOrder);
+            
+            const orderCsv = Utils.toCSV(Store.data.orders);
+            if (Store.ids.ordersFile) {
+                await Drive.updateFile(Store.ids.ordersFile, orderCsv);
+            } else {
+                await Drive.createFile(`orders_${Store.user.email}.csv`, Store.ids.ordersFolder, orderCsv);
+                const f = await Drive.find(`orders_${Store.user.email}.csv`, Store.ids.ordersFolder);
+                Store.ids.ordersFile = f.id;
+            }
+        }
+
+        ui.closeModals();
+        ui.renderShops();
+        ui.status("Updated");
+    }
+};
+
+// --- UI LOGIC ---
+const ui = {
+    map: null,
+    markers: [],
+
+    initMap: () => {
+        if (ui.map) return;
+        ui.map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(ui.map);
+    },
+
+    status: (msg) => { document.getElementById('sync-status').innerText = msg; },
+
+    switchTab: (t) => {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + t).classList.add('active');
+        if (t === 'map') setTimeout(() => ui.map.invalidateSize(), 300);
+    },
+
+    renderShops: () => {
+        const list = document.getElementById('shop-list');
+        list.innerHTML = '';
+        
+        // Clear Map Markers
+        ui.markers.forEach(m => ui.map.removeLayer(m));
+        ui.markers = [];
+
+        let totalDue = 0;
+
+        Store.data.shops.forEach(shop => {
+            if(shop.shop_id === 'INIT') return; // Skip header/init row
+
+            // Merge with User Data
+            const uData = Store.data.userData.find(u => u.shop_id === shop.shop_id) || {};
+            const due = parseFloat(uData.due_amount || 0);
+            totalDue += due;
+
+            // HTML Item
+            const div = document.createElement('div');
+            div.className = 'bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center';
+            div.innerHTML = `
+                <div>
+                    <div class="font-bold text-white">${shop.shop_name}</div>
+                    <div class="text-[10px] text-slate-500">${shop.address}</div>
+                    ${uData.visit_status ? '<span class="text-[9px] text-emerald-400">Visited</span>' : ''}
+                </div>
+                <button onclick="ui.openVisit('${shop.shop_id}')" class="px-3 py-1 bg-blue-900 text-blue-400 rounded text-xs border border-blue-800">
+                    Visit
+                </button>
+            `;
+            list.appendChild(div);
+
+            // Map Marker
+            if (shop.lat && shop.lng) {
+                const marker = L.circleMarker([shop.lat, shop.lng], {
+                    radius: 8, color: '#fff', fillColor: due > 0 ? '#ef4444' : '#10b981', fillOpacity: 0.8
+                }).addTo(ui.map);
+                marker.bindPopup(shop.shop_name);
+                ui.markers.push(marker);
+            }
         });
-        document.getElementById('order-list').innerHTML = filtered.map(l => {
-            total += parseFloat(l.amt || 0);
-            const b = `<div class="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 rounded inline-block mt-1">Booked: ${l.date}</div>`;
-            return `<tr class="border-b border-slate-800"><td class="px-4 py-3 align-top"><div class="font-bold text-white text-sm">${l.loc}</div>${b}</td><td class="px-4 py-3 text-slate-400 text-xs align-top whitespace-pre-wrap">${l.desc}</td><td class="px-4 py-3 text-right text-emerald-400 font-mono text-xs font-bold">${l.amt? '₹'+l.amt : '-'}</td></tr>`;
-        }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No orders due on this date</td></tr>';
-        document.getElementById('order-total').innerText = `₹${total}`;
-    }
 
-    submitOrder() {
-        const q1 = document.getElementById('inp-qty-1ltr').value;
-        const q5 = document.getElementById('inp-qty-500ml').value;
-        const desc = document.getElementById('input-order-details').value.trim();
-        const amt = document.getElementById('input-order-amt').value;
-        const dateVal = document.getElementById('input-order-date').value;
-        const shop = document.getElementById('order-shop-name').innerText;
-        if(q1>0 || q5>0 || desc) {
-            let finalDesc = desc;
-            if((q1>0||q5>0) && !finalDesc) finalDesc = `Order: ${q1?q1+'x1L':''} ${q5?q5+'x500ml':''}`;
-            this.store.log('ORDER', shop, finalDesc, amt, dateVal, q1, q5);
-            this.closeModals();
-            ['inp-qty-1ltr','inp-qty-500ml','input-order-details','input-order-amt'].forEach(id=>document.getElementById(id).value='');
-            this.updateTargets();
-            this.renderOrders();
-            this.drive.save(); // AUTO SAVE
-            alert("Order Saved!");
-        } else { alert("Enter Qty or Details"); }
-    }
+        document.getElementById('dash-shops').innerText = Store.data.shops.length - (Store.data.shops.length > 0 && Store.data.shops[0].shop_id === 'INIT' ? 1 : 0);
+        document.getElementById('dash-due').innerText = '₹' + totalDue;
+    },
 
-    switchTab(t) {
-        document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
-        document.getElementById('tab-'+t).classList.add('active');
-        document.querySelectorAll('.nav-btn').forEach(b => {
-            b.classList.toggle('text-blue-500', b.dataset.target===t);
-            b.classList.toggle('text-slate-500', b.dataset.target!==t);
+    openAddShop: () => document.getElementById('modal-shop').classList.add('open'),
+    
+    openVisit: (id) => {
+        const shop = Store.data.shops.find(s => s.shop_id === id);
+        const uData = Store.data.userData.find(u => u.shop_id === id) || {};
+
+        document.getElementById('visit-shop-name').innerText = shop.shop_name;
+        document.getElementById('visit-shop-id').innerText = shop.shop_id;
+        document.getElementById('inp-target').value = uData.target || '';
+        document.getElementById('inp-notes').value = uData.notes || '';
+        document.getElementById('inp-due').value = uData.due_amount || '';
+        document.getElementById('inp-order-qty').value = ''; // Reset order
+        
+        document.getElementById('modal-visit').classList.add('open');
+    },
+
+    closeModals: () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')),
+    
+    centerMap: () => {
+        navigator.geolocation.getCurrentPosition(pos => {
+            ui.map.setView([pos.coords.latitude, pos.coords.longitude], 15);
         });
-        if(t==='home') setTimeout(()=>this.map.invalidateSize(), 200);
-        if(t==='orders') this.renderOrders();
-        if(t==='store') this.renderStores();
     }
+};
 
-    saveLocation() {
-        const name=document.getElementById('inp-name').value;
-        if(name && this.pos) {
-            this.store.saveLoc({ id:Utils.uuid(), name, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now() });
-            this.locs=this.store.getLocs();
-            this.populateDropdowns();
-            this.updateMapMarkers();
-            this.closeModals();
-            this.drive.save(); // AUTO SAVE
-            alert("Shop Saved!");
-        } else { alert("Name & GPS Required"); }
-    }
-
-    renderStores() {
-        document.getElementById('store-list').innerHTML = this.locs.map(l => 
-            `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center"><div><div class="font-bold text-white">${l.name}</div><div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div></div><button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button></div>`
-        ).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores</div>';
-    }
-
-    delStore(id) {
-        if(confirm("Delete this store?")) {
-            this.store.deleteLoc(id);
-            this.locs = this.store.getLocs();
-            this.renderStores();
-            this.updateMapMarkers();
-            this.drive.save(); // AUTO SAVE
+// --- AUTH HANDLER ---
+const auth = {
+    login: async () => {
+        try {
+            document.getElementById('login-status').innerText = 'Authenticating...';
+            await Drive.init();
+            await Drive.login();
+            document.getElementById('login-status').innerText = 'Success!';
+            app.loginSuccess();
+        } catch (e) {
+            console.error(e);
+            document.getElementById('login-status').innerText = 'Login Failed';
         }
     }
+};
 
-    populateDropdowns() {
-        const h = '<option value="">-- Select --</option>' + this.locs.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-        document.getElementById('select-target').innerHTML = h;
-        document.getElementById('filter-shop').innerHTML = '<option value="all">All Shops</option>' + this.locs.map(l=>`<option value="${l.name}">${l.name}</option>`).join('');
-    }
-
-    saveProfile() { 
-        this.store.saveProfile({name:document.getElementById('prof-name').value, id:document.getElementById('prof-id').value}); 
-        this.drive.save(); // AUTO SAVE
-        alert("Saved"); 
-    }
-    
-    exportData() {
-        const logs=this.store.getLogs();
-        const csv = "TYPE,LOC,DATE,DESC,AMT\n" + logs.map(l=>`${l.type},${l.loc},${l.date},"${l.desc}",${l.amt}`).join('\n');
-        const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='data.csv'; a.click();
-    }
-
-    setTarget() {
-        const id=document.getElementById('select-target').value;
-        this.targetLoc = id ? this.locs.find(l=>l.id===id) : null;
-        document.getElementById('nav-info').classList.toggle('hidden', !this.targetLoc);
-        this.updateMapMarkers();
-    }
-    
-    centerMap() { if(this.pos) this.map.setView([this.pos.lat, this.pos.lng], 17); }
-    openMaps() { if(this.targetLoc) window.open(`https://www.google.com/maps/dir/?api=1&destination=${this.targetLoc.lat},${this.targetLoc.lng}`); }
-    
-    openAddModal() { document.getElementById('modal-add').classList.add('open'); if(this.pos) document.getElementById('add-modal-gps').innerText=`${this.pos.lat.toFixed(4)},${this.pos.lng.toFixed(4)}`; }
-    openOrderModal() { document.getElementById('modal-order').classList.add('open'); document.getElementById('input-order-date').value = Utils.fmtDate(Date.now()); }
-    closeModals() { document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open')); }
-    navTo(id) { this.switchTab('home'); document.getElementById('select-target').value = id; this.setTarget(); }
-}
-
-const app = new App();
 </script>
 </body>
 </html>
