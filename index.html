@@ -368,16 +368,13 @@
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 
-// UPDATE SCOPES AND DISCOVERY DOCS
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
-const DISCOVERY_DOCS = [
-    'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
-    'https://www.googleapis.com/discovery/v1/apis/oauth2/v2/rest'
-];
+
+// FIX: Only load Drive API here. We will fetch email manually.
+const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
 
 const ROOT_FOLDER_NAME = 'FreskeyPiyo';
 const MANAGER_EMAIL = 'freskeypiyo@gmail.com';
-
     
 // --- UTILS ---
 const Utils = {
@@ -450,22 +447,7 @@ class GoogleCloud {
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
-    async getUserInfo() {
-        const msg = document.getElementById('login-status');
-        msg.innerText = "🔍 Verifying User...";
-        try {
-            // Get User Email to determine Role
-            const resp = await gapi.client.oauth2.userinfo.get();
-            this.userEmail = resp.result.email;
-            console.log(`Logged in as: ${this.userEmail}`);
-            
-            // Start Folder Structure Check
-            this.ensureFolderStructure();
-        } catch (e) {
-            console.error(e);
-            msg.innerText = "❌ Auth Failed";
-        }
-    }
+     async getUserInfo() {
 
     // --- FOLDER & FILE LOGIC ---
     // --- INSERT/REPLACE INSIDE class GoogleCloud { ... } ---
@@ -473,22 +455,7 @@ class GoogleCloud {
     // --- ADD/UPDATE INSIDE class GoogleCloud ---
 
     // 1. Update ensureFolderStructure to create 'pending' folder
-    async ensureFolderStructure() {
-        // ... (Previous code for root, user_data, orders) ...
-        this.rootId = await this.findOrCreateFolder('FreskeyPiyo');
-        // ...
-        
-        // NEW: Create Pending Folder
-        this.pendingFolderId = await this.findOrCreateFolder('pending', this.rootId);
-        
-        // CHECK IF MANAGER
-        if (this.userEmail === 'freskeypiyo@gmail.com') {
-            document.getElementById('nav-admin-btn').classList.remove('hidden'); // Show Admin Tab
-            document.getElementById('tab-admin').classList.remove('hidden'); // Enable DOM access
-        }
-        
-        // ... (Rest of existing logic) ...
-    }
+   async ensureFolderStructure() {
 
     // 2. LOGIC: Salesman Saves Shop -> Goes to Pending File
     async submitShopForApproval(shopData) {
