@@ -490,8 +490,8 @@ class GoogleCloud {
                 const content = await this.downloadFile(this.shopsFileId);
                 if(content) this.store.restoreShopsFromCSV(content);
             } else {
-                // Create if it doesn't exist
-                const header = "ID,NAME,LAT,LNG,TAG\n";
+                // Create if it doesn't exist. HEADER: ID, NAME, LAT, LNG, ADDED_BY
+                const header = "ID,NAME,LAT,LNG,ADDED_BY\n";
                 this.shopsFileId = await this.createFile(shopsFileName, this.rootId, header);
             }
 
@@ -529,12 +529,11 @@ class GoogleCloud {
             const currentContent = await this.downloadFile(this.shopsFileId);
             
             // 2. Prepare new line
-            // CSV Format: ID, "Name (By User)", Lat, Lng, "Tag"
-            const userTag = this.userEmail.split('@')[0];
-            const displayName = `${shop.name} (By ${userTag})`;
-            // Remove quotes from name to prevent CSV break
-            const safeName = displayName.replace(/"/g, ''); 
-            const newLine = `${shop.id},"${safeName}",${shop.lat},${shop.lng},"DirectSave"`;
+            // CSV Format: ID, "Name", Lat, Lng, "Added By Email"
+            // Note: We do NOT modify the shop.name here, keeping it clean for display.
+            const userTag = this.userEmail;
+            const safeName = shop.name.replace(/"/g, ''); 
+            const newLine = `${shop.id},"${safeName}",${shop.lat},${shop.lng},"${userTag}"`;
             
             // 3. Append and Upload
             const newContent = currentContent + '\n' + newLine;
@@ -1006,18 +1005,23 @@ class App {
     }
 
     renderStores() {
+        // MANAGER ONLY: Can see delete button
+        const isManager = (this.drive.userEmail === MANAGER_EMAIL);
+
         document.getElementById('store-list').innerHTML = this.locs.map(l => 
             `<div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
                 <div>
                     <div class="font-bold text-white">${l.name}</div>
                     <div class="text-[10px] text-slate-500 font-mono">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</div>
                 </div>
-                <button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button>
+                ${isManager ? `<button onclick="app.delStore('${l.id}')" class="text-red-400"><i class="ph-bold ph-trash text-xl"></i></button>` : ''}
             </div>`
         ).join('') || '<div class="text-center text-slate-500 text-xs p-4">No Stores</div>';
     }
 
     delStore(id) {
+        if(this.drive.userEmail !== MANAGER_EMAIL) return; // Double protection
+        
         if(confirm("Delete this store from local view?")) {
             this.store.deleteLoc(id);
             this.locs = this.store.getLocs();
