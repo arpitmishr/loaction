@@ -35,7 +35,7 @@
     <!-- ICONS -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- GOOGLE API SCRIPTS -->
+    <!-- GOOGLE API SCRIPTS (REQUIRED FOR DRIVE) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
@@ -51,6 +51,9 @@
         .leaflet-container { background: #0f172a; font-family: inherit; }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #1e293b; color: #fff; border: 1px solid #334155; }
         .leaflet-popup-close-button { color: #94a3b8 !important; }
+        
+        /* Custom Marker Animation */
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 font-sans antialiased min-h-screen flex flex-col">
@@ -290,14 +293,13 @@
         </div>
     </div>
 
-    <!-- Order Modal (Updated with Targets & Dates) -->
+    <!-- Order Modal -->
     <div id="modal-order" class="modal fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="bg-slate-900 w-full max-w-sm rounded-xl border border-slate-700 p-4 flex flex-col max-h-[90vh]">
             <div class="border-b border-slate-800 pb-2 mb-3">
                 <div class="text-xs text-slate-400">Shop: <span id="order-shop-name" class="text-white font-bold">--</span></div>
             </div>
             <div class="overflow-y-auto custom-scrollbar space-y-3">
-                <!-- Targets -->
                 <div class="grid grid-cols-2 gap-3">
                     <div class="bg-blue-900/10 p-2 rounded border border-blue-900/30">
                         <label class="text-[10px] text-blue-400 font-bold block mb-1">1 LTR (Box)</label>
@@ -308,9 +310,7 @@
                         <input type="number" id="inp-qty-500ml" placeholder="0" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white text-center font-bold outline-none">
                     </div>
                 </div>
-                <!-- Details -->
                 <textarea id="input-order-details" rows="2" placeholder="Other Items / Remarks..." class="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white text-sm outline-none"></textarea>
-                <!-- Date & Amount -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-[10px] text-slate-500 uppercase font-bold block mb-1">Due Date</label>
@@ -339,17 +339,13 @@
     </div>
 
 <script>
-/**
- * GEOGUARD LOGISTICS PRO - INTEGRATED EDITION
- */
-
-// --- 1. CONFIGURATION (REPLACE WITH YOUR KEYS) ---
+// --- CONFIGURATION ---
 const GOOGLE_API_KEY = 'AIzaSyBpwJ_Z5wnR67SxDfxEf0Vr0KiFFwR8beE'; 
 const GOOGLE_CLIENT_ID = '405512233820-hj65j2lgmqf8arfqhqmugh0un3garh54.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DB_FILE_NAME = 'geoguard_db.json';
 
-// --- 2. UTILITIES ---
+// --- UTILS ---
 const Utils = {
     getDist: (lat1, lon1, lat2, lon2) => {
         const R=6371e3, rad=Math.PI/180;
@@ -366,14 +362,15 @@ const Utils = {
     fmtDate: (ts) => new Date(ts).toISOString().split('T')[0]
 };
 
-// --- 3. GOOGLE CLOUD SERVICE (ROBUST VERSION) ---
+// --- GOOGLE CLOUD SERVICE ---
 class GoogleCloud {
     constructor(storeInstance) {
         this.store = storeInstance;
         this.tokenClient = null;
         this.accessToken = null;
         this.isReady = false;
-        // Wait for Scripts to load then init
+        
+        // Dynamic Load Checker
         const check = setInterval(() => {
             if (window.google && window.gapi) {
                 clearInterval(check);
@@ -383,6 +380,7 @@ class GoogleCloud {
     }
 
     initGapi() {
+        if(GOOGLE_API_KEY.includes('PASTE')) return; // Safety check
         gapi.load('client', async () => {
             try {
                 await gapi.client.init({
@@ -406,7 +404,7 @@ class GoogleCloud {
     }
 
     login() {
-        if (!this.isReady) return alert("Google Service Loading... Please wait.");
+        if (!this.isReady) return alert("System loading or API Key Missing");
         this.tokenClient.requestAccessToken({ prompt: 'consent' });
     }
 
@@ -417,9 +415,9 @@ class GoogleCloud {
             btn.disabled = false;
             btn.classList.replace('bg-slate-800', 'bg-blue-600');
             btn.classList.replace('text-slate-500', 'text-white');
-            document.getElementById('cloud-status').innerText = "CONNECTED";
+            document.getElementById('cloud-status').innerText = "ONLINE";
             document.getElementById('cloud-dot').classList.replace('bg-slate-500', 'bg-blue-500');
-            document.getElementById('drive-msg').innerText = "Connected. Ready.";
+            document.getElementById('drive-msg').innerText = "Connected";
         }
     }
 
@@ -440,7 +438,7 @@ class GoogleCloud {
                     headers: { 'Authorization': 'Bearer ' + this.accessToken, 'Content-Type': 'application/json' },
                     body: fileContent
                 });
-                msg.innerText = "✅ Updated Successfully";
+                msg.innerText = "✅ Synced (Updated)";
             } else {
                 const metadata = { name: DB_FILE_NAME, mimeType: 'application/json' };
                 const form = new FormData();
@@ -452,16 +450,16 @@ class GoogleCloud {
                     headers: { 'Authorization': 'Bearer ' + this.accessToken },
                     body: form
                 });
-                msg.innerText = "✅ Created & Saved";
+                msg.innerText = "✅ Synced (Created)";
             }
         } catch (e) {
             console.error(e);
-            msg.innerText = "❌ Sync Failed";
+            msg.innerText = "❌ Failed";
         }
     }
 }
 
-// --- 4. DATA STORE ---
+// --- STORE ---
 class Store {
     constructor() {
         this.LOCS = 'geo_shops'; this.LOGS = 'geo_activity'; this.PROF = 'geo_profile';
@@ -472,21 +470,12 @@ class Store {
     deleteLoc(id) { const d = this.getLocs().filter(x => x.id !== id); localStorage.setItem(this.LOCS, JSON.stringify(d)); }
     
     getLogs() { return JSON.parse(localStorage.getItem(this.LOGS)) || []; }
-    
-    // UPDATED LOG FOR QUANTITIES & DATES
     log(type, locName, details, amt=0, targetDate=null, q1=0, q5=0) {
         const tDate = targetDate || Utils.fmtDate(Date.now());
         const l = { 
-            id: Utils.uuid(), 
-            type, 
-            loc: locName, 
-            desc: details, 
-            amt: amt || 0,
-            targetDate: tDate,
-            q1: parseInt(q1) || 0, 
-            q5: parseInt(q5) || 0,
-            ts: Date.now(), 
-            date: Utils.fmtDate(Date.now()) 
+            id: Utils.uuid(), type, loc: locName, desc: details, amt: amt || 0,
+            targetDate: tDate, q1: parseInt(q1) || 0, q5: parseInt(q5) || 0,
+            ts: Date.now(), date: Utils.fmtDate(Date.now()) 
         };
         const d = this.getLogs(); d.unshift(l); localStorage.setItem(this.LOGS, JSON.stringify(d));
         return l;
@@ -494,17 +483,15 @@ class Store {
 
     getProfile() { return JSON.parse(localStorage.getItem(this.PROF)) || { name: '', id: '' }; }
     saveProfile(p) { localStorage.setItem(this.PROF, JSON.stringify(p)); }
-
     dump() { return { profile: this.getProfile(), locations: this.getLocs(), logs: this.getLogs(), lastSync: Date.now() }; }
 }
 
-// --- 5. APP CONTROLLER ---
+// --- APP ---
 class App {
     constructor() {
         this.store = new Store();
         this.drive = new GoogleCloud(this.store);
-        window.drive = this.drive; // Expose to window for onclick
-
+        window.drive = this.drive;
         this.latK = {x:NaN,p:1,q:0.001,r:0.01}; 
         this.lngK = {x:NaN,p:1,q:0.001,r:0.01};
         this.pos = null; this.targetLoc = null; this.locs = this.store.getLocs();
@@ -523,7 +510,7 @@ class App {
         document.getElementById('filter-date').value = Utils.fmtDate(Date.now());
         this.renderStores();
         this.populateDropdowns();
-        this.updateTargets(); // Load sales targets
+        this.updateTargets();
     }
 
     initMap() {
@@ -531,7 +518,6 @@ class App {
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd' }).addTo(this.map);
         this.shopLayer = L.layerGroup().addTo(this.map);
         this.updateMapMarkers();
-        setTimeout(() => this.map.invalidateSize(), 500); // Fix map render issue
     }
 
     updateMapMarkers() {
@@ -555,52 +541,26 @@ class App {
 
     onGeo(pos) {
         this.pos = pos;
-        
-        // Update UI coordinates
         document.getElementById('current-coords').innerText = `${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
-        // Show Wi-Fi warning if accuracy is bad (> 40m)
         document.getElementById('modal-wifi').classList.toggle('open', pos.acc > 40);
 
         const latLng = [pos.lat, pos.lng];
-        
-        // --- CREATE MAN EMOJI MARKER ---
         if (!this.userMarker) {
             const icon = L.divIcon({ 
-                className: 'bg-transparent', // Removes default white square
-                html: `
-                    <div class="relative w-12 h-12 flex items-center justify-center">
-                        <!-- Pulsing Effect -->
-                        <div class="absolute w-full h-full bg-blue-500/50 rounded-full animate-ping opacity-75"></div>
-                        <!-- Man Emoji -->
-                        <div class="relative text-4xl z-10 drop-shadow-lg filter drop-shadow-black">🏃‍♂️</div> 
-                    </div>
-                `,
-                iconSize: [48, 48],    // Size of the icon box
-                iconAnchor: [24, 24]   // Center the icon (half of size)
+                className: 'bg-transparent',
+                html: `<div class="relative w-12 h-12 flex items-center justify-center"><div class="absolute w-full h-full bg-blue-500/50 rounded-full animate-ping opacity-75"></div><div class="relative text-4xl z-10 drop-shadow-lg filter drop-shadow-black">🏃‍♂️</div></div>`,
+                iconSize: [48, 48], iconAnchor: [24, 24]
             });
-            
-            this.userMarker = L.marker(latLng, {icon: icon}).addTo(this.map);
-            this.map.setView(latLng, 18); // Zoom in close on first load
-        } else { 
-            // Just move the existing marker
-            this.userMarker.setLatLng(latLng); 
-        }
+            this.userMarker = L.marker(latLng, {icon}).addTo(this.map);
+            this.map.setView(latLng, 18);
+        } else { this.userMarker.setLatLng(latLng); }
 
-        // --- UPDATE ROUTE LINE IF TARGET SELECTED ---
         if (this.routeLine) this.map.removeLayer(this.routeLine);
         if (this.targetLoc) {
-            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { 
-                color: '#f59e0b', 
-                weight: 4, 
-                dashArray: '10, 10', 
-                opacity: 0.8 
-            }).addTo(this.map);
-            
-            // Update Distance Text
+            this.routeLine = L.polyline([latLng, [this.targetLoc.lat, this.targetLoc.lng]], { color: '#f59e0b', weight: 4, dashArray: '10, 10' }).addTo(this.map);
             document.getElementById('nav-dist').innerText = Math.round(Utils.getDist(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
             document.getElementById('nav-bear').innerText = Math.round(Utils.getBearing(pos.lat, pos.lng, this.targetLoc.lat, this.targetLoc.lng));
         }
-
         this.checkGeofences(pos);
     }
 
@@ -608,11 +568,11 @@ class App {
         let inside = false;
         this.locs.forEach(l => {
             const dist = Utils.getDist(pos.lat, pos.lng, l.lat, l.lng);
-            if (!l.isInside && dist <= 10) { // 10m Enter
+            if (!l.isInside && dist <= 10) { 
                 l.isInside = true; l.entryTime = Date.now();
-                this.store.log('VISIT_IN', l.name, `Accuracy: ${Math.round(pos.acc)}m`);
+                this.store.log('VISIT_IN', l.name, `Acc: ${Math.round(pos.acc)}m`);
                 this.store.updateLoc(l);
-            } else if (l.isInside && dist > 15) { // 15m Exit
+            } else if (l.isInside && dist > 15) { 
                 l.isInside = false;
                 const dur = Math.round((Date.now() - l.entryTime)/60000);
                 this.store.log('VISIT_OUT', l.name, `Duration: ${dur} min`);
@@ -636,13 +596,11 @@ class App {
         this.updateMapMarkers();
     }
 
-    // --- LOGIC: TARGETS & ORDERS ---
     updateTargets() {
         const TARGET_1L = 80; const TARGET_500ML = 20;
         const today = Utils.fmtDate(Date.now());
         const logs = this.store.getLogs();
         let s1=0, s5=0;
-        
         logs.forEach(l => { if(l.type==='ORDER' && l.date===today) { s1+=(l.q1||0); s5+=(l.q5||0); } });
 
         const draw = (curr, tgt, lbl, bar, msg, clr) => {
@@ -657,6 +615,9 @@ class App {
             } else {
                 document.getElementById(lbl).innerText = `${curr} / ${tgt}`;
                 document.getElementById(msg).innerText = "";
+                if(document.getElementById(bar).classList.contains('bg-emerald-500')) {
+                   document.getElementById(bar).classList.replace('bg-emerald-500', clr);
+                }
             }
         };
         draw(s1, TARGET_1L, 'label-1ltr', 'prog-1ltr', 'msg-1ltr', 'bg-blue-600');
@@ -668,22 +629,18 @@ class App {
         const shop = document.getElementById('filter-shop').value;
         const logs = this.store.getLogs();
         let total = 0;
-
         const filtered = logs.filter(l => {
             if(l.type!=='ORDER') return false;
-            // Use Target Date (Due Date)
             const due = l.targetDate || l.date;
             if(due !== date) return false;
             if(shop!=='all' && l.loc!==shop) return false;
             return true;
         });
-
         document.getElementById('order-list').innerHTML = filtered.map(l => {
             total += parseFloat(l.amt || 0);
             const b = `<div class="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 rounded inline-block mt-1">Booked: ${l.date}</div>`;
             return `<tr class="border-b border-slate-800"><td class="px-4 py-3 align-top"><div class="font-bold text-white text-sm">${l.loc}</div>${b}</td><td class="px-4 py-3 text-slate-400 text-xs align-top whitespace-pre-wrap">${l.desc}</td><td class="px-4 py-3 text-right text-emerald-400 font-mono text-xs font-bold">${l.amt? '₹'+l.amt : '-'}</td></tr>`;
         }).join('') || '<tr><td colspan="3" class="px-4 py-8 text-center text-slate-500 italic">No orders due on this date</td></tr>';
-        
         document.getElementById('order-total').innerText = `₹${total}`;
     }
 
@@ -694,7 +651,6 @@ class App {
         const amt = document.getElementById('input-order-amt').value;
         const dateVal = document.getElementById('input-order-date').value;
         const shop = document.getElementById('order-shop-name').innerText;
-
         if(q1>0 || q5>0 || desc) {
             let finalDesc = desc;
             if((q1>0||q5>0) && !finalDesc) finalDesc = `Order: ${q1?q1+'x1L':''} ${q5?q5+'x500ml':''}`;
@@ -707,7 +663,6 @@ class App {
         } else { alert("Enter Qty or Details"); }
     }
 
-    // --- TABS & ACTIONS ---
     switchTab(t) {
         document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
         document.getElementById('tab-'+t).classList.add('active');
@@ -723,9 +678,7 @@ class App {
     saveLocation() {
         const name=document.getElementById('inp-name').value;
         if(name && this.pos) {
-            this.store.saveLoc({
-                id:Utils.uuid(), name, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now()
-            });
+            this.store.saveLoc({ id:Utils.uuid(), name, lat:this.pos.lat, lng:this.pos.lng, isInside:true, entryTime:Date.now() });
             this.locs=this.store.getLocs();
             this.populateDropdowns();
             this.updateMapMarkers();
@@ -778,7 +731,6 @@ class App {
     navTo(id) { this.switchTab('home'); document.getElementById('select-target').value = id; this.setTarget(); }
 }
 
-// START APP
 const app = new App();
 </script>
 </body>
