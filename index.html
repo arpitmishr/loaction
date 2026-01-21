@@ -232,20 +232,25 @@
             </div>
 
             <!-- Cloud Sync Control -->
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <h3 class="font-bold text-white mb-2 flex items-center gap-2">
-                    <i class="ph-bold ph-google-logo text-white"></i> Google Drive Backup
-                </h3>
-                <p class="text-xs text-slate-400 mb-4">Sync orders and locations to your Google Drive.</p>
-                
-                <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded font-bold text-sm flex items-center justify-center gap-2 mb-2">
-                    <i class="ph-bold ph-sign-in"></i> Sign in with Google
-                </button>
-                <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded font-bold text-sm flex items-center justify-center gap-2 border border-slate-700">
-                    <i class="ph-bold ph-arrows-clockwise"></i> Sync Now
-                </button>
-                <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500">Not connected</div>
-            </div>
+            <!-- Inside #tab-profile -->
+<div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+    <h3 class="font-bold text-white mb-2 flex items-center gap-2">
+        <i class="ph-bold ph-google-logo text-white"></i> Google Cloud Backup
+    </h3>
+    <p class="text-xs text-slate-400 mb-4">
+        Sync Shops, Orders, and Sales Achievements to Drive.
+    </p>
+    
+    <button id="btn-glogin" onclick="drive.login()" class="w-full py-2 bg-white text-slate-900 rounded-lg font-bold text-sm flex items-center justify-center gap-2 mb-2 hover:bg-gray-200 transition-colors">
+        <i class="ph-bold ph-sign-in"></i> Sign in with Google
+    </button>
+    
+    <button id="btn-gsync" onclick="drive.sync()" disabled class="w-full py-2 bg-slate-800 text-slate-500 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all">
+        <i class="ph-bold ph-cloud-arrow-up"></i> Sync Data Now
+    </button>
+    
+    <div id="drive-msg" class="text-[10px] text-center mt-2 text-slate-500 font-mono">Not connected</div>
+</div>
 
             <!-- Export -->
             <button onclick="app.exportData()" class="w-full py-3 bg-slate-800 border border-slate-700 text-emerald-400 font-bold rounded-xl flex items-center justify-center gap-2">
