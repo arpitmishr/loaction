@@ -462,22 +462,30 @@ function deg2rad(deg) {
 
 window.switchView = function(viewName) {
     // Hide all
-    document.getElementById('route-view').style.display = 'none';
-    document.getElementById('visit-view').style.display = 'none';
-    document.getElementById('catalog-view').style.display = 'none';
-
+    document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+    
     // Show selected
-    if(viewName === 'route') document.getElementById('route-view').style.display = 'block';
-    if(viewName === 'visit') document.getElementById('visit-view').style.display = 'block';
-    if(viewName === 'catalog') {
-        document.getElementById('catalog-view').style.display = 'block';
-        loadProductCatalog(); // Load data when tab is clicked
+    const target = document.getElementById(viewName + '-view');
+    if (target) target.classList.remove('hidden');
+
+    // Trigger map load
+    if (viewName === 'full-map') {
+        setTimeout(() => {
+            window.initFullRouteMap();
+        }, 100);
+    }
+
+    // Update Bottom Nav
+    document.querySelectorAll('.bottom-nav-item').forEach(el => {
+        el.classList.remove('active', 'text-blue-600');
+        el.classList.add('text-gray-400');
+    });
+    const btn = document.getElementById('nav-' + viewName);
+    if (btn) {
+        btn.classList.add('active', 'text-blue-600');
+        btn.classList.remove('text-gray-400');
     }
 };
-
-
-
-
 
 
 // ==========================================
@@ -902,70 +910,98 @@ window.submitLeaveRequest = async function() {
 
 
 window.initFullRouteMap = async function() {
-    console.log("Starting Full Map Init...");
+    console.log("Initializing Map View...");
     const container = document.getElementById('all-shops-map');
-    
     if (!container) return;
 
-    // 1. Destroy old instance
+    // 1. Cleanup old instance to prevent "Map already initialized" error
     if (fullMapInstance) {
         fullMapInstance.remove();
         fullMapInstance = null;
     }
 
-    // 2. Create Map Instance
-    // Center initially on a generic location
-    fullMapInstance = L.map('all-shops-map').setView([20.59, 78.96], 5);
+    // 2. Setup Leaflet Map
+    fullMapInstance = L.map('all-shops-map', {
+        zoomControl: false // Cleaner for mobile
+    }).setView([20.5937, 78.9629], 5);
 
-    // 3. Add Tiles
+    // 3. Use Browser-Friendly Tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '©OpenStreetMap',
         maxZoom: 18
     }).addTo(fullMapInstance);
 
-    // 4. THE CRITICAL FIX: Tell Leaflet the size has changed AFTER it appears
+    // 4. Force tile refresh after container is visible
     setTimeout(() => {
-        fullMapInstance.invalidateSize(true);
+        fullMapInstance.invalidateSize();
     }, 400);
 
     try {
-        // 5. Fetch Route
-        const routeQ = query(collection(db, "routes"), where("assignedSalesmanId", "==", auth.currentUser.uid));
-        const routeSnap = await getDocs(routeQ);
+        // 5. FETCH DATA STEP A: Find the route assigned to this salesman
+        const routeQuery = query(
+            collection(db, "routes"), 
+            where("assignedSalesmanId", "==", auth.currentUser.uid)
+        );
+        const routeSnap = await getDocs(routeQuery);
+
         if (routeSnap.empty) {
-            console.log("No route found");
+            console.warn("No route assigned to this user.");
             return;
         }
 
         const routeId = routeSnap.docs[0].id;
-        const shopsQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
-        const shopsSnap = await getDocs(shopsQ);
+
+        // 6. FETCH DATA STEP B: Find all outlet stops for this route
+        const stopsQuery = query(
+            collection(db, "route_outlets"), 
+            where("routeId", "==", routeId), 
+            orderBy("sequence", "asc")
+        );
+        const stopsSnap = await getDocs(stopsQuery);
 
         const markers = [];
 
-        // 6. Loop through and Add Markers
-        for (const docSnap of shopsSnap.docs) {
-            const rData = docSnap.data();
-            const oDoc = await getDoc(doc(db, "outlets", rData.outletId));
-            
-            if (oDoc.exists() && oDoc.data().geo) {
-                const g = oDoc.data().geo;
+        // 7. FETCH DATA STEP C: Get details for each outlet and Plot
+        for (const docSnap of stopsSnap.docs) {
+            const routeStop = docSnap.data();
+            const outletRef = doc(db, "outlets", routeStop.outletId);
+            const outletDoc = await getDoc(outletRef);
+
+            if (outletDoc.exists()) {
+                const outletData = outletDoc.data();
                 
-                // Add a marker for every shop
-                const m = L.marker([g.lat, g.lng]).addTo(fullMapInstance);
-                m.bindPopup(`<b>${oDoc.data().shopName}</b><br>Stop ${rData.sequence}`);
-                
-                markers.push([g.lat, g.lng]);
+                if (outletData.geo && outletData.geo.lat && outletData.geo.lng) {
+                    const lat = outletData.geo.lat;
+                    const lng = outletData.geo.lng;
+
+                    // Create Marker
+                    const marker = L.marker([lat, lng]).addTo(fullMapInstance);
+                    
+                    // Create Popup
+                    marker.bindPopup(`
+                        <div class="p-1">
+                            <h4 class="font-bold text-blue-600">${outletData.shopName}</h4>
+                            <p class="text-xs text-gray-500">Stop Sequence: ${routeStop.sequence}</p>
+                            <p class="text-xs text-gray-500">Type: ${outletData.outletType}</p>
+                            <button onclick="window.openVisitPanel('${outletDoc.id}', '${outletData.shopName}', ${lat}, ${lng})" 
+                                    class="mt-2 w-full bg-blue-600 text-white text-[10px] py-1 rounded">
+                                Visit Now
+                            </button>
+                        </div>
+                    `);
+
+                    markers.push([lat, lng]);
+                }
             }
         }
 
-        // 7. Zoom to fit markers
+        // 8. Auto-Zoom to fit all markers
         if (markers.length > 0) {
             const bounds = L.latLngBounds(markers);
             fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
         }
 
-    } catch (e) {
-        console.error("Map Load Error:", e);
+    } catch (error) {
+        console.error("Map Logic Error:", error);
     }
 };
