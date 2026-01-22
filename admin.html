@@ -487,6 +487,28 @@
                  TAB 5: STAFF
             ======================== -->
             <div id="tab-staff" class="tab-content hidden">
+                <!-- Inside <div id="tab-staff" ...> after the Sales Team list -->
+<div class="mt-10 bg-surface p-6 rounded-2xl border border-slate-100 shadow-card">
+    <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <span class="material-icons-round text-primary">target</span>
+        Set Daily Target
+    </h4>
+    <form id="targetForm" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select id="targetSalesmanId" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                <option value="">Select Salesman</option>
+            </select>
+            <input type="date" id="targetDate" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <input type="number" id="targetBoxes" placeholder="Target Boxes" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+            <input type="number" id="incentivePerBox" placeholder="Incentive (₹/Box)" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+        </div>
+        <button type="submit" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition">
+            Set Target
+        </button>
+    </form>
+</div>
                 <div class="bg-surface rounded-2xl shadow-card border border-slate-100 p-8 min-h-[50vh] max-w-2xl mx-auto">
                     <h3 class="text-xl font-bold mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
                         <div class="bg-purple-100 text-purple-600 p-2 rounded-lg">
