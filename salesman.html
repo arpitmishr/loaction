@@ -166,30 +166,45 @@
 
           <!-- IN-SHOP CONTROLS -->
           <div id="in-shop-controls" style="display:none; margin-top:15px;">
-            <p style="color:green; font-weight:bold;">
-              ✅ You are Checked In
-            </p>
+    <p style="color:green; font-weight:bold;">✅ You are Checked In</p>
+    
+    <!-- OUTSTANDING BALANCE DISPLAY -->
+    <div style="background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin-bottom:10px; text-align:center;">
+        <small>Current Outstanding:</small><br>
+        <strong style="font-size:1.2rem;" id="visit-outstanding-bal">₹0.00</strong>
+    </div>
 
-            <p>
-              Duration:
-              <span id="visit-timer">00:00</span>
-            </p>
+    <p>Duration: <span id="visit-timer">00:00</span></p>
+    
+    <button id="btn-take-order" class="btn-primary" style="background: #6f42c1; width:100%; margin-bottom:10px;">📝 Take Order</button>
+    
+    <!-- NEW PAYMENT BUTTON -->
+    <button id="btn-collect-payment" onclick="openPaymentModal()" style="background: #28a745; color: white; width:100%; padding:10px; border:none; border-radius:50px; margin-bottom:10px;">💰 Collect Payment</button>
+    
+    <button id="btn-end-visit" style="background: #dc3545; color: white; width:100%; padding:10px; border:none; border-radius:50px;">⏹ End Visit</button>
+</div>
 
-            <button
-              id="btn-take-order"
-              class="btn-primary"
-              style="background:#6f42c1; width:100%; margin-bottom:10px;"
-            >
-              📝 Take Order
-            </button>
+<!-- PAYMENT MODAL (Add at the bottom of the body) -->
+<div id="paymentModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:20px; border-radius:8px; width:80%; max-width:300px;">
+        <h3>💰 Collect Payment</h3>
+        <p>From: <b id="pay-outlet-name"></b></p>
+        
+        <input type="number" id="payAmount" placeholder="Amount (₹)" style="width:100%; padding:10px; margin-bottom:10px;">
+        
+        <select id="payMethod" style="width:100%; padding:10px; margin-bottom:10px;">
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI / Online</option>
+            <option value="Cheque">Cheque</option>
+        </select>
 
-            <button
-              id="btn-end-visit"
-              style="background:#dc3545; color:white; width:100%; padding:10px; border:none; border-radius:50px;"
-            >
-              ⏹ End Visit
-            </button>
-          </div>
+        <div style="display:flex; gap:10px;">
+            <button onclick="document.getElementById('paymentModal').style.display='none'" style="flex:1; padding:10px; border:none; background:#ccc;">Cancel</button>
+            <button onclick="submitPayment()" style="flex:1; padding:10px; border:none; background:#28a745; color:white;">Submit</button>
+        </div>
+    </div>
+</div>
+
 
         </div>
 
