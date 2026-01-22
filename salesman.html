@@ -63,6 +63,10 @@
         <!-- CONTENT AREA -->
         <main class="p-4 space-y-4">
 
+            <div id="full-map-view" class="view-section hidden fixed inset-0 bg-white z-30 pt-[60px] pb-[80px]">
+    <div id="all-shops-map" class="w-full h-full"></div>
+</div>
+
             <!-- 1. ROUTE VIEW (HOME) -->
             <div id="route-view" class="view-section block">
                 
@@ -247,16 +251,22 @@
 
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 z-40 max-w-md mx-auto">
-            <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
-                <span class="material-icons-round text-2xl">map</span>
-                <span class="text-[10px] font-bold">Route</span>
-            </button>
-            <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
-                <span class="material-icons-round text-2xl">inventory_2</span>
-                <span class="text-[10px] font-bold">Catalog</span>
-            </button>
-        </nav>
+    <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
+        <span class="material-icons-round text-2xl">map</span>
+        <span class="text-[10px] font-bold">Route</span>
+    </button>
+    
+    <!-- ADD THIS NEW BUTTON -->
+    <button onclick="switchView('full-map')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-full-map">
+        <span class="material-icons-round text-2xl">explore</span>
+        <span class="text-[10px] font-bold">Full Map</span>
+    </button>
 
+    <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
+        <span class="material-icons-round text-2xl">inventory_2</span>
+        <span class="text-[10px] font-bold">Catalog</span>
+    </button>
+</nav>
         <!-- MODALS -->
         
         <!-- Leave Modal -->
@@ -320,25 +330,32 @@
     <!-- HELPER SCRIPT FOR UI -->
     <script>
         // Tab Switcher
-        window.switchView = function(viewName) {
-            // Hide all views
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            
-            // Show selected
-            if(viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
-            if(viewName === 'catalog') {
-                document.getElementById('catalog-view').classList.remove('hidden');
-                if(window.loadProductCatalog) window.loadProductCatalog();
-            }
+window.switchView = function(viewName) {
+    // Hide all views
+    document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+    
+    // Show selected
+    if(viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
+    if(viewName === 'catalog') {
+        document.getElementById('catalog-view').classList.remove('hidden');
+        if(window.loadProductCatalog) window.loadProductCatalog();
+    }
+    // NEW LOGIC
+    if(viewName === 'full-map') {
+        document.getElementById('full-map-view').classList.remove('hidden');
+        if(window.initFullRouteMap) window.initFullRouteMap();
+    }
 
-            // Update Bottom Nav
-            document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
-            const activeBtn = document.getElementById('nav-' + viewName);
-            if(activeBtn) {
-                activeBtn.classList.add('active', 'text-blue-600');
-                activeBtn.classList.remove('text-gray-400');
-            }
-        };
+    // Update Bottom Nav UI
+    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
+    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.add('text-gray-400'));
+    
+    const activeBtn = document.getElementById('nav-' + viewName);
+    if(activeBtn) {
+        activeBtn.classList.add('active', 'text-blue-600');
+        activeBtn.classList.remove('text-gray-400');
+    }
+};
 
         // Payment Method Toggle Helper
         window.setPayMethod = function(method) {
