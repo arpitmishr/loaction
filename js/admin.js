@@ -1,3 +1,7 @@
+import { 
+    doc, getDoc, collection, getDocs, query, where, Timestamp, 
+    addDoc, updateDoc, serverTimestamp, orderBy // <--- Added these
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
@@ -31,6 +35,8 @@ onAuthStateChanged(auth, async (user) => {
 
     // --- 2. Load Data ---
     loadDashboardStats();
+    loadOutlets(); 
+    setupOutletForm();
     loadSalesmenList(); // Your existing function
 });
 
@@ -179,3 +185,146 @@ async function loadTodayAttendance() {
         }
     }
 }
+
+
+
+// --- OUTLET MANAGEMENT FUNCTIONS ---
+
+function setupOutletForm() {
+    // 1. Handle Geolocation Click
+    document.getElementById('geoBtn').addEventListener('click', () => {
+        const display = document.getElementById('geoDisplay');
+        const btn = document.getElementById('geoBtn');
+
+        if (!navigator.geolocation) {
+            alert("Geolocation not supported");
+            return;
+        }
+
+        btn.innerText = "Locating...";
+        
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                document.getElementById('lat').value = pos.coords.latitude;
+                document.getElementById('lng').value = pos.coords.longitude;
+                display.innerText = `Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
+                display.style.color = "green";
+                btn.innerText = "📍 Location Captured";
+            },
+            (err) => {
+                console.error(err);
+                alert("Could not get location. Ensure GPS is on.");
+                btn.innerText = "Retry GPS";
+            }
+        );
+    });
+
+    // 2. Handle Form Submit
+    document.getElementById('addOutletForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Saving...";
+
+        const lat = document.getElementById('lat').value;
+        const lng = document.getElementById('lng').value;
+
+        if (!lat || !lng) {
+            alert("Please click 'Get GPS Location' first.");
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Save Outlet";
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "outlets"), {
+                shopName: document.getElementById('shopName').value,
+                ownerName: document.getElementById('ownerName').value,
+                phone: document.getElementById('shopPhone').value,
+                category: document.getElementById('shopCategory').value,
+                geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
+                status: 'active', // Default status
+                currentBalance: 0,
+                createdAt: serverTimestamp()
+            });
+
+            alert("Outlet Added Successfully!");
+            document.getElementById('addOutletForm').reset();
+            document.getElementById('geoDisplay').innerText = "No location captured";
+            document.getElementById('geoBtn').innerText = "📍 Get GPS Location";
+            
+            loadOutlets(); // Refresh list
+
+        } catch (error) {
+            console.error("Error adding outlet:", error);
+            alert("Error: " + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Save Outlet";
+        }
+    });
+}
+
+async function loadOutlets() {
+    const tableBody = document.getElementById('outlets-table-body');
+    
+    try {
+        // Query outlets (Optional: order by createdAt if you create an index)
+        const q = query(collection(db, "outlets")); 
+        const snap = await getDocs(q);
+
+        tableBody.innerHTML = "";
+
+        if (snap.empty) {
+            tableBody.innerHTML = "<tr><td colspan='5'>No outlets found.</td></tr>";
+            return;
+        }
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const id = docSnap.id;
+            const isBlocked = data.status === 'blocked';
+            
+            const statusBadge = isBlocked 
+                ? `<span class="badge badge-blocked">Blocked</span>` 
+                : `<span class="badge badge-active">Active</span>`;
+
+            const actionBtn = isBlocked
+                ? `<button class="btn-sm btn-unblock" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
+                : `<button class="btn-sm btn-block" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
+
+            const row = `
+                <tr>
+                    <td><strong>${data.shopName}</strong><br><small>${data.ownerName}</small></td>
+                    <td>${data.category}</td>
+                    <td><a href="tel:${data.phone}">${data.phone}</a></td>
+                    <td>${statusBadge}</td>
+                    <td>${actionBtn}</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+
+    } catch (error) {
+        console.error("Error loading outlets:", error);
+        tableBody.innerHTML = "<tr><td colspan='5'>Error loading data.</td></tr>";
+    }
+}
+
+// Make this function global so HTML onclick attributes can see it
+window.toggleOutletStatus = async function(id, newStatus) {
+    if(!confirm(`Are you sure you want to change status to ${newStatus}?`)) return;
+
+    try {
+        const outletRef = doc(db, "outlets", id);
+        await updateDoc(outletRef, {
+            status: newStatus
+        });
+        
+        // Refresh the list to show new status
+        loadOutlets();
+    } catch (error) {
+        console.error("Error updating status:", error);
+        alert("Failed to update status.");
+    }
+};
