@@ -2,583 +2,546 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Freskey Admin</title>
-    
-    <!-- Tailwind CSS via CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Dashboard</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-                    },
                     colors: {
-                        brand: {
-                            50: '#f5f3ff',
-                            100: '#ede9fe',
-                            500: '#8b5cf6', // Violet
-                            600: '#7c3aed',
-                            700: '#6d28d9',
-                            900: '#4c1d95',
-                        }
+                        primary: '#2563eb', // Blue-600
+                        secondary: '#64748b', // Slate-500
+                        bgApp: '#f8fafc', // Slate-50
+                    },
+                    boxShadow: {
+                        'up': '0 -4px 6px -1px rgba(0, 0, 0, 0.05), 0 -2px 4px -1px rgba(0, 0, 0, 0.03)',
                     }
                 }
             }
         }
     </script>
-    
-    <!-- Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        /* Hide scrollbar for cleaner UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
         
-        /* Smooth fade for tabs */
-        .tab-content { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .hidden-tab { display: none; }
-        .block-tab { display: block; }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* App tap highlight removal */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
 
-        /* Mobile Bottom Nav Active State */
-        .mobile-nav-active { color: #7c3aed; }
-        .mobile-nav-active span { color: #7c3aed; }
+        /* Tab Active State Animations */
+        .nav-item.active span {
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .nav-item.active .icon-box {
+            background-color: #eff6ff; /* blue-50 */
+            color: #2563eb;
+            transform: translateY(-2px);
+        }
+        .icon-box {
+            transition: all 0.2s ease;
+        }
     </style>
 </head>
-<body class="text-slate-800 h-screen overflow-hidden flex selection:bg-brand-100 selection:text-brand-900">
+<body class="bg-bgApp font-sans text-gray-700 antialiased selection:bg-blue-100">
 
     <!-- LOADER -->
-    <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white z-[100]">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700 tracking-tight">Loading Freskey...</h2>
+    <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white z-[60]">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
+        <h2 class="text-sm font-medium text-gray-500 tracking-wider uppercase">Loading App...</h2>
     </div>
 
     <!-- MAIN WRAPPER -->
-    <div id="content" style="display: none;" class="w-full h-full flex flex-col md:flex-row">
+    <div id="content" style="display: none;" class="min-h-screen">
         
-        <!-- SIDEBAR (DESKTOP) -->
-        <aside class="hidden md:flex flex-col w-72 bg-slate-900 text-white h-full shadow-2xl z-20 shrink-0">
-            <!-- Brand -->
-            <div class="p-6 flex items-center gap-3 border-b border-slate-700/50">
-                <div class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/30">F</div>
+        <!-- ============================================
+             APP HEADER (Fixed Top)
+        ============================================= -->
+        <header class="fixed top-0 left-0 right-0 h-16 bg-white shadow-sm z-50 flex items-center px-4 justify-between border-b border-gray-100">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 text-white p-1.5 rounded-lg shadow-sm">
+                    <span class="text-lg font-bold">⚡</span>
+                </div>
                 <div>
-                    <h1 class="font-bold text-xl tracking-wide text-white">Freskey</h1>
-                    <p class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Admin Panel</p>
+                    <h1 class="text-lg font-bold text-gray-800 leading-tight">Admin<span class="text-blue-600">Panel</span></h1>
+                    <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Manager View</p>
                 </div>
             </div>
-
-            <!-- Nav Links -->
-            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <button onclick="switchTab('tab-dashboard')" class="nav-item active w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
-                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">dashboard</span> Dashboard
-                </button>
-                <button onclick="switchTab('tab-outlets')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
-                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">store</span> Outlets
-                </button>
-                <button onclick="switchTab('tab-routes')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
-                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">alt_route</span> Routes
-                </button>
-                <button onclick="switchTab('tab-products')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
-                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">inventory_2</span> Products
-                </button>
-                <button onclick="switchTab('tab-staff')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
-                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">badge</span> Staff
-                </button>
-            </nav>
-
-            <!-- User Profile -->
-            <div class="p-4 border-t border-slate-700/50 bg-slate-900">
-                <div class="bg-slate-800/50 rounded-xl p-4 mb-3 border border-slate-700">
-                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Logged In As</p>
-                    <p id="user-email" class="text-sm font-semibold truncate text-white">admin@freskey.com</p>
-                </div>
-                <button id="logoutBtn" class="w-full bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2 border border-red-500/20">
-                    <span class="material-icons-round text-sm">logout</span> Logout
+            <div class="flex items-center gap-3">
+                <span id="user-email" class="hidden md:block text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded"></span>
+                <button id="logoutBtn" class="text-gray-500 hover:text-red-500 transition-colors p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
                 </button>
             </div>
-        </aside>
+        </header>
 
-        <!-- MAIN CONTENT AREA -->
-        <main class="flex-1 h-full overflow-hidden flex flex-col relative bg-slate-50/50">
-            
-            <!-- MOBILE HEADER (Sticky) -->
-            <header class="md:hidden bg-white/80 backdrop-blur-md border-b border-slate-200 p-4 flex justify-between items-center z-30 sticky top-0">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">F</div>
-                    <h1 class="text-lg font-extrabold text-slate-800">Freskey</h1>
+        <!-- ============================================
+             SCROLLABLE CONTENT AREA
+             (Padding top for header, Padding bottom for footer)
+        ============================================= -->
+        <main class="pt-20 pb-28 px-4 container mx-auto max-w-5xl">
+
+            <!-- TAB 1: DASHBOARD -->
+            <div id="tab-dashboard" class="tab-content block animate-fade-in">
+                
+                <!-- Welcome Widget -->
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Overview</h2>
+                    <p class="text-sm text-gray-500">Here's what's happening today.</p>
                 </div>
-                <button id="logoutBtnMobile" class="text-slate-500 hover:text-red-600 font-medium text-sm flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-full">
-                    <span class="material-icons-round text-sm">logout</span>
-                </button>
-            </header>
 
-            <!-- SCROLLABLE CONTENT -->
-            <!-- pb-28 ensures content isn't hidden behind mobile nav -->
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
-
-                <!-- ================= TAB 1: DASHBOARD ================= -->
-                <div id="tab-dashboard" class="tab-content block-tab space-y-8">
-                    
-                    <!-- Welcome Header -->
-                    <div class="flex flex-col md:flex-row justify-between md:items-end gap-2">
-                        <div>
-                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Dashboard</h2>
-                            <p class="text-slate-500 font-medium">Overview & Alerts</p>
-                        </div>
-                        <div class="bg-white border border-slate-200 px-4 py-2 rounded-full shadow-sm text-sm font-semibold text-slate-600 flex items-center gap-2 w-fit">
-                            <span class="material-icons-round text-brand-500 text-base">calendar_today</span>
-                            <span id="currentDateDisplay">Today</span>
-                        </div>
-                    </div>
-
-                    <!-- ALERTS GRID -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <!-- Payment Alerts -->
-                        <div id="approval-section" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2">
-                                    <span class="material-icons-round">payments</span> Payment Approvals
-                                </h3>
-                                <span class="bg-amber-200 text-amber-800 text-xs px-2 py-1 rounded-md font-bold">Action Needed</span>
-                            </div>
-                            <div class="overflow-x-auto bg-white rounded-xl border border-amber-100">
-                                <table class="w-full text-sm text-left whitespace-nowrap">
-                                    <thead class="bg-amber-50 text-amber-900 font-bold text-xs uppercase">
-                                        <tr><th class="p-3">Shop</th><th class="p-3">Amount</th><th class="p-3">Method</th><th class="p-3 text-center">Action</th></tr>
-                                    </thead>
-                                    <tbody id="approval-list" class="divide-y divide-slate-50 text-slate-700"></tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Leave Alerts -->
-                        <div id="leave-approval-section" class="hidden bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2">
-                                    <span class="material-icons-round">event</span> Leave Requests
-                                </h3>
-                                <span class="bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-md font-bold">New</span>
-                            </div>
-                            <div class="overflow-x-auto bg-white rounded-xl border border-blue-100">
-                                <table class="w-full text-sm text-left whitespace-nowrap">
-                                    <thead class="bg-blue-50 text-blue-900 font-bold text-xs uppercase">
-                                        <tr><th class="p-3">Staff</th><th class="p-3">Reason</th><th class="p-3 text-center">Action</th></tr>
-                                    </thead>
-                                    <tbody id="leave-approval-list" class="divide-y divide-slate-50 text-slate-700"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- STATS CARDS -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                        <!-- Stat Card 1 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Attendance</p>
-                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-attendance">0</h4>
-                                </div>
-                                <div class="bg-blue-50 p-2 rounded-lg text-blue-600">
-                                    <span class="material-icons-round text-2xl">groups</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Stat Card 2 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Orders</p>
-                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-orders">0</h4>
-                                </div>
-                                <div class="bg-purple-50 p-2 rounded-lg text-purple-600">
-                                    <span class="material-icons-round text-2xl">local_shipping</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Stat Card 3 (Featured) -->
-                        <div class="bg-gradient-to-br from-brand-600 to-brand-800 p-5 rounded-2xl shadow-lg shadow-brand-500/20 text-white hover:scale-[1.02] transition duration-300">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-brand-100 text-xs font-bold uppercase tracking-wider mb-1">Revenue</p>
-                                    <h4 class="text-3xl font-extrabold" id="stat-sales">₹0</h4>
-                                </div>
-                                <div class="bg-white/20 p-2 rounded-lg text-white">
-                                    <span class="material-icons-round text-2xl">currency_rupee</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Stat Card 4 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Market Credit</p>
-                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-credit">₹0</h4>
-                                </div>
-                                <div class="bg-orange-50 p-2 rounded-lg text-orange-600">
-                                    <span class="material-icons-round text-2xl">account_balance_wallet</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ATTENDANCE TABLE -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                <span class="material-icons-round text-slate-400">history</span> Daily Register
-                            </h3>
-                            <div class="flex w-full sm:w-auto bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                                <input type="date" id="attendanceDateFilter" class="bg-transparent text-sm p-2 outline-none text-slate-600 flex-grow">
-                                <button onclick="loadAttendanceByDate()" class="bg-brand-50 text-brand-700 px-4 py-1.5 rounded-md text-xs font-bold hover:bg-brand-100 transition">GO</button>
-                            </div>
-                        </div>
+                <!-- NOTIFICATIONS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <!-- Payment Approvals -->
+                    <div id="approval-section" class="hidden bg-white border border-yellow-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                        <div class="absolute top-0 right-0 bg-yellow-400 w-16 h-16 rounded-bl-full opacity-10 -mr-8 -mt-8"></div>
+                        <h3 class="text-sm font-bold text-yellow-700 mb-3 flex items-center gap-2">
+                            <span class="bg-yellow-100 p-1 rounded">🔔</span> Payment Approvals
+                        </h3>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-left">
-                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wide">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-gray-400 border-b">
                                     <tr>
-                                        <th class="p-4 border-b border-slate-200">Staff Member</th>
-                                        <th class="p-4 border-b border-slate-200">Status</th>
-                                        <th class="p-4 border-b border-slate-200">Time / Location</th>
+                                        <th class="pb-2 font-medium">Shop</th>
+                                        <th class="pb-2 font-medium">Amt</th>
+                                        <th class="pb-2 text-right">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody id="attendance-list" class="divide-y divide-slate-100">
-                                    <tr><td colspan="3" class="p-8 text-center text-slate-400 italic">Loading data...</td></tr>
-                                </tbody>
+                                <tbody id="approval-list" class="divide-y divide-gray-50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Leave Approvals -->
+                    <div id="leave-approval-section" class="hidden bg-white border border-blue-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                        <div class="absolute top-0 right-0 bg-blue-400 w-16 h-16 rounded-bl-full opacity-10 -mr-8 -mt-8"></div>
+                        <h3 class="text-sm font-bold text-blue-700 mb-3 flex items-center gap-2">
+                            <span class="bg-blue-100 p-1 rounded">📅</span> Leave Requests
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-gray-400 border-b">
+                                    <tr>
+                                        <th class="pb-2 font-medium">Staff</th>
+                                        <th class="pb-2 font-medium">Reason</th>
+                                        <th class="pb-2 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leave-approval-list" class="divide-y divide-gray-50"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- ================= TAB 2: OUTLETS ================= -->
-                <div id="tab-outlets" class="tab-content hidden-tab space-y-6">
-                    <div class="flex flex-col lg:flex-row gap-6 items-start">
-                        
-                        <!-- ADD FORM -->
-                        <div class="w-full lg:w-96 shrink-0">
-                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
-                                <h3 class="font-bold text-lg mb-5 text-slate-800 flex items-center justify-between">
-                                    <span class="flex items-center gap-2"><span class="material-icons-round text-brand-600">add_business</span> <span id="formTitle">Add Outlet</span></span>
-                                </h3>
-                                
-                                <form id="addOutletForm" class="space-y-4">
-                                    <input type="hidden" id="editOutletId">
-                                    
-                                    <!-- Inputs with visible backgrounds -->
-                                    <div class="space-y-3">
-                                        <input type="text" id="shopName" placeholder="Shop Name" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 placeholder-slate-400 font-medium">
-                                        
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <div class="relative">
-                                                <select id="outletType" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-3 text-sm outline-none text-slate-800 appearance-none">
-                                                    <option value="" disabled selected>Type</option>
-                                                    <option value="Shop">Shop</option>
-                                                    <option value="Dhaba">Dhaba</option>
-                                                    <option value="Restaurant">Rest.</option>
-                                                    <option value="Other">Other</option>
-                                                </select>
-                                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><span class="material-icons-round text-sm">expand_more</span></div>
-                                            </div>
-                                            <input type="text" id="ownerName" placeholder="Owner" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 placeholder-slate-400 font-medium">
-                                        </div>
-
-                                        <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
-                                        <input type="tel" id="contactPhone" placeholder="Phone Number" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
-                                        
-                                        <!-- Credit Section -->
-                                        <div class="bg-brand-50/50 p-4 rounded-xl border border-brand-100">
-                                            <label class="text-[10px] font-bold text-brand-400 uppercase tracking-wider block mb-2">Payment Terms</label>
-                                            <div class="relative mb-3">
-                                                <select id="storeType" required class="w-full bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm outline-none text-slate-700 font-medium appearance-none">
-                                                    <option value="Cash">Cash Only</option>
-                                                    <option value="Credit">Credit Allowed</option>
-                                                </select>
-                                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-400"><span class="material-icons-round text-sm">expand_more</span></div>
-                                            </div>
-                                            <div class="grid grid-cols-2 gap-2">
-                                                <input type="number" id="creditDays" placeholder="Days" disabled class="bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50 disabled:bg-slate-100">
-                                                <input type="number" id="creditLimit" placeholder="Limit ₹" disabled class="bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50 disabled:bg-slate-100">
-                                            </div>
-                                        </div>
-
-                                        <input type="text" id="gstNumber" placeholder="GST Number (Optional)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
-
-                                        <!-- GPS -->
-                                        <button type="button" id="geoBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl text-sm font-bold flex justify-center items-center gap-2 transition shadow-md">
-                                            <span class="material-icons-round text-sm">my_location</span> <span id="geoDisplay">Capture Location</span>
-                                        </button>
-                                        <input type="hidden" id="lat"><input type="hidden" id="lng">
-                                    </div>
-
-                                    <div class="flex gap-2 pt-2">
-                                        <button type="submit" id="submitBtn" class="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition">Save Outlet</button>
-                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-300 transition">Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- LIST -->
-                        <div class="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                            <div class="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                                <h4 class="font-bold text-slate-700 text-lg">Outlet Directory</h4>
-                                <span class="bg-white border border-slate-200 px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm">All Shops</span>
-                            </div>
-                            <div class="overflow-x-auto flex-1">
-                                <table class="w-full text-sm text-left whitespace-nowrap">
-                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
-                                        <tr>
-                                            <th class="p-4 border-b border-slate-100">Details</th>
-                                            <th class="p-4 border-b border-slate-100">Contact</th>
-                                            <th class="p-4 border-b border-slate-100">Status</th>
-                                            <th class="p-4 border-b border-slate-100 text-right">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="outlets-table-body" class="divide-y divide-slate-100">
-                                        <tr><td colspan="4" class="p-8 text-center text-slate-400">Loading directory...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                <!-- STATS GRID -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                    <!-- Stat 1 -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
+                        <div class="text-blue-500 bg-blue-50 p-2 rounded-full mb-2 text-xl">🙋‍♂️</div>
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">Present</p>
+                        <p class="text-xl font-bold text-gray-800" id="stat-attendance">0</p>
+                    </div>
+                    <!-- Stat 2 -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
+                        <div class="text-purple-500 bg-purple-50 p-2 rounded-full mb-2 text-xl">📦</div>
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">Orders</p>
+                        <p class="text-xl font-bold text-gray-800" id="stat-orders">0</p>
+                    </div>
+                    <!-- Stat 3 -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
+                        <div class="text-green-500 bg-green-50 p-2 rounded-full mb-2 text-xl">💰</div>
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">Sales</p>
+                        <p class="text-xl font-bold text-green-600" id="stat-sales">$0</p>
+                    </div>
+                    <!-- Stat 4 -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center items-center text-center">
+                        <div class="text-orange-500 bg-orange-50 p-2 rounded-full mb-2 text-xl">📉</div>
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-wide">Credit</p>
+                        <p class="text-xl font-bold text-orange-600" id="stat-credit">$0</p>
                     </div>
                 </div>
 
-                <!-- ================= TAB 3: ROUTES ================= -->
-                <div id="tab-routes" class="tab-content hidden-tab h-full">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[80vh]">
-                        
-                        <!-- LEFT PANEL: Create & List -->
-                        <div class="flex flex-col gap-6 h-full">
-                            <!-- Create Card -->
-                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 shrink-0">
-                                <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                                    <span class="material-icons-round text-brand-500">add_road</span> New Route
-                                </h3>
-                                <form id="createRouteForm" class="space-y-3">
-                                    <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Mon North)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
-                                    <div class="relative">
-                                        <select id="routeSalesmanSelect" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none appearance-none font-medium text-slate-700">
-                                            <option value="">Assign Salesman</option>
-                                        </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500"><span class="material-icons-round">expand_more</span></div>
-                                    </div>
-                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-md hover:bg-brand-700 transition">Create Route</button>
-                                </form>
-                            </div>
-                            
-                            <!-- List Card -->
-                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
-                                <div class="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 text-sm uppercase tracking-wide">Active Routes</div>
-                                <ul id="routes-list-group" class="divide-y divide-slate-100 overflow-y-auto flex-1 p-0">
-                                    <li class="p-6 text-center text-slate-400 italic">Loading routes...</li>
-                                </ul>
+                <!-- ATTENDANCE -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-base font-bold text-gray-800">Attendance</h3>
+                        <div class="flex gap-2">
+                            <input type="date" id="attendanceDateFilter" class="bg-gray-50 border-0 rounded text-xs p-2 text-gray-600 focus:ring-2 focus:ring-blue-500">
+                            <button onclick="loadAttendanceByDate()" class="bg-blue-600 text-white rounded-lg p-2 shadow-sm shadow-blue-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto rounded-lg border border-gray-100">
+                        <table class="w-full text-left text-sm text-gray-600">
+                            <thead class="bg-gray-50 uppercase text-[10px] text-gray-400 font-semibold tracking-wider">
+                                <tr>
+                                    <th class="p-3">Salesman</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Info</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-list" class="divide-y divide-gray-100">
+                                <tr><td colspan="3" class="p-4 text-center text-xs text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: OUTLETS -->
+            <div id="tab-outlets" class="tab-content hidden">
+                <div class="flex flex-col gap-6">
+                    
+                    <!-- ADD OUTLET CARD -->
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h4 class="font-bold text-gray-800" id="formTitle">Add Outlet</h4>
+                            <div class="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                             </div>
                         </div>
+                        
+                        <form id="addOutletForm" class="space-y-4">
+                            <input type="hidden" id="editOutletId">
+                            
+                            <div class="space-y-3">
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wide">Details</label>
+                                <input type="text" id="shopName" placeholder="Shop Name" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all">
+                                <select id="outletType" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                                    <option value="" disabled selected>Select Type</option>
+                                    <option value="Shop">Shop</option>
+                                    <option value="Dhaba">Dhaba</option>
+                                    <option value="Cafe">Cafe</option>
+                                    <option value="Restaurant">Restaurant</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
 
-                        <!-- RIGHT PANEL: Configuration -->
-                        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
-                            <div class="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                <h4 class="font-bold text-lg text-slate-800">Route Config</h4>
-                                <span id="selectedRouteName" class="text-brand-600 font-extrabold bg-brand-50 px-3 py-1 rounded-lg text-sm border border-brand-100">None Selected</span>
+                            <div class="space-y-3">
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wide">Contact</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="text" id="ownerName" placeholder="Owner" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                                    <input type="tel" id="contactPhone" placeholder="Phone" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                                <input type="text" id="gstNumber" placeholder="GST (Optional)" class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <div class="space-y-3">
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wide">Terms</label>
+                                <select id="storeType" required class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                                    <option value="Cash">Cash Store</option>
+                                    <option value="Credit">Credit Store</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="number" id="creditDays" placeholder="Cr. Days" disabled class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm disabled:opacity-50">
+                                    <input type="number" id="creditLimit" placeholder="Cr. Limit" disabled class="w-full px-4 py-3 bg-gray-50 border-0 rounded-lg text-sm disabled:opacity-50">
+                                </div>
+                            </div>
+
+                            <!-- GPS -->
+                            <div class="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl">📍</span>
+                                    <span id="geoDisplay" class="text-xs text-blue-800 font-medium">GPS Required</span>
+                                </div>
+                                <button type="button" id="geoBtn" class="bg-blue-600 active:scale-95 text-white px-3 py-1.5 rounded-md text-xs font-bold shadow-sm">Capture</button>
+                                <input type="hidden" id="lat"><input type="hidden" id="lng">
+                            </div>
+
+                            <div class="flex gap-3 pt-2">
+                                <button type="submit" id="submitBtn" class="flex-1 bg-gray-900 text-white py-3 rounded-lg text-sm font-bold shadow-md active:bg-gray-800">Save Outlet</button>
+                                <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-1/3 bg-gray-200 text-gray-700 py-3 rounded-lg text-sm font-bold">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- OUTLET LIST -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="p-4 bg-gray-50 border-b">
+                            <h4 class="font-bold text-gray-700 text-sm uppercase tracking-wide">All Outlets</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-white text-gray-500 border-b">
+                                    <tr>
+                                        <th class="p-3 font-medium">Shop</th>
+                                        <th class="p-3 font-medium">Contact</th>
+                                        <th class="p-3 font-medium">Type</th>
+                                        <th class="p-3 text-right font-medium">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="outlets-table-body" class="divide-y divide-gray-100">
+                                    <tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs">Loading data...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: ROUTES -->
+            <div id="tab-routes" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <!-- CREATE ROUTE -->
+                    <div class="space-y-6">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                            <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <span>🚚</span> Create Route
+                            </h4>
+                            <form id="createRouteForm" class="flex flex-col gap-3">
+                                <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Area 51)" required class="w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                                <select id="routeSalesmanSelect" required class="w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                                    <option value="">Assign Salesman</option>
+                                </select>
+                                <button type="submit" class="bg-blue-600 text-white py-3 rounded-lg text-sm font-bold shadow-blue-200 shadow-sm mt-2">Create Route</button>
+                            </form>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                            <div class="p-3 bg-gray-50 border-b font-bold text-sm text-gray-600">Route List</div>
+                            <ul id="routes-list-group" class="divide-y divide-gray-100 max-h-60 overflow-y-auto">
+                                <li class="p-4 text-center text-sm text-gray-400">Loading routes...</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- ROUTE CONFIG -->
+                    <div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col min-h-[400px]">
+                            <div class="p-4 border-b bg-gray-50">
+                                <p class="text-xs text-gray-400 uppercase font-bold">Editing</p>
+                                <h4 class="font-bold text-lg text-blue-700 truncate" id="selectedRouteName">No Selection</h4>
                                 <input type="hidden" id="selectedRouteId">
                             </div>
                             
-                            <div class="p-5 flex-grow overflow-y-auto bg-slate-50/30">
+                            <div class="p-4 flex-grow relative">
                                 <div id="routeConfigPanel" class="hidden h-full flex flex-col">
-                                    <!-- Add Shop Bar -->
-                                    <div class="flex gap-2 mb-4 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                                        <div class="relative flex-grow">
-                                            <select id="allOutletsDropdown" class="w-full bg-transparent p-2 text-sm outline-none font-medium text-slate-700 appearance-none">
-                                                <option>Select Outlet to Add...</option>
-                                            </select>
-                                        </div>
-                                        <button onclick="addOutletToRoute()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow transition">Add Stop</button>
+                                    <!-- Add Shop -->
+                                    <div class="flex gap-2 mb-4">
+                                        <select id="allOutletsDropdown" class="flex-grow p-2.5 bg-white border rounded-lg text-sm shadow-sm">
+                                            <option value="">Select Outlet</option>
+                                        </select>
+                                        <button onclick="addOutletToRoute()" class="bg-green-600 text-white px-4 rounded-lg shadow-sm text-lg font-bold">+</button>
                                     </div>
 
-                                    <!-- Table -->
-                                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex-grow">
-                                        <div class="overflow-x-auto">
-                                            <table class="w-full text-sm text-left">
-                                                <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
-                                                    <tr><th class="p-3 w-16 text-center">Seq</th><th class="p-3">Outlet Name</th><th class="p-3 text-right">Actions</th></tr>
-                                                </thead>
-                                                <tbody id="route-outlets-list" class="divide-y divide-slate-100"></tbody>
-                                            </table>
-                                        </div>
+                                    <!-- List -->
+                                    <div class="flex-grow overflow-auto border rounded-lg">
+                                        <table class="w-full text-sm text-left">
+                                            <thead class="bg-gray-100 sticky top-0">
+                                                <tr>
+                                                    <th class="p-2 w-10">#</th>
+                                                    <th class="p-2">Stop Name</th>
+                                                    <th class="p-2 text-right">Del</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="route-outlets-list" class="divide-y divide-gray-100"></tbody>
+                                        </table>
                                     </div>
                                 </div>
                                 
-                                <!-- Empty State -->
-                                <div id="routeConfigMsg" class="h-full flex flex-col items-center justify-center text-slate-400">
-                                    <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-300">
-                                        <span class="material-icons-round text-4xl">alt_route</span>
-                                    </div>
-                                    <p class="font-medium">Select a route from the list to manage stops.</p>
+                                <div id="routeConfigMsg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-300">
+                                    <span class="text-4xl mb-2">👆</span>
+                                    <p class="text-sm">Select a route above</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- ================= TAB 4: PRODUCTS ================= -->
-                <div id="tab-products" class="tab-content hidden-tab">
-                    <div class="flex flex-col lg:flex-row gap-6 items-start">
-                        <!-- Add Form -->
-                        <div class="w-full lg:w-80 shrink-0">
-                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
-                                <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
-                                    <span class="material-icons-round text-brand-600">add_box</span> Add Product
-                                </h3>
-                                <form id="addProductForm" class="space-y-3">
-                                    <input type="text" id="prodName" placeholder="Product Name" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-500 font-medium">
-                                    
-                                    <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
-                                    <datalist id="catSuggestions"><option value="Beverages"><option value="Snacks"><option value="Dairy"></datalist>
-                                    
-                                    <input type="text" id="prodHSN" placeholder="HSN Code" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
-                                    
-                                    <div class="relative">
-                                        <span class="absolute left-4 top-3 text-slate-400 font-bold">₹</span>
-                                        <input type="number" id="prodPrice" placeholder="0.00" step="0.01" required class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-4 py-3 text-sm outline-none font-bold text-slate-800">
-                                    </div>
-                                    
-                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition mt-2">Add to Inventory</button>
-                                </form>
-                            </div>
+            <!-- TAB 4: PRODUCTS -->
+            <div id="tab-products" class="tab-content hidden">
+                <div class="flex flex-col gap-6">
+                    <!-- ADD PRODUCT -->
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="font-bold text-gray-800">New Product</h4>
+                            <span class="text-2xl">📦</span>
                         </div>
+                        <form id="addProductForm" class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="prodName" placeholder="Product Name" required class="col-span-2 w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                                <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                                <input type="number" id="prodPrice" placeholder="Price (₹)" step="0.01" required class="w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                            </div>
+                            <datalist id="catSuggestions">
+                                <option value="Beverages">
+                                <option value="Snacks">
+                                <option value="Dairy">
+                            </datalist>
+                            <input type="text" id="prodHSN" placeholder="HSN Code (Optional)" class="w-full p-3 bg-gray-50 border-0 rounded-lg text-sm">
+                            <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg text-sm font-bold shadow-md mt-2">Add to Inventory</button>
+                        </form>
+                    </div>
 
-                        <!-- Inventory Table -->
-                        <div class="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div class="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                                <h4 class="font-bold text-slate-700 text-lg">Product Inventory</h4>
-                                <button onclick="loadProducts()" class="text-brand-600 hover:text-brand-700"><span class="material-icons-round">refresh</span></button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-left">
-                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
-                                        <tr><th class="p-4 border-b">Item Name</th><th class="p-4 border-b">Category</th><th class="p-4 border-b">Price</th><th class="p-4 border-b text-right">Delete</th></tr>
-                                    </thead>
-                                    <tbody id="product-list-body" class="divide-y divide-slate-100 text-slate-700">
-                                        <tr><td colspan="4" class="p-8 text-center text-slate-400 italic">Loading inventory...</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <!-- INVENTORY LIST -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="p-4 bg-gray-50 border-b font-bold text-sm text-gray-700">Current Inventory</div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-white text-gray-500 border-b">
+                                    <tr>
+                                        <th class="p-3">Name</th>
+                                        <th class="p-3">Cat</th>
+                                        <th class="p-3">Price</th>
+                                        <th class="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="product-list-body" class="divide-y divide-gray-100">
+                                    <tr><td colspan="4" class="p-4 text-center text-xs">Loading...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- ================= TAB 5: STAFF ================= -->
-                <div id="tab-staff" class="tab-content hidden-tab">
-                    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-                        <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                            <span class="material-icons-round text-4xl">badge</span>
-                        </div>
-                        <h3 class="text-2xl font-bold text-slate-800 mb-2">Field Force</h3>
-                        <p class="text-slate-500 mb-8">Active Salesmen currently registered in the system.</p>
-                        
-                        <div class="text-left bg-slate-50 rounded-2xl border border-slate-200 p-1 overflow-hidden">
-                            <ul id="salesmen-list" class="divide-y divide-slate-200">
-                                <li class="p-4 text-center text-slate-400 italic">Loading list...</li>
-                            </ul>
-                        </div>
-                        
-                        <p class="mt-6 text-xs text-slate-400">To add new staff, create a user in Firebase Auth and add a doc in 'users' collection.</p>
-                    </div>
+            <!-- TAB 5: STAFF -->
+            <div id="tab-staff" class="tab-content hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[50vh]">
+                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2 border-b pb-4">
+                        <span class="bg-purple-100 text-purple-600 p-2 rounded-lg">👥</span> Active Sales Team
+                    </h3>
+                    <ul id="salesmen-list" class="space-y-3">
+                        <li class="text-gray-400 italic text-center mt-10">Fetching staff list...</li>
+                    </ul>
                 </div>
+            </div>
 
-            </div> <!-- End Scrollable -->
         </main>
 
-        <!-- MOBILE BOTTOM NAV (Visible only on small screens) -->
-        <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 z-50 flex justify-around py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
-            <button onclick="switchTab('tab-dashboard')" class="mobile-nav-item mobile-nav-active flex flex-col items-center p-2 rounded-xl transition">
-                <span class="material-icons-round text-2xl mb-0.5">dashboard</span>
-                <span class="text-[10px] font-bold">Home</span>
-            </button>
-            <button onclick="switchTab('tab-outlets')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
-                <span class="material-icons-round text-2xl mb-0.5">store</span>
-                <span class="text-[10px] font-bold">Shops</span>
-            </button>
-            <button onclick="switchTab('tab-routes')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
-                <span class="material-icons-round text-2xl mb-0.5">alt_route</span>
-                <span class="text-[10px] font-bold">Route</span>
-            </button>
-            <button onclick="switchTab('tab-products')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
-                <span class="material-icons-round text-2xl mb-0.5">inventory_2</span>
-                <span class="text-[10px] font-bold">Items</span>
-            </button>
+        <!-- ============================================
+             BOTTOM NAVIGATION BAR (Fixed)
+        ============================================= -->
+        <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-up z-50 pb-safe">
+            <div class="container mx-auto px-1 max-w-5xl">
+                <div class="flex justify-between items-center" id="tabs-container">
+                    
+                    <!-- Tab 1 -->
+                    <button onclick="switchTab('tab-dashboard')" class="nav-item active flex-1 py-2 flex flex-col items-center justify-center group touch-manipulation">
+                        <div class="icon-box p-1.5 rounded-xl mb-0.5 text-gray-400 group-hover:text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                        </div>
+                        <span class="text-[10px] font-medium text-gray-400">Home</span>
+                    </button>
+
+                    <!-- Tab 2 -->
+                    <button onclick="switchTab('tab-outlets')" class="nav-item flex-1 py-2 flex flex-col items-center justify-center group touch-manipulation">
+                        <div class="icon-box p-1.5 rounded-xl mb-0.5 text-gray-400 group-hover:text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                        </div>
+                        <span class="text-[10px] font-medium text-gray-400">Outlets</span>
+                    </button>
+
+                    <!-- Tab 3 -->
+                    <button onclick="switchTab('tab-routes')" class="nav-item flex-1 py-2 flex flex-col items-center justify-center group touch-manipulation">
+                        <div class="icon-box p-1.5 rounded-xl mb-0.5 text-gray-400 group-hover:text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                            </svg>
+                        </div>
+                        <span class="text-[10px] font-medium text-gray-400">Routes</span>
+                    </button>
+
+                    <!-- Tab 4 -->
+                    <button onclick="switchTab('tab-products')" class="nav-item flex-1 py-2 flex flex-col items-center justify-center group touch-manipulation">
+                        <div class="icon-box p-1.5 rounded-xl mb-0.5 text-gray-400 group-hover:text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                        </div>
+                        <span class="text-[10px] font-medium text-gray-400">Items</span>
+                    </button>
+
+                    <!-- Tab 5 -->
+                    <button onclick="switchTab('tab-staff')" class="nav-item flex-1 py-2 flex flex-col items-center justify-center group touch-manipulation">
+                        <div class="icon-box p-1.5 rounded-xl mb-0.5 text-gray-400 group-hover:text-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                        </div>
+                        <span class="text-[10px] font-medium text-gray-400">Team</span>
+                    </button>
+                    
+                </div>
+            </div>
         </nav>
 
-    </div>
+    </div> <!-- End Content -->
 
-    <!-- UI SCRIPT (TAB LOGIC) -->
+    <!-- JAVASCRIPT FOR TABS -->
     <script>
-        // Update Date Display
-        const dateEl = document.getElementById('currentDateDisplay');
-        if(dateEl) {
-            const options = { weekday: 'long', day: 'numeric', month: 'short' };
-            dateEl.innerText = new Date().toLocaleDateString('en-US', options);
+        function switchTab(tabId) {
+            // 1. Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => {
+                content.classList.add('hidden');
+                content.classList.remove('block');
+            });
+
+            // 2. Deactivate all navigation items
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                // Reset colors manually for non-active states
+                const iconBox = item.querySelector('.icon-box');
+                const label = item.querySelector('span');
+                iconBox.classList.remove('text-blue-600', 'bg-blue-50');
+                iconBox.classList.add('text-gray-400');
+                label.classList.remove('text-blue-600', 'font-semibold');
+                label.classList.add('text-gray-400');
+            });
+
+            // 3. Show selected tab
+            const selectedContent = document.getElementById(tabId);
+            if(selectedContent) {
+                selectedContent.classList.remove('hidden');
+                selectedContent.classList.add('block');
+            }
+
+            // 4. Activate clicked button (event target lookup)
+            const btns = Array.from(document.querySelectorAll('.nav-item'));
+            const activeBtn = btns.find(b => b.getAttribute('onclick').includes(tabId));
+            
+            if(activeBtn) {
+                activeBtn.classList.add('active');
+                // Apply active styles
+                const iconBox = activeBtn.querySelector('.icon-box');
+                const label = activeBtn.querySelector('span');
+                
+                iconBox.classList.remove('text-gray-400');
+                iconBox.classList.add('text-blue-600'); // No bg change here due to CSS handling it via .active
+                
+                label.classList.remove('text-gray-400');
+                label.classList.add('text-blue-600');
+            }
+            
+            // Scroll to top when switching tabs
+            window.scrollTo(0, 0);
         }
-
-        // Tab Switching Logic
-        window.switchTab = function(tabId) {
-            // 1. Hide all contents
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.add('hidden-tab');
-                el.classList.remove('block-tab');
-            });
-
-            // 2. Show active content
-            document.getElementById(tabId).classList.remove('hidden-tab');
-            document.getElementById(tabId).classList.add('block-tab');
-
-            // 3. Update Desktop Sidebar
-            document.querySelectorAll('.nav-item').forEach(btn => {
-                btn.classList.remove('bg-slate-800', 'text-white', 'shadow-md');
-                btn.classList.add('text-slate-300');
-                if(btn.getAttribute('onclick').includes(tabId)) {
-                    btn.classList.remove('text-slate-300');
-                    btn.classList.add('bg-slate-800', 'text-white', 'shadow-md');
-                }
-            });
-
-            // 4. Update Mobile Bottom Nav
-            document.querySelectorAll('.mobile-nav-item').forEach(btn => {
-                btn.classList.remove('mobile-nav-active', 'text-brand-600');
-                btn.classList.add('text-slate-400');
-                if(btn.getAttribute('onclick').includes(tabId)) {
-                    btn.classList.remove('text-slate-400');
-                    btn.classList.add('mobile-nav-active', 'text-brand-600');
-                }
-            });
-        };
-
-        // Set initial active state
-        const firstBtn = document.querySelector('.nav-item');
-        if(firstBtn) {
-            firstBtn.classList.remove('text-slate-300');
-            firstBtn.classList.add('bg-slate-800', 'text-white', 'shadow-md');
-        }
-
-        // Mobile Logout
-        document.getElementById('logoutBtnMobile')?.addEventListener('click', () => {
-            document.getElementById('logoutBtn').click();
-        });
     </script>
 
-    <!-- FIREBASE LOGIC -->
+    <!-- MODULE SCRIPT -->
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
