@@ -37,28 +37,34 @@
         .bottom-nav-item.active span { color: #2563eb; }
 
 
-
-        /* Force the map container to fill the screen */
+/* FORCE the map container to exist with physical dimensions */
 #full-map-view {
-    height: 100vh !important;
-    width: 100vw !important;
     position: fixed !important;
     top: 0;
     left: 0;
-    z-index: 30; /* Higher than content, lower than bottom-nav */
+    width: 100vw !important;
+    height: 100vh !important;
+    background: white;
+    z-index: 30; /* Above content, below modals */
 }
 
 #all-shops-map {
-    height: 100% !important;
+    position: absolute !important;
+    top: 60px !important;    /* Header height */
+    bottom: 72px !important; /* Nav height */
+    left: 0;
+    right: 0;
     width: 100% !important;
-    background: #f1f5f9; /* Gray background so you see it's there */
+    height: auto !important; /* Height is calculated by top/bottom */
+    background: #e5e7eb;     /* Gray color to prove container exists */
 }
 
-/* Ensure Leaflet tiles are visible */
+/* Fix for Leaflet tiles appearing gray/blank */
 .leaflet-container {
-    height: 100% !important;
-    width: 100% !important;
+    background: #f8fafc !important;
+    outline: 0;
 }
+
     </style>
 </head>
 <body class="pb-20"> <!-- Padding bottom for nav bar -->
@@ -273,7 +279,7 @@
 
 
 
-<!-- Full Map Section -->
+<!-- Full Map View Section -->
 <div id="full-map-view" class="view-section hidden">
     <div id="all-shops-map"></div>
 </div>
