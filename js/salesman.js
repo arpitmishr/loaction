@@ -19,7 +19,7 @@ let visitStartTime = null;
 let timerInterval = null;
 
 // --- CONFIGURATION ---
-const GEO_FENCE_RADIUS = 10; // 10 Meters Strict Limit
+const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
 console.log("Salesman Script Loaded");
 
