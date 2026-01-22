@@ -20,6 +20,24 @@
 
             <!-- STATISTICS GRID -->
             <div class="dashboard-grid">
+
+                <!-- Add this inside .dashboard-grid or below it -->
+<div class="card" style="grid-column: 1 / -1;">
+    <h3>📅 Today's Attendance</h3>
+    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+        <thead>
+            <tr style="border-bottom: 2px solid #eee;">
+                <th style="padding: 10px;">Salesman</th>
+                <th>Time</th>
+                <th>Map</th>
+            </tr>
+        </thead>
+        <tbody id="attendance-list">
+            <tr><td colspan="3">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+                
                 <!-- Card 1: Attendance -->
                 <div class="stat-card">
                     <span class="stat-icon">🙋‍♂️</span>
