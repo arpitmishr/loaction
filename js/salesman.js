@@ -114,3 +114,108 @@ async function loadRouteOutlets(routeId) {
         list.innerHTML = '<li>Error loading shops (Check Console).</li>';
     }
 }
+
+
+
+
+// --- ATTENDANCE LOGIC ---
+
+function getTodayDateString() {
+    // Returns "YYYY-MM-DD" based on local time
+    const d = new Date();
+    return d.getFullYear() + "-" + 
+           String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+           String(d.getDate()).padStart(2, '0');
+}
+
+async function checkTodayAttendance(user) {
+    const statusEl = document.getElementById('attendance-status');
+    const btn = document.getElementById('checkInBtn');
+    const todayStr = getTodayDateString();
+
+    try {
+        // Query: Find attendance docs for THIS user + THIS date
+        const q = query(
+            collection(db, "attendance"),
+            where("salesmanId", "==", user.uid),
+            where("date", "==", todayStr)
+        );
+
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+            // Already checked in
+            const data = snap.docs[0].data();
+            const time = data.checkInTime.toDate().toLocaleTimeString();
+            statusEl.innerHTML = `✅ Checked in at <b>${time}</b>`;
+            statusEl.style.color = "green";
+            btn.innerText = "Attendance Marked";
+            btn.disabled = true;
+        } else {
+            // Not checked in yet
+            statusEl.innerText = "You haven't checked in today.";
+            btn.disabled = false;
+        }
+    } catch (error) {
+        console.error("Error checking attendance:", error);
+        statusEl.innerText = "Error loading status.";
+    }
+}
+
+function handleCheckIn(user) {
+    const btn = document.getElementById('checkInBtn');
+    const statusEl = document.getElementById('attendance-status');
+
+    if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+    }
+
+    btn.innerText = "Locating...";
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            try {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const todayStr = getTodayDateString();
+
+                // Create the Record
+                await addDoc(collection(db, "attendance"), {
+                    salesmanId: user.uid,
+                    salesmanEmail: user.email, // Storing email saves a read query later
+                    date: todayStr,
+                    checkInTime: Timestamp.now(),
+                    location: new GeoPoint(lat, lng),
+                    device: navigator.userAgent // Optional: Track device info
+                });
+
+                // UI Update
+                alert("Check-in Successful!");
+                checkTodayAttendance(user); // Refresh UI
+
+            } catch (error) {
+                console.error("Firestore Error:", error);
+                alert("Failed to save attendance. Try again.");
+                btn.disabled = false;
+                btn.innerText = "📍 Check In Now";
+            }
+        },
+        (error) => {
+            // Location Error Handling
+            console.error("Geo Error:", error);
+            let msg = "Location error.";
+            if(error.code === 1) msg = "Please allow location access to check in.";
+            if(error.code === 2) msg = "Location unavailable. GPS signal lost.";
+            if(error.code === 3) msg = "Location request timed out.";
+            
+            alert(msg);
+            statusEl.innerText = msg;
+            statusEl.style.color = "red";
+            btn.disabled = false;
+            btn.innerText = "📍 Check In Now";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
