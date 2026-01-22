@@ -225,6 +225,31 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module" src="js/salesman.js"></script>
+<!-- LEAVE REQUEST MODAL -->
+<div id="leaveModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:white; padding:20px; border-radius:8px; width:85%; max-width:320px;">
+        <h3>📅 Request Leave / Half Day</h3>
+        
+        <label>Select Date:</label>
+        <input type="date" id="leaveDate" style="width:100%; padding:8px; margin-bottom:10px;">
+        
+        <label>Type:</label>
+        <select id="leaveType" style="width:100%; padding:8px; margin-bottom:10px;">
+            <option value="Full Day">Full Day Leave</option>
+            <option value="Half Day">Half Day</option>
+            <option value="Sick Leave">Sick Leave</option>
+        </select>
 
+        <label>Reason / Remark:</label>
+        <textarea id="leaveReason" rows="3" placeholder="e.g. Doctor appointment" style="width:100%; padding:8px; margin-bottom:15px;"></textarea>
+
+        <div style="display:flex; gap:10px;">
+            <button onclick="document.getElementById('leaveModal').style.display='none'" style="flex:1; padding:10px; border:none; background:#ccc;">Cancel</button>
+            <button onclick="submitLeaveRequest()" style="flex:1; padding:10px; border:none; background:#007bff; color:white;">Submit</button>
+        </div>
+    </div>
+</div>
+
+  
 </body>
 </html>
