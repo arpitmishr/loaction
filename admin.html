@@ -45,13 +45,20 @@
 
                 <!-- Add this inside .dashboard-grid or below it -->
 <div class="card" style="grid-column: 1 / -1;">
-    <h3>📅 Today's Attendance</h3>
-    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 style="margin:0;">📅 Attendance Register</h3>
+        <div>
+            <input type="date" id="attendanceDateFilter" style="padding:5px;">
+            <button onclick="loadAttendanceByDate()" style="padding:5px 10px; cursor:pointer;">🔍 View</button>
+        </div>
+    </div>
+
+    <table class="styled-table">
         <thead>
-            <tr style="border-bottom: 2px solid #eee;">
-                <th style="padding: 10px;">Salesman</th>
-                <th>Time</th>
-                <th>Map</th>
+            <tr>
+                <th>Salesman</th>
+                <th>Status</th>
+                <th>Details / Map / Reason</th>
             </tr>
         </thead>
         <tbody id="attendance-list">
@@ -288,7 +295,22 @@
     </div>
 </div>
 
-            
+          <div class="card">
+              <div id="leave-approval-section" class="card" style="display:none; border-left: 5px solid #17a2b8; background: #e0f7fa; margin-bottom: 20px;">
+    <h3 style="margin-top:0;">📅 Leave Requests Pending</h3>
+    <table class="styled-table" style="background: white;">
+        <thead>
+            <tr>
+                <th>Salesman</th>
+                <th>Date & Type</th>
+                <th>Reason</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="leave-approval-list"></tbody>
+    </table>
+</div>
+          </div>
             
 
             <!-- Existing lists (Optional, keep or remove) -->
