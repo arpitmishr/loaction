@@ -807,3 +807,54 @@ window.submitPayment = async function() {
         modal.style.display = 'flex'; // Reopen on error
     }
 };
+
+
+
+
+
+// ==========================================
+//      LEAVE REQUEST LOGIC
+// ==========================================
+
+window.openLeaveModal = function() {
+    document.getElementById('leaveModal').style.display = 'flex';
+    // Set default date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('leaveDate').valueAsDate = tomorrow;
+};
+
+window.submitLeaveRequest = async function() {
+    const date = document.getElementById('leaveDate').value;
+    const type = document.getElementById('leaveType').value;
+    const reason = document.getElementById('leaveReason').value.trim();
+    const btn = document.querySelector('#leaveModal button[onclick="submitLeaveRequest()"]');
+
+    if(!date || !reason) return alert("Please select date and provide a reason.");
+
+    btn.disabled = true;
+    btn.innerText = "Sending...";
+
+    try {
+        await addDoc(collection(db, "leaves"), {
+            salesmanId: auth.currentUser.uid,
+            salesmanEmail: auth.currentUser.email, // Store email/name for display
+            date: date, // Format YYYY-MM-DD
+            type: type,
+            reason: reason,
+            status: "pending",
+            createdAt: Timestamp.now()
+        });
+
+        alert("Request Sent! Waiting for Admin approval.");
+        document.getElementById('leaveModal').style.display = 'none';
+        document.getElementById('leaveReason').value = ""; // Reset
+
+    } catch (error) {
+        console.error("Leave Error:", error);
+        alert("Failed to send request: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Submit";
+    }
+};
