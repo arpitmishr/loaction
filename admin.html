@@ -15,24 +15,7 @@
 
 <div class="container" style="margin-bottom: 20px;">
     <!-- ALERTS SECTION -->
-    <div id="approval-section" class="card" style="border-left: 5px solid #ffc107; display:none;">
-        <h3>🔔 Payment Approvals needed</h3>
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Shop</th>
-                    <th>Amount</th>
-                    <th>Salesman</th>
-                    <th>Method</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="approval-list">
-                <!-- Loaded via JS -->
-            </tbody>
-        </table>
-    </div>
-</div>
+  
             <h1>Admin Panel</h1>
             <button id="logoutBtn">Logout</button>
         </nav>
@@ -40,6 +23,22 @@
         
         <div class="container">
             <p>Welcome, <span id="user-email">Admin</span></p>
+
+              <!-- NOTIFICATION BOX -->
+    <div id="approval-section" class="card" style="display:none; border-left: 5px solid #ffc107; background: #fff8e1; margin-bottom: 20px;">
+        <h3 style="margin-top:0;">🔔 Payment Approvals Needed</h3>
+        <table class="styled-table" style="background: white;">
+            <thead>
+                <tr>
+                    <th>Shop</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="approval-list"></tbody>
+        </table>
+    </div>
 
             <!-- STATISTICS GRID -->
             <div class="dashboard-grid">
