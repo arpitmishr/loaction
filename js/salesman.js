@@ -178,38 +178,70 @@ async function loadShops(routeId) {
 
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
-window.openVisitPanel = function(outletId, name, shopLat, shopLng) {
-    // Switch Views
+window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
+
+    // ── Switch Views ─────────────────────────────
     document.getElementById('route-view').style.display = 'none';
     document.getElementById('visit-view').style.display = 'block';
-    
+
     document.getElementById('visit-shop-name').innerText = name;
     document.getElementById('dist-display').innerText = "Locating...";
-    
-    // Reset Controls
-    document.getElementById('btn-geo-checkin').style.display = 'block';
-    document.getElementById('btn-geo-checkin').disabled = true;
-    document.getElementById('btn-geo-checkin').innerText = "Waiting for GPS...";
+
+    // ── Reset Controls ───────────────────────────
+    const geoBtn = document.getElementById('btn-geo-checkin');
+    geoBtn.style.display = 'block';
+    geoBtn.disabled = true;
+    geoBtn.innerText = "Waiting for GPS...";
     document.getElementById('in-shop-controls').style.display = 'none';
-    
-    // Initialize Map
-    if(map) { map.remove(); } // Destroy previous instance
-    map = L.map('map').setView([shopLat, shopLng], 18); // High zoom
+
+    // ── NEW: Fetch Outstanding Balance ───────────
+    const balEl = document.getElementById('visit-outstanding-bal');
+    balEl.innerText = "Loading...";
+
+    try {
+        const docSnap = await getDoc(doc(db, "outlets", outletId));
+        if (docSnap.exists()) {
+            const bal = docSnap.data().currentBalance || 0;
+            balEl.innerText = "₹" + bal.toFixed(2);
+
+            // Save outlet info for payment modal
+            const payEl = document.getElementById('pay-outlet-name');
+            payEl.dataset.id = outletId;
+            payEl.innerText = name;
+        } else {
+            balEl.innerText = "₹0.00";
+        }
+    } catch (e) {
+        console.error("Balance fetch failed:", e);
+        balEl.innerText = "Error";
+    }
+
+    // ── Initialize Map ───────────────────────────
+    if (map) map.remove(); // Destroy previous instance
+
+    map = L.map('map').setView([shopLat, shopLng], 18);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // Add Shop Marker
-    shopMarker = L.marker([shopLat, shopLng]).addTo(map)
-        .bindPopup(`<b>${name}</b><br>Target Location`).openPopup();
+    // ── Shop Marker ──────────────────────────────
+    shopMarker = L.marker([shopLat, shopLng])
+        .addTo(map)
+        .bindPopup(`<b>${name}</b><br>Target Location`)
+        .openPopup();
 
-    // Add User Marker (Blue Circle)
-    userMarker = L.circleMarker([0,0], { radius: 8, color: 'blue', fillOpacity: 0.8 }).addTo(map);
+    // ── User Marker ──────────────────────────────
+    userMarker = L.circleMarker([0, 0], {
+        radius: 8,
+        color: 'blue',
+        fillOpacity: 0.8
+    }).addTo(map);
 
-    // Start Live Tracking
+    // ── Start Geo-Fencing ─────────────────────────
     startGeoFencing(shopLat, shopLng, outletId, name);
 };
+
 
 window.closeVisitPanel = function() {
     if(watchId) navigator.geolocation.clearWatch(watchId);
@@ -732,5 +764,46 @@ window.submitOrder = async function() {
     } finally {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
+    }
+};
+
+
+
+
+window.openPaymentModal = function() {
+    document.getElementById('paymentModal').style.display = 'flex';
+    document.getElementById('payAmount').value = "";
+};
+
+window.submitPayment = async function() {
+    const outletId = document.getElementById('pay-outlet-name').dataset.id;
+    const outletName = document.getElementById('pay-outlet-name').innerText;
+    const amount = parseFloat(document.getElementById('payAmount').value);
+    const method = document.getElementById('payMethod').value;
+    const modal = document.getElementById('paymentModal');
+
+    if(!amount || amount <= 0) return alert("Enter valid amount");
+
+    // 1. Close Modal immediately
+    modal.style.display = 'none';
+
+    try {
+        // 2. Add 'Pending' Payment
+        await addDoc(collection(db, "payments"), {
+            salesmanId: auth.currentUser.uid,
+            outletId: outletId,
+            outletName: outletName,
+            amount: amount,
+            method: method,
+            date: Timestamp.now(),
+            status: "pending" // Critical: Admin must approve
+        });
+
+        alert("Payment Recorded! Waiting for Admin Approval.");
+
+    } catch (error) {
+        console.error("Payment Error:", error);
+        alert("Failed to record payment: " + error.message);
+        modal.style.display = 'flex'; // Reopen on error
     }
 };
