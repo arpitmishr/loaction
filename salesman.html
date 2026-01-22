@@ -65,8 +65,6 @@
     </div>
 
 
-<!-- Add this inside <div class="container">, parallel to #visit-view and #route-view -->
-
 <div id="order-view" style="display: none;">
     <button onclick="cancelOrder()" style="margin-bottom:10px; background:#6c757d; color:white; border:none; padding:5px 10px; border-radius:4px;">⬅ Cancel</button>
     
@@ -74,13 +72,26 @@
         <h3>📝 New Order</h3>
         <h4 id="order-outlet-name" style="color:#007bff; margin-top:0;">Outlet Name</h4>
         
-        <!-- PHONE ORDER TOGGLE -->
-        <div style="background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffeeba; margin-bottom:15px; display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <strong>📞 Phone / Telephonic Order?</strong><br>
-                <small style="color:#856404;">(No Location Check + 5% GST)</small>
+        <!-- SETTINGS SECTION -->
+        <div style="display: grid; gap: 10px; margin-bottom: 15px;">
+            
+            <!-- 1. Phone Order Toggle (Skips GPS) -->
+            <div style="background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffeeba; display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                    <strong>📞 Phone Order?</strong><br>
+                    <small style="color:#856404;">(Skip Location Check)</small>
+                </div>
+                <input type="checkbox" id="isPhoneOrder" style="width:20px; height:20px;">
             </div>
-            <input type="checkbox" id="isPhoneOrder" style="width:20px; height:20px;">
+
+            <!-- 2. GST Toggle (Optional Tax) -->
+            <div style="background:#e2e3e5; padding:10px; border-radius:5px; border:1px solid #d6d8db; display:flex; align-items:center; justify-content:space-between;">
+                <div>
+                    <strong>💵 Apply 5% GST?</strong><br>
+                    <small style="color:#383d41;">(Optional for all orders)</small>
+                </div>
+                <input type="checkbox" id="applyGst" style="width:20px; height:20px;">
+            </div>
         </div>
 
         <!-- PRODUCT SELECTOR -->
@@ -111,7 +122,7 @@
         <!-- TOTALS -->
         <div style="text-align:right; border-top:2px solid #ddd; padding-top:10px;">
             <div>Subtotal: <span id="ord-subtotal">₹0.00</span></div>
-            <div id="tax-row" style="color:#d63384;">GST (5%): <span id="ord-tax">₹0.00</span></div>
+            <div id="tax-row" style="color:#d63384; display:none;">GST (5%): <span id="ord-tax">₹0.00</span></div>
             <div style="font-size:1.2rem; font-weight:bold; margin-top:5px;">Total: <span id="ord-grand-total">₹0.00</span></div>
         </div>
 
