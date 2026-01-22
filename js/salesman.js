@@ -511,7 +511,7 @@ function filterProducts(e) {
 
 
 // ==========================================
-//      ORDER TAKING LOGIC
+//      ORDER TAKING LOGIC (UPDATED)
 // ==========================================
 
 // 1. OPEN ORDER FORM
@@ -522,13 +522,10 @@ window.openOrderForm = async function(outletId, outletName) {
         if (!docSnap.exists()) return alert("Outlet not found.");
         
         const data = docSnap.data();
-        
-        // CHECK: Is Outlet Blocked?
         if (data.status === 'blocked') {
             alert("⛔ This outlet is BLOCKED. You cannot take orders.");
             return;
         }
-
         currentOrderOutlet = { id: outletId, name: outletName, data: data };
 
     } catch (e) {
@@ -538,29 +535,28 @@ window.openOrderForm = async function(outletId, outletName) {
     }
 
     // B. Switch UI
-    document.getElementById('visit-view').style.display = 'none'; // Hide visit/map
+    document.getElementById('visit-view').style.display = 'none';
     document.getElementById('order-view').style.display = 'block';
     
     document.getElementById('order-outlet-name').innerText = outletName;
     
-    // Reset Form
+    // Reset Form & Settings
     orderCart = [];
-    document.getElementById('isPhoneOrder').checked = false;
-    document.getElementById('isPhoneOrder').disabled = false;
+    document.getElementById('isPhoneOrder').checked = false; // Default: Physical Visit
+    document.getElementById('applyGst').checked = false;     // Default: No Tax
+    
     renderCart();
-
-    // Load Products for Dropdown
     populateProductDropdown();
     
-    // Attach Listener for Phone Toggle
-    document.getElementById('isPhoneOrder').onchange = renderCart; // Re-calc totals on toggle
+    // Attach Listeners for Toggles to Re-calculate Totals
+    document.getElementById('applyGst').onchange = renderCart;
 };
 
 window.cancelOrder = function() {
     if(orderCart.length > 0 && !confirm("Discard current order?")) return;
     document.getElementById('order-view').style.display = 'none';
     
-    // If we were in a visit, go back to visit view. Else go to route view.
+    // Return to previous view
     if(currentVisitId) {
         document.getElementById('visit-view').style.display = 'block';
     } else {
@@ -571,15 +567,13 @@ window.cancelOrder = function() {
 // 2. POPULATE DROPDOWN
 async function populateProductDropdown() {
     const select = document.getElementById('order-product-select');
-    if(select.options.length > 1) return; // Already loaded
+    if(select.options.length > 1) return; 
 
     try {
-        // Query active products
-        const q = query(collection(db, "products"), orderBy("name")); // Ensure index exists
+        const q = query(collection(db, "products"), orderBy("name")); 
         const snap = await getDocs(q);
 
         select.innerHTML = '<option value="">Select Product...</option>';
-        
         snap.forEach(doc => {
             const p = doc.data();
             const opt = document.createElement('option');
@@ -607,7 +601,6 @@ window.addToCart = function() {
     const price = parseFloat(select.options[select.selectedIndex].dataset.price);
     const name = select.options[select.selectedIndex].dataset.name;
 
-    // Check if exists
     const existing = orderCart.find(item => item.productId === productId);
     if (existing) {
         existing.qty += qty;
@@ -622,17 +615,16 @@ window.addToCart = function() {
         });
     }
 
-    qtyInput.value = ""; // Reset input
+    qtyInput.value = ""; 
     renderCart();
 };
 
-// 4. RENDER CART & CALCULATE TOTALS
+// 4. RENDER CART & CALCULATE TOTALS (GST INDEPENDENT)
 function renderCart() {
     const tbody = document.getElementById('order-cart-body');
-    const isPhone = document.getElementById('isPhoneOrder').checked;
+    const applyTax = document.getElementById('applyGst').checked; // Check GST Toggle
     
     tbody.innerHTML = "";
-    
     let subtotal = 0;
 
     orderCart.forEach((item, index) => {
@@ -647,9 +639,9 @@ function renderCart() {
         `;
     });
 
-    // GST Logic
+    // GST Calculation based ONLY on checkbox
     let gstAmount = 0;
-    if (isPhone) {
+    if (applyTax) {
         gstAmount = subtotal * 0.05; // 5% GST
         document.getElementById('tax-row').style.display = 'block';
     } else {
@@ -671,16 +663,16 @@ window.removeFromCart = function(index) {
 // 5. SUBMIT ORDER
 window.submitOrder = async function() {
     const isPhone = document.getElementById('isPhoneOrder').checked;
+    const applyTax = document.getElementById('applyGst').checked;
     const btn = document.getElementById('btn-submit-order');
 
     // VALIDATION 1: Empty Cart
     if (orderCart.length === 0) return alert("Cart is empty!");
 
-    // VALIDATION 2: Geo-Fencing
+    // VALIDATION 2: Geo-Fencing (Skipped if Phone Order is Checked)
     if (!isPhone) {
-        // If NOT a phone order, User MUST be "Checked In" (Active Visit)
         if (!currentVisitId) {
-            alert("❌ Geo-Fence Error:\nYou must be Checked-In to the shop to place a regular order.\n\nUse 'Phone Order' if you are taking this remotely.");
+            alert("❌ Geo-Fence Error:\nYou must be Checked-In to the shop to place a regular order.\n\nUse 'Phone Order' toggle if you are taking this remotely.");
             return;
         }
     }
@@ -692,16 +684,17 @@ window.submitOrder = async function() {
 
     try {
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
-        const tax = isPhone ? (subtotal * 0.05) : 0;
+        const tax = applyTax ? (subtotal * 0.05) : 0; // Tax depends on checkbox
         const total = subtotal + tax;
 
         const orderData = {
             salesmanId: auth.currentUser.uid,
             outletId: currentOrderOutlet.id,
             outletName: currentOrderOutlet.name,
-            visitId: isPhone ? null : currentVisitId, // Link to visit if present
+            visitId: isPhone ? null : currentVisitId,
             orderDate: Timestamp.now(),
             orderType: isPhone ? "Phone Call" : "Physical Visit",
+            isGstApplied: applyTax, // Record if tax was applied
             items: orderCart,
             financials: {
                 subtotal: subtotal,
@@ -711,24 +704,12 @@ window.submitOrder = async function() {
             status: "pending"
         };
 
-        // Write to Firestore
         await addDoc(collection(db, "orders"), orderData);
-
-        // Optional: Update Outlet Current Balance (Requires a Cloud Function in real production, but we can do client-side here)
-        // Note: This updates the balance in the outlet document immediately
-        /*
-        const outletRef = doc(db, "outlets", currentOrderOutlet.id);
-        await updateDoc(outletRef, {
-            currentBalance: (currentOrderOutlet.data.currentBalance || 0) + total
-        });
-        */
 
         alert("✅ Order Placed Successfully!");
         
-        // Cleanup
         document.getElementById('order-view').style.display = 'none';
         
-        // Return to appropriate screen
         if(currentVisitId) {
             document.getElementById('visit-view').style.display = 'block';
         } else {
@@ -742,4 +723,5 @@ window.submitOrder = async function() {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
     }
+};
 };
