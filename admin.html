@@ -67,6 +67,66 @@
                 </div>
             </div>
 
+
+
+
+<!-- OUTLET MANAGEMENT SECTION -->
+<div class="card" style="margin-top: 30px;">
+    <h3>🏪 Manage Outlets</h3>
+
+    <!-- 1. Add New Outlet Form -->
+    <div class="form-box">
+        <h4>Add New Shop</h4>
+        <form id="addOutletForm">
+            <div class="form-grid">
+                <input type="text" id="shopName" placeholder="Shop Name" required>
+                <input type="text" id="ownerName" placeholder="Owner Name" required>
+                <input type="tel" id="shopPhone" placeholder="Mobile Number" required>
+                <select id="shopCategory">
+                    <option value="Grocery">Grocery</option>
+                    <option value="Pharmacy">Pharmacy</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="General">General Store</option>
+                </select>
+            </div>
+            
+            <!-- GPS Section -->
+            <div style="margin: 15px 0; display: flex; align-items: center; gap: 10px;">
+                <button type="button" id="geoBtn" style="background: #666;">📍 Get GPS Location</button>
+                <span id="geoDisplay" style="font-size: 0.9rem; color: #666;">No location captured</span>
+                <input type="hidden" id="lat">
+                <input type="hidden" id="lng">
+            </div>
+
+            <button type="submit" class="btn-primary">Save Outlet</button>
+        </form>
+    </div>
+
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+    <!-- 2. Outlets List -->
+    <h4>All Outlets</h4>
+    <div class="table-responsive">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Shop Name</th>
+                    <th>Category</th>
+                    <th>Mobile</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="outlets-table-body">
+                <tr><td colspan="5">Loading outlets...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+            
+            
+
             <!-- Existing lists (Optional, keep or remove) -->
             <div class="card">
                 <h3>Active Salesmen</h3>
