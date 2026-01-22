@@ -899,27 +899,34 @@ window.submitLeaveRequest = async function() {
 
 window.initFullRouteMap = async function() {
     const mapContainer = document.getElementById('all-shops-map');
-    
-    // 1. Initialize Map if not already done
+    if (!mapContainer) return;
+
+    // 1. Clean up existing instance to prevent "Map already initialized" error
     if (fullMapInstance) {
-        fullMapInstance.remove(); // Reset to prevent double-init errors
+        fullMapInstance.remove();
+        fullMapInstance = null;
     }
-    
-    fullMapInstance = L.map('all-shops-map').setView([20.5937, 78.9629], 5); // Default India center
+
+    // 2. Create the Map Instance
+    fullMapInstance = L.map('all-shops-map').setView([20.5937, 78.9629], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
         attribution: '© OpenStreetMap'
     }).addTo(fullMapInstance);
 
+    // 3. FORCE LEAFLET TO RE-CALCULATE SIZE (The Fix)
+    setTimeout(() => {
+        fullMapInstance.invalidateSize();
+    }, 200);
+
     try {
-        // 2. Get Assigned Route
+        // 4. Fetch the route data
         const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", auth.currentUser.uid));
         const routeSnap = await getDocs(q);
         if (routeSnap.empty) return;
 
         const routeId = routeSnap.docs[0].id;
-
-        // 3. Get all shops in route
         const shopsQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
         const shopsSnap = await getDocs(shopsQ);
 
@@ -929,30 +936,25 @@ window.initFullRouteMap = async function() {
             const routeOutlet = docSnap.data();
             const outletDoc = await getDoc(doc(db, "outlets", routeOutlet.outletId));
             
-            if (outletDoc.exists()) {
-                const outletData = outletDoc.data();
-                if (outletData.geo) {
-                    const marker = L.marker([outletData.geo.lat, outletData.geo.lng])
-                        .addTo(fullMapInstance)
-                        .bindPopup(`
-                            <div style="font-family: sans-serif;">
-                                <b style="color:#2563eb;">${outletData.shopName}</b><br>
-                                <span style="font-size:10px; color:#666;">Stop #${routeOutlet.sequence}</span><br>
-                                <button onclick="switchView('route')" style="background:#2563eb; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; margin-top:5px; cursor:pointer;">Go to Route List</button>
-                            </div>
-                        `);
-                    markers.push([outletData.geo.lat, outletData.geo.lng]);
-                }
+            if (outletDoc.exists() && outletDoc.data().geo) {
+                const geo = outletDoc.data().geo;
+                const shopName = outletDoc.data().shopName;
+
+                const m = L.marker([geo.lat, geo.lng])
+                    .addTo(fullMapInstance)
+                    .bindPopup(`<b>${shopName}</b><br>Stop ${routeOutlet.sequence}`);
+                
+                markers.push([geo.lat, geo.lng]);
             }
         }
 
-        // 4. Zoom map to fit all markers
+        // 5. Fit the view to show all markers
         if (markers.length > 0) {
             const bounds = L.latLngBounds(markers);
             fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
         }
 
     } catch (error) {
-        console.error("Full Map Error:", error);
+        console.error("Full Map Loading Error:", error);
     }
 };
