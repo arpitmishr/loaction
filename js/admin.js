@@ -1,6 +1,6 @@
 // js/admin.js
 
-// 1. Consolidated Imports
+// 1. IMPORTS
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
@@ -12,7 +12,7 @@ import { logoutUser } from "./auth.js";
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
 
-// --- 2. Main Execution (Auth Guard) ---
+// --- 2. MAIN EXECUTION ---
 onAuthStateChanged(auth, async (user) => {
     // A. Not Logged In -> Redirect
     if (!user) {
@@ -38,19 +38,17 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById('user-email').innerText = user.email;
         }
 
-        // D. Load Data (After UI is visible)
-        // We run these separately so one failure doesn't stop the others
+        // D. Setup Forms (Do this immediately so listeners attach)
+        setupOutletForm();
+
+        // E. Load Data
         loadDashboardStats();
         loadTodayAttendance();
         loadOutlets(); 
-        loadSalesmenList();
-        
-        // E. Setup Forms
-        setupOutletForm();
+        loadSalesmenList(); // This function is now defined below
 
     } catch (error) {
         console.error("Dashboard Init Error:", error);
-        if (loader) loader.innerText = "Error loading dashboard. Check console.";
         alert("Error: " + error.message);
     }
 });
@@ -60,53 +58,40 @@ const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) logoutBtn.addEventListener('click', logoutUser);
 
 
-// --- 3. CORE DASHBOARD LOGIC ---
+// --- 3. DASHBOARD STATS LOGIC ---
 
 async function loadDashboardStats() {
     try {
-        // Define "Today"
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-
         const startTs = Timestamp.fromDate(startOfDay);
         const endTs = Timestamp.fromDate(endOfDay);
 
-        // Execute Queries
-        // Note: These might require indexes. Check Console if data is missing.
         const [attendanceSnap, ordersSnap, outletsSnap] = await Promise.all([
             getDocs(query(collection(db, "attendance"), where("checkInTime", ">=", startTs), where("checkInTime", "<", endTs))),
             getDocs(query(collection(db, "orders"), where("orderDate", ">=", startTs), where("orderDate", "<", endTs))),
             getDocs(collection(db, "outlets"))
         ]);
 
-        // Calculate Stats
-        const attendanceCount = attendanceSnap.size;
-        let totalOrders = ordersSnap.size;
         let totalSales = 0;
-        
-        ordersSnap.forEach(doc => {
-            totalSales += Number(doc.data().totalAmount) || 0;
-        });
+        ordersSnap.forEach(doc => totalSales += Number(doc.data().totalAmount) || 0);
 
         let totalCredit = 0;
-        outletsSnap.forEach(doc => {
-            totalCredit += Number(doc.data().currentBalance) || 0;
-        });
+        outletsSnap.forEach(doc => totalCredit += Number(doc.data().currentBalance) || 0);
 
-        // Update UI (Check if elements exist first)
         const elAttend = document.getElementById('stat-attendance');
         const elOrders = document.getElementById('stat-orders');
         const elSales = document.getElementById('stat-sales');
         const elCredit = document.getElementById('stat-credit');
 
-        if(elAttend) elAttend.innerText = attendanceCount;
-        if(elOrders) elOrders.innerText = totalOrders;
+        if(elAttend) elAttend.innerText = attendanceSnap.size;
+        if(elOrders) elOrders.innerText = ordersSnap.size;
         if(elSales) elSales.innerText = formatCurrency(totalSales);
         if(elCredit) elCredit.innerText = formatCurrency(totalCredit);
 
     } catch (error) {
-        console.error("Error loading stats (Likely missing Index):", error);
+        console.error("Stats Error (Check Indexes):", error);
     }
 }
 
@@ -125,48 +110,54 @@ async function loadTodayAttendance() {
             where("date", "==", todayStr),
             orderBy("checkInTime", "desc")
         );
-
         const snap = await getDocs(q);
         list.innerHTML = "";
-
         if (snap.empty) {
-            list.innerHTML = "<tr><td colspan='3' style='padding:15px; text-align:center'>No check-ins today.</td></tr>";
+            list.innerHTML = "<tr><td colspan='3' style='text-align:center'>No check-ins today.</td></tr>";
             return;
         }
-
         snap.forEach(doc => {
             const data = doc.data();
             const time = data.checkInTime ? data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
+            let mapLink = data.location 
+                ? `<a href="https://www.google.com/maps/search/?api=1&query=${data.location.latitude},${data.location.longitude}" target="_blank">View 📍</a>` 
+                : "No Loc";
             
-            // Handle missing location safely
-            let mapLink = "No Loc";
-            if (data.location) {
-                const lat = data.location.latitude;
-                const lng = data.location.longitude;
-                mapLink = `<a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" style="color: #007bff; text-decoration: none;">View 📍</a>`;
-            }
-
-            const row = `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px;">${data.salesmanEmail || 'Unknown'}</td>
-                    <td>${time}</td>
-                    <td>${mapLink}</td>
-                </tr>
-            `;
-            list.innerHTML += row;
+            list.innerHTML += `<tr style="border-bottom: 1px solid #eee;"><td style="padding:10px;">${data.salesmanEmail}</td><td>${time}</td><td>${mapLink}</td></tr>`;
         });
-
     } catch (error) {
-        console.error("Attendance Load Error:", error);
-        if(error.message.includes("index")) {
-            list.innerHTML = "<tr><td colspan='3' style='color:red'>Missing Index. Check Console (F12).</td></tr>";
-        }
+        console.error("Attendance Error:", error);
     }
 }
 
-// --- 4. OUTLET MANAGEMENT ---
+// --- 4. SALESMAN LIST (WAS MISSING) ---
 
-// --- OUTLET MANAGEMENT FUNCTIONS ---
+async function loadSalesmenList() {
+    const list = document.getElementById('salesmen-list');
+    if(!list) return;
+    list.innerHTML = '<li>Loading...</li>';
+
+    try {
+        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        const snap = await getDocs(q);
+        
+        list.innerHTML = "";
+        if(snap.empty) { list.innerHTML = "<li>No active salesmen found.</li>"; return; }
+
+        snap.forEach(doc => {
+            const d = doc.data();
+            const li = document.createElement('li');
+            li.textContent = `👤 ${d.fullName || d.email} ${d.phone ? ' - ' + d.phone : ''}`;
+            li.style.padding = "5px 0";
+            list.appendChild(li);
+        });
+    } catch (e) {
+        console.error("Salesmen List Error:", e);
+        list.innerHTML = "<li>Error loading list.</li>";
+    }
+}
+
+// --- 5. OUTLET MANAGEMENT ---
 
 function setupOutletForm() {
     const form = document.getElementById('addOutletForm');
@@ -175,10 +166,11 @@ function setupOutletForm() {
     const creditDaysInput = document.getElementById('creditDays');
     const creditLimitInput = document.getElementById('creditLimit');
     
-    if (!form) return;
+    if (!form || !storeTypeSelect) return;
 
     // 1. Dynamic Toggle: Enable/Disable Credit fields
     storeTypeSelect.addEventListener('change', (e) => {
+        // Ensure values compare correctly
         if (e.target.value === 'Credit') {
             creditDaysInput.disabled = false;
             creditLimitInput.disabled = false;
@@ -203,33 +195,32 @@ function setupOutletForm() {
             alert("Geolocation not supported");
             return;
         }
-
         btn.innerText = "Locating...";
         
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 document.getElementById('lat').value = pos.coords.latitude;
                 document.getElementById('lng').value = pos.coords.longitude;
-                display.innerText = `✅ Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
+                display.innerText = `✅ Captured`;
                 display.style.color = "green";
-                btn.innerText = "📍 Update Location";
+                btn.innerText = "📍 Update Loc";
             },
             (err) => {
                 console.error(err);
-                alert("Could not get location. Ensure GPS is on.");
+                alert("GPS Error. Ensure Location is ON.");
                 btn.innerText = "Retry GPS";
             }
         );
     });
 
-    // 3. Handle Submit (Add OR Edit)
+    // 3. Handle Submit
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = document.getElementById('submitBtn');
-        const editId = document.getElementById('editOutletId').value; // Check if we are editing
+        const editId = document.getElementById('editOutletId').value;
         
         submitBtn.disabled = true;
-        submitBtn.innerText = editId ? "Updating..." : "Saving...";
+        submitBtn.innerText = "Saving...";
 
         const lat = document.getElementById('lat').value;
         const lng = document.getElementById('lng').value;
@@ -242,7 +233,6 @@ function setupOutletForm() {
         }
 
         try {
-            // Prepare Data Object
             const outletData = {
                 shopName: document.getElementById('shopName').value.trim(),
                 outletType: document.getElementById('outletType').value,
@@ -253,26 +243,22 @@ function setupOutletForm() {
                 storeType: document.getElementById('storeType').value,
                 creditDays: document.getElementById('creditDays').value ? Number(document.getElementById('creditDays').value) : 0,
                 creditLimit: document.getElementById('creditLimit').value ? Number(document.getElementById('creditLimit').value) : 0,
-                geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
-                // Don't overwrite status or createdAt on edit unless necessary
+                geo: { lat: parseFloat(lat), lng: parseFloat(lng) }
             };
 
             if (editId) {
-                // --- UPDATE EXISTING ---
-                const docRef = doc(db, "outlets", editId);
-                await updateDoc(docRef, outletData);
-                alert("Outlet Updated Successfully!");
+                await updateDoc(doc(db, "outlets", editId), outletData);
+                alert("Updated Successfully!");
             } else {
-                // --- CREATE NEW ---
                 outletData.status = 'active';
                 outletData.currentBalance = 0;
                 outletData.createdAt = serverTimestamp();
                 await addDoc(collection(db, "outlets"), outletData);
-                alert("Outlet Added Successfully!");
+                alert("Added Successfully!");
             }
 
-            cancelEdit(); // Helper to reset form
-            loadOutlets(); // Refresh Table
+            cancelEdit();
+            loadOutlets();
 
         } catch (error) {
             console.error("Save Error:", error);
@@ -284,26 +270,16 @@ function setupOutletForm() {
     });
 }
 
-// Global Function: Populate form for Editing
+// Global Edit Function
 window.editOutlet = async function(id) {
     try {
-        // Scroll to form
         document.getElementById('addOutletForm').scrollIntoView({ behavior: 'smooth' });
+        const docSnap = await getDoc(doc(db, "outlets", id));
 
-        const docRef = doc(db, "outlets", id);
-        const docSnap = await getDoc(docRef);
-
-        if (!docSnap.exists()) {
-            alert("Outlet not found!");
-            return;
-        }
-
+        if (!docSnap.exists()) return;
         const data = docSnap.data();
 
-        // 1. Fill Hidden ID
         document.getElementById('editOutletId').value = id;
-
-        // 2. Fill Text/Select Inputs
         document.getElementById('shopName').value = data.shopName;
         document.getElementById('outletType').value = data.outletType;
         document.getElementById('ownerName').value = data.ownerName;
@@ -312,7 +288,7 @@ window.editOutlet = async function(id) {
         document.getElementById('gstNumber').value = data.gstNumber;
         document.getElementById('storeType').value = data.storeType;
 
-        // 3. Handle Credit Logic
+        // Trigger Credit Logic Manually for Edit Mode
         const creditDaysInput = document.getElementById('creditDays');
         const creditLimitInput = document.getElementById('creditLimit');
         
@@ -328,38 +304,28 @@ window.editOutlet = async function(id) {
             creditLimitInput.value = "";
         }
 
-        // 4. Fill GPS (Keep existing unless they click capture again)
         document.getElementById('lat').value = data.geo.lat;
         document.getElementById('lng').value = data.geo.lng;
-        document.getElementById('geoDisplay').innerText = `Existing: ${data.geo.lat}, ${data.geo.lng}`;
+        document.getElementById('geoDisplay').innerText = "Existing Location Kept";
         document.getElementById('geoDisplay').style.color = "blue";
 
-        // 5. Update UI Buttons
         document.getElementById('formTitle').innerText = "Edit Outlet";
         document.getElementById('submitBtn').innerText = "Update Outlet";
         document.getElementById('cancelEditBtn').style.display = "block";
 
     } catch (error) {
-        console.error("Edit fetch error:", error);
-        alert("Failed to fetch outlet details.");
+        console.error("Edit Error:", error);
     }
 };
 
-// Global Function: Reset Form
 window.cancelEdit = function() {
     document.getElementById('addOutletForm').reset();
-    document.getElementById('editOutletId').value = ""; // Clear ID
+    document.getElementById('editOutletId').value = "";
     document.getElementById('formTitle').innerText = "Add New Outlet";
     document.getElementById('submitBtn').innerText = "Save Outlet";
     document.getElementById('cancelEditBtn').style.display = "none";
-    
-    // Reset GPS UI
     document.getElementById('geoDisplay').innerText = "Location required";
     document.getElementById('geoDisplay').style.color = "#333";
-    document.getElementById('lat').value = "";
-    document.getElementById('lng').value = "";
-    
-    // Reset Credit inputs
     document.getElementById('creditDays').disabled = true;
     document.getElementById('creditLimit').disabled = true;
 };
@@ -373,23 +339,17 @@ async function loadOutlets() {
         const snap = await getDocs(q);
 
         tableBody.innerHTML = "";
-
-        if (snap.empty) {
-            tableBody.innerHTML = "<tr><td colspan='6'>No outlets found.</td></tr>";
-            return;
-        }
+        if (snap.empty) { tableBody.innerHTML = "<tr><td colspan='6'>No outlets found.</td></tr>"; return; }
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
             const id = docSnap.id;
             const isBlocked = data.status === 'blocked';
             
-            // Status Badge
             const statusBadge = isBlocked 
-                ? `<span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px; font-size:0.8rem;">Blocked</span>` 
-                : `<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px; font-size:0.8rem;">Active</span>`;
+                ? `<span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;">Blocked</span>` 
+                : `<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;">Active</span>`;
 
-            // Action Buttons (Block & Edit)
             const blockBtn = isBlocked
                 ? `<button style="background:#28a745; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
                 : `<button style="background:#dc3545; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
@@ -397,36 +357,34 @@ async function loadOutlets() {
             const editBtn = `<button style="background:#007bff; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="editOutlet('${id}')">Edit</button>`;
 
             const creditInfo = data.storeType === 'Credit' 
-                ? `<small style="color:#d63384;">Limit: ₹${data.creditLimit}<br>Days: ${data.creditDays}</small>` 
-                : `<small style="color:#28a745;">Cash Only</small>`;
+                ? `<small style="color:#d63384;">Limit: ${data.creditLimit}</small>` 
+                : `<small style="color:#28a745;">Cash</small>`;
 
             const row = `
                 <tr>
-                    <td>
-                        <strong>${data.shopName}</strong>
-                        <br><small style="color:#666;">${data.outletType}</small>
-                    </td>
-                    <td>
-                        ${data.contactPerson}
-                        <br><small><a href="tel:${data.contactPhone}">${data.contactPhone}</a></small>
-                    </td>
-                    <td>
-                        ${data.storeType}
-                        <br>${creditInfo}
-                    </td>
+                    <td><strong>${data.shopName}</strong><br><small style="color:#666;">${data.outletType}</small></td>
+                    <td>${data.contactPerson}<br><small><a href="tel:${data.contactPhone}">${data.contactPhone}</a></small></td>
+                    <td>${data.storeType}<br>${creditInfo}</td>
                     <td><small>${data.gstNumber}</small></td>
                     <td>${statusBadge}</td>
-                    <td>
-                        ${editBtn}
-                        ${blockBtn}
-                    </td>
-                </tr>
-            `;
+                    <td>${editBtn} ${blockBtn}</td>
+                </tr>`;
             tableBody.innerHTML += row;
         });
-
     } catch (error) {
         console.error("Load Outlets Error:", error);
-        tableBody.innerHTML = "<tr><td colspan='6'>Error loading data.</td></tr>";
     }
+}
+
+window.toggleOutletStatus = async function(id, newStatus) {
+    if(!confirm(`Change status to ${newStatus}?`)) return;
+    try {
+        await updateDoc(doc(db, "outlets", id), { status: newStatus });
+        loadOutlets();
+    } catch (error) { alert("Failed to update status."); }
+};
+
+// --- UTILITY (WAS MISSING) ---
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
