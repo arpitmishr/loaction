@@ -4,323 +4,451 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
-    <link rel="stylesheet" href="css/style.css">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#007bff',
+                        success: '#28a745',
+                        danger: '#dc3545',
+                        warning: '#ffc107',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        /* Tab Active State */
+        .tab-btn.active {
+            border-bottom: 3px solid #3b82f6;
+            color: #1d4ed8;
+            background-color: #eff6ff;
+        }
+    </style>
 </head>
-<body>
-    <div id="loader">Loading Dashboard...</div>
+<body class="bg-slate-50 font-sans text-gray-700">
 
-    <div id="content" style="display: none;">
-        <nav>
-            <!-- Insert this immediately after the <nav> in admin.html -->
+    <!-- LOADER -->
+    <div id="loader" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 class="text-xl font-semibold text-gray-600">Loading Dashboard...</h2>
+        </div>
+    </div>
 
-<div class="container" style="margin-bottom: 20px;">
-    <!-- ALERTS SECTION -->
-  
-            <h1>Admin Panel</h1>
-            <button id="logoutBtn">Logout</button>
+    <!-- MAIN CONTENT WRAPPER -->
+    <div id="content" style="display: none;" class="min-h-screen flex flex-col">
+        
+        <!-- TOP NAVIGATION -->
+        <nav class="bg-slate-800 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">⚡</span>
+                    <h1 class="text-xl font-bold tracking-wide">Admin Panel</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <p class="hidden md:block text-sm text-gray-300">User: <span id="user-email" class="font-semibold text-white"></span></p>
+                    <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow transition duration-200 text-sm">
+                        Logout
+                    </button>
+                </div>
+            </div>
         </nav>
-        
-        
-        <div class="container">
-            <p>Welcome, <span id="user-email">Admin</span></p>
 
-              <!-- NOTIFICATION BOX -->
-    <div id="approval-section" class="card" style="display:none; border-left: 5px solid #ffc107; background: #fff8e1; margin-bottom: 20px;">
-        <h3 style="margin-top:0;">🔔 Payment Approvals Needed</h3>
-        <table class="styled-table" style="background: white;">
-            <thead>
-                <tr>
-                    <th>Shop</th>
-                    <th>Amount</th>
-                    <th>Method</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="approval-list"></tbody>
-        </table>
-    </div>
-
-            <!-- STATISTICS GRID -->
-            <div class="dashboard-grid">
-
-                <!-- Add this inside .dashboard-grid or below it -->
-<div class="card" style="grid-column: 1 / -1;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3 style="margin:0;">📅 Attendance Register</h3>
-        <div>
-            <input type="date" id="attendanceDateFilter" style="padding:5px;">
-            <button onclick="loadAttendanceByDate()" style="padding:5px 10px; cursor:pointer;">🔍 View</button>
+        <!-- TABS NAVIGATION -->
+        <div class="bg-white shadow border-b sticky top-0 z-40">
+            <div class="container mx-auto px-4">
+                <div class="flex overflow-x-auto space-x-1" id="tabs-container">
+                    <button onclick="switchTab('tab-dashboard')" class="tab-btn active flex-shrink-0 py-4 px-6 font-medium hover:bg-gray-50 transition duration-200">
+                        📊 Dashboard
+                    </button>
+                    <button onclick="switchTab('tab-outlets')" class="tab-btn flex-shrink-0 py-4 px-6 font-medium hover:bg-gray-50 transition duration-200">
+                        🏪 Outlets
+                    </button>
+                    <button onclick="switchTab('tab-routes')" class="tab-btn flex-shrink-0 py-4 px-6 font-medium hover:bg-gray-50 transition duration-200">
+                        🚚 Routes
+                    </button>
+                    <button onclick="switchTab('tab-products')" class="tab-btn flex-shrink-0 py-4 px-6 font-medium hover:bg-gray-50 transition duration-200">
+                        📦 Products
+                    </button>
+                    <button onclick="switchTab('tab-staff')" class="tab-btn flex-shrink-0 py-4 px-6 font-medium hover:bg-gray-50 transition duration-200">
+                        👥 Staff
+                    </button>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <table class="styled-table">
-        <thead>
-            <tr>
-                <th>Salesman</th>
-                <th>Status</th>
-                <th>Details / Map / Reason</th>
-            </tr>
-        </thead>
-        <tbody id="attendance-list">
-            <tr><td colspan="3">Loading...</td></tr>
-        </tbody>
-    </table>
-</div>
+        <!-- MAIN CONTAINER -->
+        <div class="container mx-auto px-4 py-6 flex-grow">
+
+            <!-- ============================================
+                 TAB 1: DASHBOARD
+            ============================================= -->
+            <div id="tab-dashboard" class="tab-content block">
                 
-                <!-- Card 1: Attendance -->
-                <div class="stat-card">
-                    <span class="stat-icon">🙋‍♂️</span>
-                    <div class="stat-value text-blue" id="stat-attendance">0</div>
-                    <div class="stat-label">Present Today</div>
+                <!-- NOTIFICATIONS GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    
+                    <!-- 1. Payment Approvals -->
+                    <div id="approval-section" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-sm">
+                        <h3 class="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
+                            🔔 Payment Approvals
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left bg-white rounded shadow-sm">
+                                <thead class="bg-yellow-100 text-yellow-900">
+                                    <tr>
+                                        <th class="p-2">Shop</th>
+                                        <th class="p-2">Amount</th>
+                                        <th class="p-2">Method</th>
+                                        <th class="p-2">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="approval-list" class="divide-y divide-yellow-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 2. Leave Approvals -->
+                    <div id="leave-approval-section" class="hidden bg-blue-50 border-l-4 border-blue-400 p-4 rounded shadow-sm">
+                        <h3 class="text-lg font-bold text-blue-800 mb-3 flex items-center gap-2">
+                            📅 Leave Requests
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left bg-white rounded shadow-sm">
+                                <thead class="bg-blue-100 text-blue-900">
+                                    <tr>
+                                        <th class="p-2">Salesman</th>
+                                        <th class="p-2">Date/Type</th>
+                                        <th class="p-2">Reason</th>
+                                        <th class="p-2">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leave-approval-list" class="divide-y divide-blue-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Card 2: Orders Count -->
-                <div class="stat-card">
-                    <span class="stat-icon">📦</span>
-                    <div class="stat-value text-purple" id="stat-orders">0</div>
-                    <div class="stat-label">Orders Today</div>
+                <!-- STATISTICS CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <!-- Stat 1 -->
+                    <div class="bg-white p-5 rounded-lg shadow border-l-4 border-blue-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm uppercase font-bold">Present Today</p>
+                            <p class="text-2xl font-bold text-gray-800" id="stat-attendance">0</p>
+                        </div>
+                        <span class="text-3xl">🙋‍♂️</span>
+                    </div>
+                    <!-- Stat 2 -->
+                    <div class="bg-white p-5 rounded-lg shadow border-l-4 border-purple-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm uppercase font-bold">Orders Today</p>
+                            <p class="text-2xl font-bold text-gray-800" id="stat-orders">0</p>
+                        </div>
+                        <span class="text-3xl">📦</span>
+                    </div>
+                    <!-- Stat 3 -->
+                    <div class="bg-white p-5 rounded-lg shadow border-l-4 border-green-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm uppercase font-bold">Sales Today</p>
+                            <p class="text-2xl font-bold text-green-600" id="stat-sales">$0</p>
+                        </div>
+                        <span class="text-3xl">💰</span>
+                    </div>
+                    <!-- Stat 4 -->
+                    <div class="bg-white p-5 rounded-lg shadow border-l-4 border-orange-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm uppercase font-bold">Market Credit</p>
+                            <p class="text-2xl font-bold text-orange-600" id="stat-credit">$0</p>
+                        </div>
+                        <span class="text-3xl">📉</span>
+                    </div>
                 </div>
 
-                <!-- Card 3: Total Sales -->
-                <div class="stat-card">
-                    <span class="stat-icon">💰</span>
-                    <div class="stat-value text-green" id="stat-sales">$0</div>
-                    <div class="stat-label">Sales Today</div>
-                </div>
-
-                <!-- Card 4: Outstanding Credit -->
-                <div class="stat-card">
-                    <span class="stat-icon">📉</span>
-                    <div class="stat-value text-orange" id="stat-credit">$0</div>
-                    <div class="stat-label">Market Credit</div>
+                <!-- ATTENDANCE REGISTER -->
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+                        <h3 class="text-lg font-bold text-gray-700">📅 Daily Attendance Register</h3>
+                        <div class="flex gap-2">
+                            <input type="date" id="attendanceDateFilter" class="border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="loadAttendanceByDate()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">🔍 View</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-600 border-collapse">
+                            <thead class="bg-gray-100 uppercase text-xs text-gray-700">
+                                <tr>
+                                    <th class="p-3 border-b">Salesman</th>
+                                    <th class="p-3 border-b">Status</th>
+                                    <th class="p-3 border-b">Details / Map / Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-list" class="divide-y divide-gray-200">
+                                <tr><td colspan="3" class="p-4 text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
+            <!-- ============================================
+                 TAB 2: OUTLETS
+            ============================================= -->
+            <div id="tab-outlets" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- FORM -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white p-6 rounded-lg shadow border border-gray-200 sticky top-24">
+                            <h4 class="text-lg font-bold mb-4 border-b pb-2" id="formTitle">Add New Outlet</h4>
+                            <form id="addOutletForm" class="space-y-3">
+                                <input type="hidden" id="editOutletId">
+                                
+                                <!-- Basic -->
+                                <p class="text-xs font-bold text-gray-400 uppercase mt-2">Basic Info</p>
+                                <input type="text" id="shopName" placeholder="Shop Name" required class="w-full p-2 border rounded text-sm">
+                                <select id="outletType" required class="w-full p-2 border rounded text-sm bg-white">
+                                    <option value="" disabled selected>Select Type</option>
+                                    <option value="Shop">Shop</option>
+                                    <option value="Dhaba">Dhaba</option>
+                                    <option value="Cafe">Cafe</option>
+                                    <option value="Restaurant">Restaurant</option>
+                                    <option value="Other">Other</option>
+                                </select>
 
+                                <!-- Contact -->
+                                <p class="text-xs font-bold text-gray-400 uppercase mt-2">Contact</p>
+                                <input type="text" id="ownerName" placeholder="Owner Name" required class="w-full p-2 border rounded text-sm">
+                                <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full p-2 border rounded text-sm">
+                                <input type="tel" id="contactPhone" placeholder="Phone No." required class="w-full p-2 border rounded text-sm">
+                                <input type="text" id="gstNumber" placeholder="GST (Optional)" class="w-full p-2 border rounded text-sm">
 
+                                <!-- Financial -->
+                                <p class="text-xs font-bold text-gray-400 uppercase mt-2">Financial</p>
+                                <select id="storeType" required class="w-full p-2 border rounded text-sm bg-white">
+                                    <option value="Cash">Cash Store</option>
+                                    <option value="Credit">Credit Store</option>
+                                </select>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="number" id="creditDays" placeholder="Days" disabled class="w-full p-2 border rounded text-sm disabled:bg-gray-100">
+                                    <input type="number" id="creditLimit" placeholder="Limit" disabled class="w-full p-2 border rounded text-sm disabled:bg-gray-100">
+                                </div>
 
-<!-- OUTLET MANAGEMENT SECTION -->
-<div class="card" style="margin-top: 30px;">
-    <h3>🏪 Manage Outlets</h3>
+                                <!-- GPS -->
+                                <div class="flex items-center gap-2 bg-gray-50 p-2 rounded border mt-2">
+                                    <button type="button" id="geoBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs">📍 Capture GPS</button>
+                                    <span id="geoDisplay" class="text-xs text-gray-500">Required</span>
+                                    <input type="hidden" id="lat"><input type="hidden" id="lng">
+                                </div>
 
-    <!-- 1. Add New Outlet Form -->
-    <div class="form-box">
-    <h4 id="formTitle">Add New Outlet</h4>
-    <form id="addOutletForm">
-        <!-- HIDDEN FIELD TO STORE ID WHEN EDITING -->
-        <input type="hidden" id="editOutletId">
+                                <!-- Buttons -->
+                                <div class="flex gap-2 pt-2">
+                                    <button type="submit" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-medium">Save Outlet</button>
+                                    <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded text-sm">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
-        <!-- SECTION 1: BASIC INFO -->
-        <h5 style="margin: 10px 0 5px; color: #666;">📍 Basic Details</h5>
-        <div class="form-grid">
-            <input type="text" id="shopName" placeholder="Shop/Outlet Name" required>
-            <select id="outletType" required>
-                <option value="" disabled selected>Select Outlet Type</option>
-                <option value="Shop">Shop / Kirana</option>
-                <option value="Dhaba">Dhaba</option>
-                <option value="Cafe">Cafe</option>
-                <option value="Restaurant">Restaurant</option>
-                <option value="Other">Other</option>
-            </select>
-        </div>
-
-        <!-- SECTION 2: CONTACT INFO -->
-        <h5 style="margin: 15px 0 5px; color: #666;">👤 Contact Details</h5>
-        <div class="form-grid">
-            <input type="text" id="ownerName" placeholder="Owner Name" required>
-            <input type="text" id="contactPerson" placeholder="Contact Person Name" required>
-            <input type="tel" id="contactPhone" placeholder="Contact Person Phone" required>
-            <input type="text" id="gstNumber" placeholder="GST Number (Optional)">
-        </div>
-
-        <!-- SECTION 3: FINANCIAL INFO -->
-        <h5 style="margin: 15px 0 5px; color: #666;">💰 Financial Settings</h5>
-        <div class="form-grid">
-            <select id="storeType" required>
-                <option value="Cash">Cash Store</option>
-                <option value="Credit">Credit Store</option>
-            </select>
-            
-            <input type="number" id="creditDays" placeholder="Credit Days" disabled>
-            <input type="number" id="creditLimit" placeholder="Credit Limit" disabled>
-        </div>
-        
-        <!-- GPS Section -->
-        <div style="margin: 20px 0; display: flex; align-items: center; gap: 10px; background: #eee; padding: 10px; border-radius: 5px;">
-            <button type="button" id="geoBtn" style="background: #555; font-size: 0.9rem;">📍 Capture GPS</button>
-            <span id="geoDisplay" style="font-size: 0.9rem; color: #333;">Location required</span>
-            <input type="hidden" id="lat">
-            <input type="hidden" id="lng">
-        </div>
-
-        <!-- BUTTONS -->
-        <div style="display: flex; gap: 10px;">
-            <button type="submit" id="submitBtn" class="btn-primary" style="flex: 1;">Save Outlet</button>
-            <button type="button" id="cancelEditBtn" onclick="cancelEdit()" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; display: none;">Cancel</button>
-        </div>
-    </form>
-</div>
-
-    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-
-
-    <!-- ROUTE MANAGEMENT SECTION -->
-<div class="card" style="margin-top: 30px;">
-    <h3>🚚 Route Management</h3>
-    
-    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-        
-        <!-- LEFT: Create & List Routes -->
-        <div style="flex: 1; min-width: 300px; border-right: 1px solid #eee; padding-right: 15px;">
-            <h4>1. Create / Select Route</h4>
-            <form id="createRouteForm" style="background: #f9f9f9; padding: 15px; border-radius: 8px;">
-                <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Monday North)" required style="width: 100%; margin-bottom: 10px; padding: 8px;">
-                
-                <select id="routeSalesmanSelect" required style="width: 100%; margin-bottom: 10px; padding: 8px;">
-                    <option value="">Select Salesman</option>
-                    <!-- Populated by JS -->
-                </select>
-                
-                <button type="submit" class="btn-primary" style="width: 100%;">Create Route</button>
-            </form>
-
-            <h5 style="margin-top: 20px;">Existing Routes</h5>
-            <ul id="routes-list-group" style="list-style: none; padding: 0; max-height: 300px; overflow-y: auto;">
-                <li>Loading routes...</li>
-            </ul>
-        </div>
-
-        <!-- RIGHT: Configure Selected Route -->
-        <div style="flex: 1.5; min-width: 300px;">
-            <h4>2. Configure Route: <span id="selectedRouteName" style="color: #007bff;">None Selected</span></h4>
-            <input type="hidden" id="selectedRouteId">
-            
-            <!-- Add Outlet to Route -->
-            <div id="routeConfigPanel" style="display: none;">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <select id="allOutletsDropdown" style="flex: 1; padding: 8px;">
-                        <option value="">Select Outlet to Add</option>
-                    </select>
-                    <button onclick="addOutletToRoute()" style="background: #28a745; color: white; border: none; padding: 0 15px; cursor: pointer;">Add</button>
+                    <!-- LIST -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="p-4 bg-gray-50 border-b">
+                                <h4 class="font-bold text-gray-700">All Outlets</h4>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                                        <tr>
+                                            <th class="p-3">Shop Name</th>
+                                            <th class="p-3">Contact</th>
+                                            <th class="p-3">Status</th>
+                                            <th class="p-3">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="outlets-table-body" class="divide-y divide-gray-200">
+                                        <tr><td colspan="4" class="p-4 text-center">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <!-- List of Attached Outlets -->
-                <table class="styled-table">
-                    <thead>
-                        <tr>
-                            <th width="10%">Seq</th>
-                            <th>Outlet Name</th>
-                            <th width="30%">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="route-outlets-list">
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
             </div>
-            
-            <p id="routeConfigMsg" style="color: #666; font-style: italic;">Select a route from the left to configure outlets.</p>
-        </div>
-    </div>
-</div>
 
+            <!-- ============================================
+                 TAB 3: ROUTES
+            ============================================= -->
+            <div id="tab-routes" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    
+                    <!-- LEFT: Routes List & Create -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Create Form -->
+                        <div class="bg-white p-5 rounded-lg shadow border border-gray-200">
+                            <h4 class="font-bold mb-3">Create New Route</h4>
+                            <form id="createRouteForm" class="space-y-3">
+                                <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Mon North)" required class="w-full p-2 border rounded text-sm">
+                                <select id="routeSalesmanSelect" required class="w-full p-2 border rounded text-sm bg-white">
+                                    <option value="">Select Salesman</option>
+                                </select>
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm">Create Route</button>
+                            </form>
+                        </div>
 
+                        <!-- Route List -->
+                        <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+                            <div class="p-3 bg-gray-50 border-b font-bold text-sm">Existing Routes</div>
+                            <ul id="routes-list-group" class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                                <li class="p-3 text-center text-sm text-gray-500">Loading...</li>
+                            </ul>
+                        </div>
+                    </div>
 
-<!-- Add this below the Route Management section in admin.html -->
+                    <!-- RIGHT: Configuration -->
+                    <div class="lg:col-span-3">
+                        <div class="bg-white rounded-lg shadow h-full flex flex-col">
+                            <div class="p-4 border-b">
+                                <h4 class="font-bold text-lg">Configure: <span id="selectedRouteName" class="text-blue-600">None Selected</span></h4>
+                                <input type="hidden" id="selectedRouteId">
+                            </div>
+                            
+                            <div class="p-4 flex-grow">
+                                <div id="routeConfigPanel" class="hidden">
+                                    <!-- Add Shop Control -->
+                                    <div class="flex gap-2 mb-4">
+                                        <select id="allOutletsDropdown" class="flex-grow p-2 border rounded text-sm bg-white">
+                                            <option value="">Select Outlet to Add</option>
+                                        </select>
+                                        <button onclick="addOutletToRoute()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Add</button>
+                                    </div>
 
-<div class="card" style="margin-top: 30px;">
-    <h3>📦 Product Management</h3>
-
-    <!-- Add Product Form -->
-    <div class="form-box">
-        <h4>Add New Product</h4>
-        <form id="addProductForm">
-            <div class="form-grid">
-                <input type="text" id="prodName" placeholder="Product Name (e.g. Chips 50g)" required>
-                <input type="text" id="prodCategory" placeholder="Category (e.g. Snacks)" list="catSuggestions" required>
-                <!-- Datalist for suggestions -->
-                <datalist id="catSuggestions">
-                    <option value="Beverages">
-                    <option value="Snacks">
-                    <option value="Dairy">
-                </datalist>
-                
-                <input type="text" id="prodHSN" placeholder="HSN Code (Optional)">
-                <input type="number" id="prodPrice" placeholder="Unit Price (₹)" step="0.01" required>
+                                    <!-- Table -->
+                                    <table class="w-full text-sm text-left border">
+                                        <thead class="bg-gray-100">
+                                            <tr>
+                                                <th class="p-2 w-16">Seq</th>
+                                                <th class="p-2">Outlet Name</th>
+                                                <th class="p-2 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="route-outlets-list" class="divide-y divide-gray-200">
+                                            <!-- Items -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <p id="routeConfigMsg" class="text-gray-400 text-center mt-10 italic">
+                                    Select a route from the list to manage stops.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button type="submit" class="btn-primary" style="margin-top: 10px;">Add Product</button>
-        </form>
-    </div>
 
-    <!-- Product List -->
-    <h4 style="margin-top: 20px;">Current Inventory</h4>
-    <div class="table-responsive">
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>HSN</th>
-                    <th>Price</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="product-list-body">
-                <tr><td colspan="5">Loading products...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+            <!-- ============================================
+                 TAB 4: PRODUCTS
+            ============================================= -->
+            <div id="tab-products" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- FORM -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white p-6 rounded-lg shadow border border-gray-200">
+                            <h4 class="font-bold mb-4">Add Product</h4>
+                            <form id="addProductForm" class="space-y-3">
+                                <input type="text" id="prodName" placeholder="Product Name" required class="w-full p-2 border rounded text-sm">
+                                <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full p-2 border rounded text-sm">
+                                <datalist id="catSuggestions">
+                                    <option value="Beverages">
+                                    <option value="Snacks">
+                                    <option value="Dairy">
+                                </datalist>
+                                <input type="text" id="prodHSN" placeholder="HSN Code" class="w-full p-2 border rounded text-sm">
+                                <input type="number" id="prodPrice" placeholder="Price (₹)" step="0.01" required class="w-full p-2 border rounded text-sm">
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-medium">Add Product</button>
+                            </form>
+                        </div>
+                    </div>
 
-
-    
-
-    <!-- 2. Outlets List -->
-    <h4>All Outlets</h4>
-    <div class="table-responsive">
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>Shop Name</th>
-                    <th>Category</th>
-                    <th>Mobile</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="outlets-table-body">
-                <tr><td colspan="5">Loading outlets...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-          <div class="card">
-              <div id="leave-approval-section" class="card" style="display:none; border-left: 5px solid #17a2b8; background: #e0f7fa; margin-bottom: 20px;">
-    <h3 style="margin-top:0;">📅 Leave Requests Pending</h3>
-    <table class="styled-table" style="background: white;">
-        <thead>
-            <tr>
-                <th>Salesman</th>
-                <th>Date & Type</th>
-                <th>Reason</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody id="leave-approval-list"></tbody>
-    </table>
-</div>
-          </div>
-            
-
-            <!-- Existing lists (Optional, keep or remove) -->
-            <div class="card">
-                <h3>Active Salesmen</h3>
-                <ul id="salesmen-list"><li>Loading...</li></ul>
+                    <!-- TABLE -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="p-4 bg-gray-50 border-b font-bold text-gray-700">Inventory</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                                        <tr>
+                                            <th class="p-3">Name</th>
+                                            <th class="p-3">Category</th>
+                                            <th class="p-3">Price</th>
+                                            <th class="p-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="product-list-body" class="divide-y divide-gray-200">
+                                        <tr><td colspan="4" class="p-4 text-center">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
+            <!-- ============================================
+                 TAB 5: STAFF
+            ============================================= -->
+            <div id="tab-staff" class="tab-content hidden">
+                <div class="max-w-lg mx-auto bg-white rounded-lg shadow p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <span>👨‍💼</span> Active Salesmen
+                    </h3>
+                    <ul id="salesmen-list" class="space-y-2 divide-y divide-gray-100">
+                        <li class="text-gray-500 italic">Loading list...</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div> <!-- End Container -->
+    </div> <!-- End Content -->
+
+    <!-- JAVASCRIPT FOR TABS -->
+    <script>
+        function switchTab(tabId) {
+            // 1. Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.add('hidden'));
+            contents.forEach(content => content.classList.remove('block'));
+
+            // 2. Deactivate all buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            // 3. Show selected tab
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById(tabId).classList.add('block');
+
+            // 4. Activate clicked button (event target lookup)
+            // Using a simple loop to find the button that called this function based on onclick attribute logic matches
+            // Ideally, pass 'this' keyword, but string ID works with this loop:
+            const btns = Array.from(document.querySelectorAll('.tab-btn'));
+            const activeBtn = btns.find(b => b.getAttribute('onclick').includes(tabId));
+            if(activeBtn) activeBtn.classList.add('active');
+        }
+    </script>
+
+    <!-- MODULE SCRIPT -->
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
