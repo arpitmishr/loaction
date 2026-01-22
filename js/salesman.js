@@ -395,3 +395,93 @@ function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
 function deg2rad(deg) {
   return deg * (Math.PI/180)
 }
+
+
+
+
+
+window.switchView = function(viewName) {
+    // Hide all
+    document.getElementById('route-view').style.display = 'none';
+    document.getElementById('visit-view').style.display = 'none';
+    document.getElementById('catalog-view').style.display = 'none';
+
+    // Show selected
+    if(viewName === 'route') document.getElementById('route-view').style.display = 'block';
+    if(viewName === 'visit') document.getElementById('visit-view').style.display = 'block';
+    if(viewName === 'catalog') {
+        document.getElementById('catalog-view').style.display = 'block';
+        loadProductCatalog(); // Load data when tab is clicked
+    }
+};
+
+
+
+
+
+
+// ==========================================
+//      PRODUCT CATALOG LOGIC
+// ==========================================
+
+let allProducts = []; // Cache for search
+
+async function loadProductCatalog() {
+    const list = document.getElementById('catalog-list');
+    list.innerHTML = '<p>Loading products...</p>';
+
+    try {
+        const q = query(collection(db, "products"), orderBy("name"));
+        const snap = await getDocs(q);
+
+        allProducts = []; // Clear cache
+        list.innerHTML = "";
+
+        if (snap.empty) {
+            list.innerHTML = "<p>No products available.</p>";
+            return;
+        }
+
+        snap.forEach(doc => {
+            const d = doc.data();
+            allProducts.push(d); // Store for search
+            list.innerHTML += createProductCard(d);
+        });
+
+        // Attach Search Listener
+        document.getElementById('searchProd').addEventListener('keyup', filterProducts);
+
+    } catch (error) {
+        console.error("Catalog Error:", error);
+        list.innerHTML = "<p>Error loading catalog.</p>";
+    }
+}
+
+function createProductCard(d) {
+    return `
+        <div style="border:1px solid #eee; padding:10px; border-radius:8px; text-align:center; background:#fff;">
+            <div style="font-weight:bold; font-size:1rem;">${d.name}</div>
+            <div style="color:#666; font-size:0.8rem;">${d.category}</div>
+            <div style="color:#28a745; font-weight:bold; margin-top:5px;">₹${d.price}</div>
+        </div>
+    `;
+}
+
+function filterProducts(e) {
+    const term = e.target.value.toLowerCase();
+    const list = document.getElementById('catalog-list');
+    list.innerHTML = "";
+
+    const filtered = allProducts.filter(p => 
+        p.name.toLowerCase().includes(term) || 
+        p.category.toLowerCase().includes(term)
+    );
+
+    if(filtered.length === 0) {
+        list.innerHTML = "<p>No matches found.</p>";
+    } else {
+        filtered.forEach(p => {
+            list.innerHTML += createProductCard(p);
+        });
+    }
+}
