@@ -1,3 +1,4 @@
+import { orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp 
@@ -14,6 +15,7 @@ onAuthStateChanged(auth, async (user) => {
         window.location.href = 'index.html';
         return;
     }
+    loadTodayAttendance();
 
     const userDoc = await getDoc(doc(db, "users", user.uid));
     if (!userDoc.exists() || userDoc.data().role !== 'admin') {
@@ -122,4 +124,58 @@ async function loadSalesmenList() {
         li.textContent = `👤 ${d.fullName || d.email}`;
         list.appendChild(li);
     });
+}
+
+
+async function loadTodayAttendance() {
+    const list = document.getElementById('attendance-list');
+    
+    // Helper to get today's YYYY-MM-DD
+    const d = new Date();
+    const todayStr = d.getFullYear() + "-" + 
+           String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+           String(d.getDate()).padStart(2, '0');
+
+    try {
+        // Query: Date == Today
+        const q = query(
+            collection(db, "attendance"),
+            where("date", "==", todayStr),
+            orderBy("checkInTime", "desc") // Show newest first
+        );
+
+        const snap = await getDocs(q);
+        list.innerHTML = "";
+
+        if (snap.empty) {
+            list.innerHTML = "<tr><td colspan='3' style='padding:15px; text-align:center'>No check-ins yet today.</td></tr>";
+            return;
+        }
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            const time = data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            // Create Google Maps Link
+            const lat = data.location.latitude;
+            const lng = data.location.longitude;
+            const mapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+            const row = `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">${data.salesmanEmail || 'Unknown'}</td>
+                    <td>${time}</td>
+                    <td><a href="${mapUrl}" target="_blank" style="color: #007bff; text-decoration: none;">View 📍</a></td>
+                </tr>
+            `;
+            list.innerHTML += row;
+        });
+
+    } catch (error) {
+        console.error("Error loading attendance:", error);
+        // If index error, show helpful message
+        if(error.message.includes("index")) {
+            list.innerHTML = "<tr><td colspan='3' style='color:red'>Missing Index. Check Console.</td></tr>";
+        }
+    }
 }
