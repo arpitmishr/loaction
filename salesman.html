@@ -41,23 +41,33 @@
         .bottom-nav-item.active span { color: #2563eb; }
 
 
-/* Force the map container to be visible and sized */
-#all-shops-map {
-    display: block;
-    background-color: #f1f5f9; /* Gray background while tiles load */
+/* Ensure the Map View container occupies the full space between Header and Nav */
+#full-map-view {
+    position: fixed !important;
+    top: 64px;    /* Header height */
+    bottom: 80px; /* Navigation height */
+    left: 0;
+    right: 0;
+    background: white;
+    display: none; /* Controlled by switchView */
+    flex-direction: column;
+    z-index: 20;
 }
 
-/* Ensure Leaflet tiles and markers show up */
-.leaflet-container {
-    height: 100% !important;
-    width: 100% !important;
-    z-index: 1;
-}
-
-/* Ensure the Map View sits correctly between Header and Nav */
 #full-map-view:not(.hidden) {
     display: flex !important;
-    flex-direction: column;
+}
+
+#all-shops-map {
+    flex-grow: 1;
+    width: 100%;
+    background: #f1f5f9;
+}
+
+/* Fix for Leaflet marker popups */
+.leaflet-popup-content-wrapper {
+    border-radius: 12px;
+    padding: 5px;
 }
     </style>
 </head>
@@ -273,24 +283,26 @@
 
 
 
-<!-- Full Map View Section -->
+
+        </main>
+<!-- Inside #content, after </main> -->
 <div id="full-map-view" class="view-section hidden">
     <div id="all-shops-map"></div>
 </div>
-            
-        </main>
 
+
+        
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 z-40 max-w-md mx-auto">
     <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
         <span class="material-icons-round text-2xl">map</span>
-        <span class="text-[10px] font-bold">Route</span>
+        <span class="text-[10px] font-bold">List</span>
     </button>
     
-    <!-- ADD THIS NEW BUTTON -->
+    <!-- NEW MAP BUTTON -->
     <button onclick="switchView('full-map')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-full-map">
         <span class="material-icons-round text-2xl">explore</span>
-        <span class="text-[10px] font-bold">Full Map</span>
+        <span class="text-[10px] font-bold">Map</span>
     </button>
 
     <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
