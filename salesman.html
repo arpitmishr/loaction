@@ -8,20 +8,27 @@
 <body>
     <div id="loader">Verifying Salesman Access...</div>
 
-    <div id="content" style="display: none;">
-        <nav>
-            <h1>Sales Dashboard</h1>
-            <button id="logoutBtn">Logout</button>
-        </nav>
-        <div class="main-body">
-            <p>Welcome, <span id="user-email"></span></p>
-            <div class="card">
-                <h3>My Routes</h3>
-                <p>View assigned routes here.</p>
-            </div>
+   <div id="content" style="display: none;">
+    <nav>
+        <h1>Sales Dashboard</h1>
+        <button id="logoutBtn">Logout</button>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <h3>📍 My Route Today</h3>
+            <h2 id="route-name">Loading Route...</h2>
+        </div>
+
+        <div class="card">
+            <h3>🏬 Shops to Visit</h3>
+            <ul id="shops-list">
+                <li>Loading shops...</li>
+            </ul>
         </div>
     </div>
-
-    <script type="module" src="js/salesman.js"></script>
+</div>
+<script type="module" src="js/salesman.js"></script>
+    
 </body>
 </html>
