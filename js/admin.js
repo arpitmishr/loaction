@@ -10,7 +10,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
-    addDoc, updateDoc, serverTimestamp, orderBy 
+    addDoc, updateDoc, deleteDoc, serverTimestamp, orderBy 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -56,6 +56,9 @@ onAuthStateChanged(auth, async (user) => {
 loadRoutes();
 populateSalesmanDropdown();
 populateAllOutletsDropdown();
+        // ... inside the try block ...
+loadProducts();
+setupProductForm();
 
     } catch (error) {
         console.error("Dashboard Init Error:", error);
@@ -629,6 +632,92 @@ window.changeSequence = async function(docId, direction, currentSeq) {
         // This query requires a composite index: routeId ASC, sequence ASC
         if(e.message.includes("index")) alert("Index missing. Check console.");
     }
+};
+
+// ==========================================
+//      PRODUCT MANAGEMENT LOGIC
+// ==========================================
+
+function setupProductForm() {
+    const form = document.getElementById('addProductForm');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.innerText = "Saving...";
+        btn.disabled = true;
+
+        try {
+            await addDoc(collection(db, "products"), {
+                name: document.getElementById('prodName').value.trim(),
+                category: document.getElementById('prodCategory').value.trim(),
+                hsn: document.getElementById('prodHSN').value.trim() || "N/A",
+                price: Number(document.getElementById('prodPrice').value),
+                createdAt: serverTimestamp(),
+                isActive: true
+            });
+
+            alert("Product Added!");
+            form.reset();
+            loadProducts(); // Refresh list
+
+        } catch (error) {
+            console.error(error);
+            alert("Error adding product: " + error.message);
+        } finally {
+            btn.innerText = "Add Product";
+            btn.disabled = false;
+        }
+    });
+}
+
+async function loadProducts() {
+    const tbody = document.getElementById('product-list-body');
+    if (!tbody) return;
+
+    try {
+        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+
+        tbody.innerHTML = "";
+        if (snap.empty) {
+            tbody.innerHTML = "<tr><td colspan='5'>No products found.</td></tr>";
+            return;
+        }
+
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            const row = `
+                <tr>
+                    <td><strong>${d.name}</strong></td>
+                    <td>${d.category}</td>
+                    <td>${d.hsn}</td>
+                    <td>₹${d.price.toFixed(2)}</td>
+                    <td>
+                        <button onclick="deleteProduct('${docSnap.id}')" style="color:red; border:none; background:none; cursor:pointer;">🗑️</button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+    } catch (error) {
+        console.error("Load Products Error:", error);
+        if(error.message.includes("index")) {
+            // Fallback if index missing
+             tbody.innerHTML = "<tr><td colspan='5' style='color:red'>Missing Index (See Console)</td></tr>";
+        }
+    }
+}
+
+// Global Delete Function
+window.deleteProduct = async function(id) {
+    if(!confirm("Delete this product?")) return;
+    try {
+        await deleteDoc(doc(db, "products", id));
+        loadProducts();
+    } catch (e) { alert("Error deleting: " + e.message); }
 };
 // --- UTILITY (WAS MISSING) ---
 function formatCurrency(amount) {
