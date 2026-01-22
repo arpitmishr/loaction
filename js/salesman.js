@@ -1005,3 +1005,61 @@ window.initFullRouteMap = async function() {
         console.error("Map Logic Error:", error);
     }
 };
+
+
+
+
+
+
+async function loadDailyTarget(uid) {
+    const today = getTodayDateString(); // Ensure you have this helper function from previous steps
+    const card = document.getElementById('target-card');
+    
+    try {
+        // 1. Fetch Target
+        const targetQ = query(collection(db, "daily_targets"), 
+            where("salesmanId", "==", uid), 
+            where("date", "==", today)
+        );
+        const targetSnap = await getDocs(targetQ);
+
+        if (targetSnap.empty) {
+            card.classList.add('hidden');
+            return;
+        }
+
+        const targetData = targetSnap.docs[0].data();
+        card.classList.remove('hidden');
+        document.getElementById('total-target').innerText = targetData.targetBoxes;
+        document.getElementById('target-incentive').innerText = `₹${targetData.incentivePerBox}/box incentive`;
+
+        // 2. Fetch Today's Achievement (Sum items in orders)
+        // Note: You need an index for orders: salesmanId + orderDate
+        const ordersQ = query(collection(db, "orders"), 
+            where("salesmanId", "==", uid),
+            where("status", "==", "pending") // Or approved
+        );
+        const ordersSnap = await getDocs(ordersQ);
+        
+        let totalSold = 0;
+        ordersSnap.forEach(doc => {
+            const order = doc.data();
+            // Assuming orderDate is Timestamp and belongs to today
+            const orderDate = order.orderDate.toDate().toISOString().split('T')[0];
+            if(orderDate === today) {
+                order.items.forEach(item => {
+                    totalSold += item.qty;
+                });
+            }
+        });
+
+        // 3. Update UI
+        const percent = Math.min(Math.round((totalSold / targetData.targetBoxes) * 100), 100);
+        document.getElementById('current-progress').innerText = totalSold;
+        document.getElementById('percent-label').innerText = percent + "%";
+        document.getElementById('target-progress-bar').style.width = percent + "%";
+
+    } catch (error) {
+        console.error("Target Load Error:", error);
+    }
+}
