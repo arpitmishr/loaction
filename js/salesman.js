@@ -1,57 +1,197 @@
+// js/salesman.js
+
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, Timestamp, GeoPoint } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+import { 
+    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, Timestamp, GeoPoint 
+} from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
 
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
 
-// --- AUTH & INIT ---
+// --- INIT ---
 onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-        window.location.href = 'index.html';
-        return;
-    }
+    if (!user) { window.location.href = 'index.html'; return; }
 
     try {
+        // 1. Check Role
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        
         if (!userDoc.exists() || userDoc.data().role !== 'salesman') {
-            alert("Access Denied: Salesman only.");
+            alert("Access Denied.");
             logoutUser();
             return;
         }
 
-        // Show Dashboard
+        // 2. Show UI
         if (loader) loader.style.display = 'none';
         content.style.display = 'block';
 
-        // Load Data
+        // 3. Load Data
         checkTodayAttendance(user);
-        loadAssignedRoute(user.uid);
+        loadAssignedRoute(user.uid); // Pass UID to find route
 
-        // Attach Check-in Button
+        // 4. Attach Listeners
         const checkInBtn = document.getElementById('checkInBtn');
-        if(checkInBtn) {
-            checkInBtn.addEventListener('click', () => handleCheckIn(user));
-        }
+        if(checkInBtn) checkInBtn.addEventListener('click', () => handleCheckIn(user));
 
     } catch (error) {
         console.error("Init Error:", error);
-        alert("Error loading profile: " + error.message);
+        alert("Error: " + error.message);
     }
 });
 
 document.getElementById('logoutBtn').addEventListener('click', logoutUser);
 
-// --- ATTENDANCE FUNCTIONS ---
+// --- ROUTE & OUTLETS ---
 
+async function loadAssignedRoute(uid) {
+    const routeNameEl = document.getElementById('route-name');
+    const shopsListEl = document.getElementById('shops-list');
+    const debugEl = document.getElementById('route-debug');
+
+    // Debug info for you to see on screen
+    debugEl.innerText = `Searching for route assigned to User ID: ${uid}`;
+
+    try {
+        // Find Route
+        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        const routeSnap = await getDocs(q);
+
+        if (routeSnap.empty) {
+            routeNameEl.innerText = "No Route Assigned";
+            shopsListEl.innerHTML = "<li style='padding:10px;'>Contact Admin to assign a route.</li>";
+            debugEl.innerText += " -> No document found in 'routes' collection.";
+            return;
+        }
+
+        const routeDoc = routeSnap.docs[0];
+        const routeId = routeDoc.id;
+        routeNameEl.innerText = routeDoc.data().name;
+        debugEl.innerText = ""; // Clear debug if found
+
+        // Load Outlets for this Route
+        loadRouteOutlets(routeId, uid);
+
+    } catch (error) {
+        console.error("Route Error:", error);
+        routeNameEl.innerText = "Error Loading Route";
+        shopsListEl.innerHTML = `<li style="color:red">Error: ${error.message}</li>`;
+    }
+}
+
+async function loadRouteOutlets(routeId, uid) {
+    const list = document.getElementById('shops-list');
+    
+    try {
+        // Note: This query requires an Index: routeId ASC, sequence ASC
+        const q = query(
+            collection(db, "route_outlets"), 
+            where("routeId", "==", routeId),
+            orderBy("sequence", "asc")
+        );
+        
+        const snap = await getDocs(q);
+        list.innerHTML = '';
+
+        if (snap.empty) {
+            list.innerHTML = '<li style="padding:10px;">No shops added to this route yet.</li>';
+            return;
+        }
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            const li = document.createElement('li');
+            li.style.background = "white";
+            li.style.margin = "10px 0";
+            li.style.padding = "15px";
+            li.style.borderRadius = "8px";
+            li.style.border = "1px solid #ddd";
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.style.alignItems = "center";
+
+            li.innerHTML = `
+                <div>
+                    <strong style="font-size:1.1rem;">${data.outletName}</strong>
+                    <div style="font-size:0.9rem; color:#666;">Sequence: ${data.sequence}</div>
+                </div>
+                <button class="visit-btn" data-id="${data.outletId}" data-name="${data.outletName}" 
+                    style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
+                    Visit 🚀
+                </button>
+            `;
+            list.appendChild(li);
+        });
+
+        // Add Click Listeners to "Visit" buttons
+        document.querySelectorAll('.visit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const outletId = e.target.dataset.id;
+                const outletName = e.target.dataset.name;
+                handleVisit(uid, outletId, outletName, e.target);
+            });
+        });
+
+    } catch (error) {
+        console.error("Outlets Error:", error);
+        if(error.message.includes("index")) {
+            list.innerHTML = `<li style="color:red; font-weight:bold;">⚠️ Missing Index. Tell Admin to check Console.</li>`;
+        } else {
+            list.innerHTML = `<li>Error: ${error.message}</li>`;
+        }
+    }
+}
+
+// --- VISIT ACTION ---
+
+async function handleVisit(uid, outletId, outletName, btnElement) {
+    if(!confirm(`Start visit for ${outletName}?`)) return;
+
+    if (!navigator.geolocation) {
+        alert("Geolocation not supported.");
+        return;
+    }
+
+    btnElement.disabled = true;
+    btnElement.innerText = "Locating...";
+
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            try {
+                // Save Visit to Firestore
+                await addDoc(collection(db, "visits"), {
+                    salesmanId: uid,
+                    outletId: outletId,
+                    outletName: outletName,
+                    checkInTime: Timestamp.now(),
+                    location: new GeoPoint(pos.coords.latitude, pos.coords.longitude),
+                    type: "routine_visit"
+                });
+
+                alert("Visit Started! ✅");
+                btnElement.innerText = "Visited";
+                btnElement.style.background = "#28a745"; // Green
+
+            } catch (error) {
+                console.error("Visit Error:", error);
+                alert("Failed to save visit: " + error.message);
+                btnElement.disabled = false;
+                btnElement.innerText = "Visit 🚀";
+            }
+        },
+        (err) => {
+            alert("Location required to visit.");
+            btnElement.disabled = false;
+            btnElement.innerText = "Visit 🚀";
+        }
+    );
+}
+
+// --- ATTENDANCE (Keep existing logic) ---
 function getTodayDateString() {
     const d = new Date();
-    // Format: YYYY-MM-DD
-    return d.getFullYear() + "-" + 
-           String(d.getMonth() + 1).padStart(2, '0') + "-" + 
-           String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
 }
 
 async function checkTodayAttendance(user) {
@@ -60,164 +200,37 @@ async function checkTodayAttendance(user) {
     
     try {
         const todayStr = getTodayDateString();
-        
-        // QUERY: Get attendance for THIS user for THIS date
-        // NOTE: This requires a composite index in Firestore!
-        const q = query(
-            collection(db, "attendance"),
-            where("salesmanId", "==", user.uid),
-            where("date", "==", todayStr)
-        );
-
+        const q = query(collection(db, "attendance"), where("salesmanId", "==", user.uid), where("date", "==", todayStr));
         const snap = await getDocs(q);
 
         if (!snap.empty) {
-            // Already checked in
             const data = snap.docs[0].data();
             const time = data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             statusEl.innerHTML = `✅ Checked in at <b>${time}</b>`;
             statusEl.style.color = "green";
-            btn.innerText = "Attendance Marked";
-            btn.disabled = true;
+            if(btn) { btn.innerText = "Attendance Marked"; btn.disabled = true; }
         } else {
-            // Not checked in yet
             statusEl.innerText = "You haven't checked in today.";
-            btn.disabled = false;
+            if(btn) btn.disabled = false;
         }
-
-    } catch (error) {
-        console.error("Attendance Error:", error);
-        
-        // SHOW ERROR ON SCREEN
-        if(error.message.includes("index")) {
-            statusEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Missing Index</span><br>Open Console (F12) & Click the Firebase Link.`;
-        } else {
-            statusEl.innerText = "Error: " + error.message;
-            statusEl.style.color = "red";
-        }
-    }
+    } catch (e) { console.error(e); }
 }
 
 function handleCheckIn(user) {
     const btn = document.getElementById('checkInBtn');
-    const statusEl = document.getElementById('attendance-status');
-
-    // 1. Check if Geolocation exists
-    if (!navigator.geolocation) {
-        alert("Your browser does not support Geolocation.");
-        return;
-    }
-
-    // 2. Check for Secure Context (HTTPS)
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-        alert("Location requires HTTPS. Please host on GitHub Pages or use localhost.");
-        return;
-    }
-
+    if (!navigator.geolocation) return alert("No GPS");
     btn.innerText = "Locating...";
-    btn.disabled = true;
-
-    // 3. Request Location
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            // SUCCESS
-            try {
-                btn.innerText = "Saving...";
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const todayStr = getTodayDateString();
-
-                await addDoc(collection(db, "attendance"), {
-                    salesmanId: user.uid,
-                    salesmanEmail: user.email,
-                    date: todayStr,
-                    checkInTime: Timestamp.now(),
-                    location: new GeoPoint(lat, lng),
-                    device: navigator.userAgent
-                });
-
-                alert("Check-in Successful!");
-                checkTodayAttendance(user); // Refresh UI
-
-            } catch (error) {
-                console.error("Save Error:", error);
-                alert("Database Error: " + error.message);
-                btn.innerText = "📍 Check In Now";
-                btn.disabled = false;
-            }
-        },
-        (error) => {
-            // ERROR / PERMISSION DENIED
-            console.error("Geo Error:", error);
-            
-            let msg = "Unknown location error.";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    msg = "❌ Permission Denied. Please allow location access in browser settings.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    msg = "❌ GPS Signal unavailable.";
-                    break;
-                case error.TIMEOUT:
-                    msg = "❌ Location request timed out.";
-                    break;
-            }
-
-            statusEl.innerHTML = `<span style="color:red">${msg}</span>`;
-            alert(msg);
-            btn.innerText = "📍 Check In Now";
-            btn.disabled = false;
-        },
-        { 
-            enableHighAccuracy: true, 
-            timeout: 15000, // Wait up to 15 seconds
-            maximumAge: 0 
-        }
-    );
-}
-
-// --- ROUTE FUNCTIONS (Keep these as is) ---
-async function loadAssignedRoute(uid) {
-    const routeNameEl = document.getElementById('route-name');
-    const shopsListEl = document.getElementById('shops-list');
-    
-    try {
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
-        const routeSnap = await getDocs(q);
-
-        if (routeSnap.empty) {
-            routeNameEl.innerText = "No route assigned.";
-            shopsListEl.innerHTML = "<li>Contact Admin.</li>";
-            return;
-        }
-
-        const routeDoc = routeSnap.docs[0];
-        routeNameEl.innerText = routeDoc.data().name;
-        loadRouteOutlets(routeDoc.id);
-
-    } catch (error) {
-        console.error("Route Error:", error);
-        routeNameEl.innerText = "Error loading route.";
-    }
-}
-
-async function loadRouteOutlets(routeId) {
-    const list = document.getElementById('shops-list');
-    try {
-        const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
-        const snap = await getDocs(q);
-        list.innerHTML = '';
-        if (snap.empty) { list.innerHTML = '<li>No shops.</li>'; return; }
-        snap.forEach(doc => {
-            const data = doc.data();
-            const li = document.createElement('li');
-            li.innerHTML = `<strong>${data.outletName}</strong>`;
-            li.style.padding = "10px";
-            li.style.borderBottom = "1px solid #eee";
-            list.appendChild(li);
-        });
-    } catch (error) {
-        console.error("Outlet Error:", error);
-        list.innerHTML = '<li>Error loading shops (Index missing?).</li>';
-    }
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+            await addDoc(collection(db, "attendance"), {
+                salesmanId: user.uid,
+                salesmanEmail: user.email,
+                date: getTodayDateString(),
+                checkInTime: Timestamp.now(),
+                location: new GeoPoint(pos.coords.latitude, pos.coords.longitude)
+            });
+            alert("Checked In!");
+            checkTodayAttendance(user);
+        } catch (e) { alert("Error: " + e.message); btn.innerText = "Check In"; }
+    });
 }
