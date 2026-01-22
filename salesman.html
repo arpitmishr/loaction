@@ -38,15 +38,26 @@
 
 
 
-        #all-shops-map {
-    height: 100%;
-    width: 100%;
-    background-color: #e5e7eb; /* Light gray while loading */
+        /* Force the map container to fill the screen */
+#full-map-view {
+    height: 100vh !important;
+    width: 100vw !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    z-index: 30; /* Higher than content, lower than bottom-nav */
 }
 
-/* Ensure the view container is visible for Leaflet to calculate size */
-#full-map-view:not(.hidden) {
-    display: flex !important;
+#all-shops-map {
+    height: 100% !important;
+    width: 100% !important;
+    background: #f1f5f9; /* Gray background so you see it's there */
+}
+
+/* Ensure Leaflet tiles are visible */
+.leaflet-container {
+    height: 100% !important;
+    width: 100% !important;
 }
     </style>
 </head>
@@ -260,6 +271,13 @@
                 </div>
             </div>
 
+
+
+<!-- Full Map Section -->
+<div id="full-map-view" class="view-section hidden">
+    <div id="all-shops-map"></div>
+</div>
+            
         </main>
 
         <!-- BOTTOM NAVIGATION BAR -->
@@ -344,31 +362,39 @@
     <script>
         // Tab Switcher
 window.switchView = function(viewName) {
-    // 1. Hide ALL sections
+    console.log("Switching to view:", viewName);
+    
+    // Hide all view sections
     document.querySelectorAll('.view-section').forEach(el => {
         el.classList.add('hidden');
-        el.style.display = 'none'; // Extra safety
     });
 
-    // 2. Show the target section
-    const targetView = document.getElementById(viewName + '-view');
-    if (targetView) {
-        targetView.classList.remove('hidden');
-        targetView.style.display = 'block';
+    // Show the target section
+    const target = document.getElementById(viewName + '-view');
+    if (target) {
+        target.classList.remove('hidden');
     }
 
-    // 3. Special Logic for Full Map
+    // Special logic for Map
     if (viewName === 'full-map') {
-        // We use a small timeout to ensure the browser has rendered the DIV
+        // Small delay to let Tailwind remove the 'hidden' class first
         setTimeout(() => {
-            if (window.initFullRouteMap) window.initFullRouteMap();
-        }, 100);
+            if (window.initFullRouteMap) {
+                window.initFullRouteMap();
+            }
+        }, 300);
     }
 
-    // 4. Update Nav UI
-    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
-    const activeBtn = document.getElementById('nav-' + viewName);
-    if (activeBtn) activeBtn.classList.add('active', 'text-blue-600');
+    // Nav UI Highlight
+    document.querySelectorAll('.bottom-nav-item').forEach(el => {
+        el.classList.remove('active', 'text-blue-600');
+        el.classList.add('text-gray-400');
+    });
+    const btn = document.getElementById('nav-' + viewName);
+    if(btn) {
+        btn.classList.add('active', 'text-blue-600');
+        btn.classList.remove('text-gray-400');
+    }
 };
 
         // Payment Method Toggle Helper
