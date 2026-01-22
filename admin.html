@@ -3,24 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin HQ</title>
+    <title>Freskey Admin</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
                     },
                     colors: {
                         brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            900: '#0c4a6e',
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6', // Violet
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            900: '#4c1d95',
                         }
                     }
                 }
@@ -29,191 +30,232 @@
     </script>
     
     <!-- Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        
         /* Smooth fade for tabs */
-        .tab-content { transition: opacity 0.3s ease-in-out; }
-        .hidden { display: none; opacity: 0; }
-        .block { display: block; opacity: 1; }
+        .tab-content { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .hidden-tab { display: none; }
+        .block-tab { display: block; }
         
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Mobile Bottom Nav Active State */
+        .mobile-nav-active { color: #7c3aed; }
+        .mobile-nav-active span { color: #7c3aed; }
     </style>
 </head>
-<body class="text-slate-800 h-screen overflow-hidden flex">
+<body class="text-slate-800 h-screen overflow-hidden flex selection:bg-brand-100 selection:text-brand-900">
 
     <!-- LOADER -->
     <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white z-[100]">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-600 mb-4"></div>
-        <h2 class="text-xl font-bold text-slate-700 animate-pulse">Initializing HQ...</h2>
+        <h2 class="text-xl font-bold text-slate-700 tracking-tight">Loading Freskey...</h2>
     </div>
 
-    <!-- MAIN CONTENT WRAPPER -->
+    <!-- MAIN WRAPPER -->
     <div id="content" style="display: none;" class="w-full h-full flex flex-col md:flex-row">
         
         <!-- SIDEBAR (DESKTOP) -->
-        <aside class="hidden md:flex flex-col w-64 bg-slate-900 text-white h-full shadow-2xl z-20">
-            <div class="p-6 flex items-center gap-3 border-b border-slate-700">
-                <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/50">A</div>
+        <aside class="hidden md:flex flex-col w-72 bg-slate-900 text-white h-full shadow-2xl z-20 shrink-0">
+            <!-- Brand -->
+            <div class="p-6 flex items-center gap-3 border-b border-slate-700/50">
+                <div class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/30">F</div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-wide">Admin HQ</h1>
-                    <p class="text-xs text-slate-400">Sales Master</p>
+                    <h1 class="font-bold text-xl tracking-wide text-white">Freskey</h1>
+                    <p class="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Admin Panel</p>
                 </div>
             </div>
 
+            <!-- Nav Links -->
             <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <button onclick="switchTab('tab-dashboard')" class="nav-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300">
-                    <span class="material-icons-round">dashboard</span> Dashboard
+                <button onclick="switchTab('tab-dashboard')" class="nav-item active w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
+                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">dashboard</span> Dashboard
                 </button>
-                <button onclick="switchTab('tab-outlets')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300">
-                    <span class="material-icons-round">storefront</span> Outlets
+                <button onclick="switchTab('tab-outlets')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
+                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">store</span> Outlets
                 </button>
-                <button onclick="switchTab('tab-routes')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300">
-                    <span class="material-icons-round">alt_route</span> Routes
+                <button onclick="switchTab('tab-routes')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
+                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">alt_route</span> Routes
                 </button>
-                <button onclick="switchTab('tab-products')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300">
-                    <span class="material-icons-round">inventory_2</span> Products
+                <button onclick="switchTab('tab-products')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
+                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">inventory_2</span> Products
                 </button>
-                <button onclick="switchTab('tab-staff')" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300">
-                    <span class="material-icons-round">groups</span> Staff
+                <button onclick="switchTab('tab-staff')" class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 text-left hover:bg-slate-800 text-slate-300 font-medium group">
+                    <span class="material-icons-round group-hover:text-brand-400 transition-colors">badge</span> Staff
                 </button>
             </nav>
 
-            <div class="p-4 border-t border-slate-700">
-                <div class="bg-slate-800 rounded-xl p-4 mb-3">
-                    <p class="text-xs text-slate-400 uppercase font-bold">Logged In As</p>
-                    <p id="user-email" class="text-sm font-medium truncate text-white">admin@sys.com</p>
+            <!-- User Profile -->
+            <div class="p-4 border-t border-slate-700/50 bg-slate-900">
+                <div class="bg-slate-800/50 rounded-xl p-4 mb-3 border border-slate-700">
+                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Logged In As</p>
+                    <p id="user-email" class="text-sm font-semibold truncate text-white">admin@freskey.com</p>
                 </div>
-                <button id="logoutBtn" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold shadow-lg shadow-red-900/20 transition flex items-center justify-center gap-2">
+                <button id="logoutBtn" class="w-full bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400 py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2 border border-red-500/20">
                     <span class="material-icons-round text-sm">logout</span> Logout
                 </button>
             </div>
         </aside>
 
-        <!-- MAIN AREA -->
-        <main class="flex-1 h-full overflow-hidden flex flex-col relative bg-slate-50">
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 h-full overflow-hidden flex flex-col relative bg-slate-50/50">
             
-            <!-- MOBILE HEADER -->
-            <header class="md:hidden bg-white shadow-sm p-4 flex justify-between items-center z-10">
-                <h1 class="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                    <span class="text-brand-600">⚡</span> HQ
-                </h1>
-                <button id="logoutBtnMobile" class="text-red-500 font-medium text-sm">Logout</button>
+            <!-- MOBILE HEADER (Sticky) -->
+            <header class="md:hidden bg-white/80 backdrop-blur-md border-b border-slate-200 p-4 flex justify-between items-center z-30 sticky top-0">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">F</div>
+                    <h1 class="text-lg font-extrabold text-slate-800">Freskey</h1>
+                </div>
+                <button id="logoutBtnMobile" class="text-slate-500 hover:text-red-600 font-medium text-sm flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-full">
+                    <span class="material-icons-round text-sm">logout</span>
+                </button>
             </header>
 
             <!-- SCROLLABLE CONTENT -->
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+            <!-- pb-28 ensures content isn't hidden behind mobile nav -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
 
                 <!-- ================= TAB 1: DASHBOARD ================= -->
-                <div id="tab-dashboard" class="tab-content block space-y-6">
+                <div id="tab-dashboard" class="tab-content block-tab space-y-8">
                     
-                    <!-- Welcome -->
-                    <div class="flex justify-between items-end">
+                    <!-- Welcome Header -->
+                    <div class="flex flex-col md:flex-row justify-between md:items-end gap-2">
                         <div>
-                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800">Overview</h2>
-                            <p class="text-slate-500">Here's what's happening today.</p>
+                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Dashboard</h2>
+                            <p class="text-slate-500 font-medium">Overview & Alerts</p>
                         </div>
-                        <span class="hidden md:block text-sm bg-white px-3 py-1 rounded-full border shadow-sm text-slate-500">
-                            📅 <span id="currentDateDisplay">Today</span>
-                        </span>
-                    </div>
-
-                    <!-- ALERTS (Hidden by default) -->
-                    <div id="approval-section" class="hidden bg-amber-50 border-l-4 border-amber-400 p-4 rounded-xl shadow-sm">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="material-icons-round text-amber-600">notifications_active</span>
-                            <h3 class="font-bold text-amber-800">Payment Approvals</h3>
-                        </div>
-                        <div class="overflow-x-auto bg-white rounded-lg shadow-sm">
-                            <table class="w-full text-sm text-left">
-                                <thead class="bg-amber-100 text-amber-900 uppercase text-xs">
-                                    <tr><th class="p-3">Shop</th><th class="p-3">Amount</th><th class="p-3">Via</th><th class="p-3">Action</th></tr>
-                                </thead>
-                                <tbody id="approval-list" class="divide-y divide-amber-50"></tbody>
-                            </table>
+                        <div class="bg-white border border-slate-200 px-4 py-2 rounded-full shadow-sm text-sm font-semibold text-slate-600 flex items-center gap-2 w-fit">
+                            <span class="material-icons-round text-brand-500 text-base">calendar_today</span>
+                            <span id="currentDateDisplay">Today</span>
                         </div>
                     </div>
 
-                    <div id="leave-approval-section" class="hidden bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded-xl shadow-sm">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="material-icons-round text-indigo-600">event_available</span>
-                            <h3 class="font-bold text-indigo-800">Leave Requests</h3>
+                    <!-- ALERTS GRID -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Payment Alerts -->
+                        <div id="approval-section" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                                    <span class="material-icons-round">payments</span> Payment Approvals
+                                </h3>
+                                <span class="bg-amber-200 text-amber-800 text-xs px-2 py-1 rounded-md font-bold">Action Needed</span>
+                            </div>
+                            <div class="overflow-x-auto bg-white rounded-xl border border-amber-100">
+                                <table class="w-full text-sm text-left whitespace-nowrap">
+                                    <thead class="bg-amber-50 text-amber-900 font-bold text-xs uppercase">
+                                        <tr><th class="p-3">Shop</th><th class="p-3">Amount</th><th class="p-3">Method</th><th class="p-3 text-center">Action</th></tr>
+                                    </thead>
+                                    <tbody id="approval-list" class="divide-y divide-slate-50 text-slate-700"></tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto bg-white rounded-lg shadow-sm">
-                            <table class="w-full text-sm text-left">
-                                <thead class="bg-indigo-100 text-indigo-900 uppercase text-xs">
-                                    <tr><th class="p-3">Staff</th><th class="p-3">Type</th><th class="p-3">Reason</th><th class="p-3">Action</th></tr>
-                                </thead>
-                                <tbody id="leave-approval-list" class="divide-y divide-indigo-50"></tbody>
-                            </table>
+
+                        <!-- Leave Alerts -->
+                        <div id="leave-approval-section" class="hidden bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2">
+                                    <span class="material-icons-round">event</span> Leave Requests
+                                </h3>
+                                <span class="bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-md font-bold">New</span>
+                            </div>
+                            <div class="overflow-x-auto bg-white rounded-xl border border-blue-100">
+                                <table class="w-full text-sm text-left whitespace-nowrap">
+                                    <thead class="bg-blue-50 text-blue-900 font-bold text-xs uppercase">
+                                        <tr><th class="p-3">Staff</th><th class="p-3">Reason</th><th class="p-3 text-center">Action</th></tr>
+                                    </thead>
+                                    <tbody id="leave-approval-list" class="divide-y divide-slate-50 text-slate-700"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- STATS GRID -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <!-- Stat 1 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
-                            <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                                <span class="material-icons-round text-6xl text-blue-600">groups</span>
+                    <!-- STATS CARDS -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                        <!-- Stat Card 1 -->
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Attendance</p>
+                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-attendance">0</h4>
+                                </div>
+                                <div class="bg-blue-50 p-2 rounded-lg text-blue-600">
+                                    <span class="material-icons-round text-2xl">groups</span>
+                                </div>
                             </div>
-                            <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Attendance</p>
-                            <p class="text-3xl font-extrabold text-slate-800 mt-1" id="stat-attendance">0</p>
-                            <p class="text-xs text-green-500 font-medium mt-1 flex items-center">
-                                <span class="material-icons-round text-sm">arrow_upward</span> Present
-                            </p>
                         </div>
-                        <!-- Stat 2 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
-                            <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                                <span class="material-icons-round text-6xl text-purple-600">shopping_cart</span>
+                        
+                        <!-- Stat Card 2 -->
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Orders</p>
+                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-orders">0</h4>
+                                </div>
+                                <div class="bg-purple-50 p-2 rounded-lg text-purple-600">
+                                    <span class="material-icons-round text-2xl">local_shipping</span>
+                                </div>
                             </div>
-                            <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Orders</p>
-                            <p class="text-3xl font-extrabold text-slate-800 mt-1" id="stat-orders">0</p>
-                            <p class="text-xs text-purple-500 font-medium mt-1">Today</p>
                         </div>
-                        <!-- Stat 3 -->
-                        <div class="bg-gradient-to-br from-brand-500 to-brand-700 p-5 rounded-2xl shadow-lg shadow-brand-200 text-white relative overflow-hidden">
-                            <p class="text-brand-100 text-xs font-bold uppercase tracking-wider">Revenue</p>
-                            <p class="text-3xl font-extrabold mt-1" id="stat-sales">₹0</p>
-                            <p class="text-xs text-brand-100 mt-1 opacity-80">Sales Today</p>
-                        </div>
-                        <!-- Stat 4 -->
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
-                            <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                                <span class="material-icons-round text-6xl text-orange-600">account_balance_wallet</span>
+
+                        <!-- Stat Card 3 (Featured) -->
+                        <div class="bg-gradient-to-br from-brand-600 to-brand-800 p-5 rounded-2xl shadow-lg shadow-brand-500/20 text-white hover:scale-[1.02] transition duration-300">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-brand-100 text-xs font-bold uppercase tracking-wider mb-1">Revenue</p>
+                                    <h4 class="text-3xl font-extrabold" id="stat-sales">₹0</h4>
+                                </div>
+                                <div class="bg-white/20 p-2 rounded-lg text-white">
+                                    <span class="material-icons-round text-2xl">currency_rupee</span>
+                                </div>
                             </div>
-                            <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Market Credit</p>
-                            <p class="text-3xl font-extrabold text-slate-800 mt-1" id="stat-credit">₹0</p>
-                            <p class="text-xs text-orange-500 font-medium mt-1">Outstanding</p>
+                        </div>
+
+                        <!-- Stat Card 4 -->
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition duration-300">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Market Credit</p>
+                                    <h4 class="text-3xl font-extrabold text-slate-800" id="stat-credit">₹0</h4>
+                                </div>
+                                <div class="bg-orange-50 p-2 rounded-lg text-orange-600">
+                                    <span class="material-icons-round text-2xl">account_balance_wallet</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- ATTENDANCE TABLE -->
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-                            <h3 class="font-bold text-lg text-slate-800">Daily Register</h3>
-                            <div class="flex gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
-                                <input type="date" id="attendanceDateFilter" class="bg-transparent text-sm p-1 outline-none text-slate-600">
-                                <button onclick="loadAttendanceByDate()" class="bg-white text-brand-600 shadow-sm px-3 py-1 rounded-md text-xs font-bold hover:text-brand-700">GO</button>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                <span class="material-icons-round text-slate-400">history</span> Daily Register
+                            </h3>
+                            <div class="flex w-full sm:w-auto bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                                <input type="date" id="attendanceDateFilter" class="bg-transparent text-sm p-2 outline-none text-slate-600 flex-grow">
+                                <button onclick="loadAttendanceByDate()" class="bg-brand-50 text-brand-700 px-4 py-1.5 rounded-md text-xs font-bold hover:bg-brand-100 transition">GO</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm text-left">
-                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-semibold tracking-wide">
                                     <tr>
-                                        <th class="p-4">Staff</th>
-                                        <th class="p-4">Status</th>
-                                        <th class="p-4">Time / Location</th>
+                                        <th class="p-4 border-b border-slate-200">Staff Member</th>
+                                        <th class="p-4 border-b border-slate-200">Status</th>
+                                        <th class="p-4 border-b border-slate-200">Time / Location</th>
                                     </tr>
                                 </thead>
                                 <tbody id="attendance-list" class="divide-y divide-slate-100">
-                                    <tr><td colspan="3" class="p-6 text-center text-slate-400">Loading data...</td></tr>
+                                    <tr><td colspan="3" class="p-8 text-center text-slate-400 italic">Loading data...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -221,73 +263,92 @@
                 </div>
 
                 <!-- ================= TAB 2: OUTLETS ================= -->
-                <div id="tab-outlets" class="tab-content hidden space-y-6">
-                    <div class="flex flex-col lg:flex-row gap-6 h-full">
-                        <!-- Add Form -->
-                        <div class="lg:w-1/3">
-                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-4">
-                                <h3 class="font-bold text-lg mb-4 text-slate-800 border-b pb-2 flex items-center gap-2">
-                                    <span class="material-icons-round text-brand-500">add_business</span> <span id="formTitle">Add Outlet</span>
+                <div id="tab-outlets" class="tab-content hidden-tab space-y-6">
+                    <div class="flex flex-col lg:flex-row gap-6 items-start">
+                        
+                        <!-- ADD FORM -->
+                        <div class="w-full lg:w-96 shrink-0">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
+                                <h3 class="font-bold text-lg mb-5 text-slate-800 flex items-center justify-between">
+                                    <span class="flex items-center gap-2"><span class="material-icons-round text-brand-600">add_business</span> <span id="formTitle">Add Outlet</span></span>
                                 </h3>
+                                
                                 <form id="addOutletForm" class="space-y-4">
                                     <input type="hidden" id="editOutletId">
                                     
+                                    <!-- Inputs with visible backgrounds -->
                                     <div class="space-y-3">
-                                        <input type="text" id="shopName" placeholder="Shop Name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                                        <input type="text" id="shopName" placeholder="Shop Name" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none text-slate-800 placeholder-slate-400 font-medium">
                                         
                                         <div class="grid grid-cols-2 gap-3">
-                                            <select id="outletType" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none">
-                                                <option value="" disabled selected>Type</option>
-                                                <option value="Shop">Shop</option>
-                                                <option value="Dhaba">Dhaba</option>
-                                                <option value="Restaurant">Rest.</option>
-                                            </select>
-                                            <input type="text" id="ownerName" placeholder="Owner" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
+                                            <div class="relative">
+                                                <select id="outletType" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-3 text-sm outline-none text-slate-800 appearance-none">
+                                                    <option value="" disabled selected>Type</option>
+                                                    <option value="Shop">Shop</option>
+                                                    <option value="Dhaba">Dhaba</option>
+                                                    <option value="Restaurant">Rest.</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500"><span class="material-icons-round text-sm">expand_more</span></div>
+                                            </div>
+                                            <input type="text" id="ownerName" placeholder="Owner" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 placeholder-slate-400 font-medium">
                                         </div>
 
-                                        <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
-                                        <input type="tel" id="contactPhone" placeholder="Phone" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
+                                        <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
+                                        <input type="tel" id="contactPhone" placeholder="Phone Number" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
                                         
-                                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                                            <label class="text-xs font-bold text-slate-400 uppercase block mb-2">Terms</label>
-                                            <select id="storeType" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none mb-2">
-                                                <option value="Cash">Cash Only</option>
-                                                <option value="Credit">Credit Allowed</option>
-                                            </select>
+                                        <!-- Credit Section -->
+                                        <div class="bg-brand-50/50 p-4 rounded-xl border border-brand-100">
+                                            <label class="text-[10px] font-bold text-brand-400 uppercase tracking-wider block mb-2">Payment Terms</label>
+                                            <div class="relative mb-3">
+                                                <select id="storeType" required class="w-full bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm outline-none text-slate-700 font-medium appearance-none">
+                                                    <option value="Cash">Cash Only</option>
+                                                    <option value="Credit">Credit Allowed</option>
+                                                </select>
+                                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-brand-400"><span class="material-icons-round text-sm">expand_more</span></div>
+                                            </div>
                                             <div class="grid grid-cols-2 gap-2">
-                                                <input type="number" id="creditDays" placeholder="Days" disabled class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50">
-                                                <input type="number" id="creditLimit" placeholder="Limit" disabled class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50">
+                                                <input type="number" id="creditDays" placeholder="Days" disabled class="bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50 disabled:bg-slate-100">
+                                                <input type="number" id="creditLimit" placeholder="Limit ₹" disabled class="bg-white border border-brand-200 rounded-lg px-3 py-2 text-sm disabled:opacity-50 disabled:bg-slate-100">
                                             </div>
                                         </div>
 
-                                        <input type="text" id="gstNumber" placeholder="GST (Optional)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
+                                        <input type="text" id="gstNumber" placeholder="GST Number (Optional)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none text-slate-800 font-medium">
 
-                                        <!-- GPS Button -->
-                                        <button type="button" id="geoBtn" class="w-full border border-slate-300 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-100 flex justify-center gap-2">
-                                            <span class="material-icons-round text-sm">my_location</span> <span id="geoDisplay">Capture GPS (Req)</span>
+                                        <!-- GPS -->
+                                        <button type="button" id="geoBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl text-sm font-bold flex justify-center items-center gap-2 transition shadow-md">
+                                            <span class="material-icons-round text-sm">my_location</span> <span id="geoDisplay">Capture Location</span>
                                         </button>
                                         <input type="hidden" id="lat"><input type="hidden" id="lng">
                                     </div>
 
                                     <div class="flex gap-2 pt-2">
-                                        <button type="submit" id="submitBtn" class="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition">Save</button>
-                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-300">X</button>
+                                        <button type="submit" id="submitBtn" class="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition">Save Outlet</button>
+                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-4 bg-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-300 transition">Cancel</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
 
-                        <!-- List -->
-                        <div class="lg:w-2/3 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                            <div class="p-4 bg-slate-50 border-b border-slate-100">
-                                <h4 class="font-bold text-slate-700">Outlet Directory</h4>
+                        <!-- LIST -->
+                        <div class="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            <div class="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                <h4 class="font-bold text-slate-700 text-lg">Outlet Directory</h4>
+                                <span class="bg-white border border-slate-200 px-3 py-1 rounded-full text-xs font-bold text-slate-500 shadow-sm">All Shops</span>
                             </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-left">
-                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
-                                        <tr><th class="p-4">Details</th><th class="p-4">Contact</th><th class="p-4">Status</th><th class="p-4">Edit</th></tr>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-sm text-left whitespace-nowrap">
+                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
+                                        <tr>
+                                            <th class="p-4 border-b border-slate-100">Details</th>
+                                            <th class="p-4 border-b border-slate-100">Contact</th>
+                                            <th class="p-4 border-b border-slate-100">Status</th>
+                                            <th class="p-4 border-b border-slate-100 text-right">Action</th>
+                                        </tr>
                                     </thead>
-                                    <tbody id="outlets-table-body" class="divide-y divide-slate-100"></tbody>
+                                    <tbody id="outlets-table-body" class="divide-y divide-slate-100">
+                                        <tr><td colspan="4" class="p-8 text-center text-slate-400">Loading directory...</td></tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -295,51 +356,76 @@
                 </div>
 
                 <!-- ================= TAB 3: ROUTES ================= -->
-                <div id="tab-routes" class="tab-content hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-                        <!-- Create & List -->
-                        <div class="space-y-6">
-                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                <h3 class="font-bold text-lg mb-4 text-slate-800">Create Route</h3>
+                <div id="tab-routes" class="tab-content hidden-tab h-full">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[80vh]">
+                        
+                        <!-- LEFT PANEL: Create & List -->
+                        <div class="flex flex-col gap-6 h-full">
+                            <!-- Create Card -->
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 shrink-0">
+                                <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                    <span class="material-icons-round text-brand-500">add_road</span> New Route
+                                </h3>
                                 <form id="createRouteForm" class="space-y-3">
-                                    <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Mon North)" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                                    <select id="routeSalesmanSelect" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
-                                        <option value="">Assign Salesman</option>
-                                    </select>
-                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow hover:bg-brand-700">Create</button>
+                                    <input type="text" id="routeNameInput" placeholder="Route Name (e.g. Mon North)" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
+                                    <div class="relative">
+                                        <select id="routeSalesmanSelect" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none appearance-none font-medium text-slate-700">
+                                            <option value="">Assign Salesman</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500"><span class="material-icons-round">expand_more</span></div>
+                                    </div>
+                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-md hover:bg-brand-700 transition">Create Route</button>
                                 </form>
                             </div>
                             
-                            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                                <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">Active Routes</div>
-                                <ul id="routes-list-group" class="divide-y divide-slate-100 max-h-96 overflow-y-auto"></ul>
+                            <!-- List Card -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                                <div class="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 text-sm uppercase tracking-wide">Active Routes</div>
+                                <ul id="routes-list-group" class="divide-y divide-slate-100 overflow-y-auto flex-1 p-0">
+                                    <li class="p-6 text-center text-slate-400 italic">Loading routes...</li>
+                                </ul>
                             </div>
                         </div>
 
-                        <!-- Configuration Panel -->
-                        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px] lg:h-auto">
-                            <div class="p-5 border-b border-slate-100 bg-slate-50">
-                                <h4 class="font-bold text-lg text-slate-800">Route Config: <span id="selectedRouteName" class="text-brand-600">Select a route</span></h4>
+                        <!-- RIGHT PANEL: Configuration -->
+                        <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden h-full">
+                            <div class="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                <h4 class="font-bold text-lg text-slate-800">Route Config</h4>
+                                <span id="selectedRouteName" class="text-brand-600 font-extrabold bg-brand-50 px-3 py-1 rounded-lg text-sm border border-brand-100">None Selected</span>
                                 <input type="hidden" id="selectedRouteId">
                             </div>
-                            <div class="p-5 flex-grow overflow-y-auto">
+                            
+                            <div class="p-5 flex-grow overflow-y-auto bg-slate-50/30">
                                 <div id="routeConfigPanel" class="hidden h-full flex flex-col">
-                                    <div class="flex gap-2 mb-4">
-                                        <select id="allOutletsDropdown" class="flex-grow bg-white border border-slate-300 rounded-xl px-3 text-sm"></select>
-                                        <button onclick="addOutletToRoute()" class="bg-green-600 text-white px-6 rounded-xl font-bold hover:bg-green-700">Add</button>
+                                    <!-- Add Shop Bar -->
+                                    <div class="flex gap-2 mb-4 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+                                        <div class="relative flex-grow">
+                                            <select id="allOutletsDropdown" class="w-full bg-transparent p-2 text-sm outline-none font-medium text-slate-700 appearance-none">
+                                                <option>Select Outlet to Add...</option>
+                                            </select>
+                                        </div>
+                                        <button onclick="addOutletToRoute()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow transition">Add Stop</button>
                                     </div>
-                                    <div class="flex-grow border rounded-xl overflow-hidden">
-                                        <table class="w-full text-sm text-left">
-                                            <thead class="bg-slate-100 text-slate-600">
-                                                <tr><th class="p-3 w-16">#</th><th class="p-3">Shop</th><th class="p-3 text-right">Action</th></tr>
-                                            </thead>
-                                            <tbody id="route-outlets-list" class="divide-y divide-slate-100"></tbody>
-                                        </table>
+
+                                    <!-- Table -->
+                                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex-grow">
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full text-sm text-left">
+                                                <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                                                    <tr><th class="p-3 w-16 text-center">Seq</th><th class="p-3">Outlet Name</th><th class="p-3 text-right">Actions</th></tr>
+                                                </thead>
+                                                <tbody id="route-outlets-list" class="divide-y divide-slate-100"></tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Empty State -->
                                 <div id="routeConfigMsg" class="h-full flex flex-col items-center justify-center text-slate-400">
-                                    <span class="material-icons-round text-6xl mb-2 opacity-20">alt_route</span>
-                                    <p>Select a route from the left to configure stops.</p>
+                                    <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-300">
+                                        <span class="material-icons-round text-4xl">alt_route</span>
+                                    </div>
+                                    <p class="font-medium">Select a route from the list to manage stops.</p>
                                 </div>
                             </div>
                         </div>
@@ -347,29 +433,46 @@
                 </div>
 
                 <!-- ================= TAB 4: PRODUCTS ================= -->
-                <div id="tab-products" class="tab-content hidden">
-                    <div class="flex flex-col lg:flex-row gap-6">
-                        <div class="lg:w-1/3">
-                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                <h3 class="font-bold text-lg mb-4 text-slate-800">Add Product</h3>
+                <div id="tab-products" class="tab-content hidden-tab">
+                    <div class="flex flex-col lg:flex-row gap-6 items-start">
+                        <!-- Add Form -->
+                        <div class="w-full lg:w-80 shrink-0">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 sticky top-4">
+                                <h3 class="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2">
+                                    <span class="material-icons-round text-brand-600">add_box</span> Add Product
+                                </h3>
                                 <form id="addProductForm" class="space-y-3">
-                                    <input type="text" id="prodName" placeholder="Product Name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                                    <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
+                                    <input type="text" id="prodName" placeholder="Product Name" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brand-500 font-medium">
+                                    
+                                    <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
                                     <datalist id="catSuggestions"><option value="Beverages"><option value="Snacks"><option value="Dairy"></datalist>
-                                    <input type="text" id="prodHSN" placeholder="HSN Code" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
-                                    <input type="number" id="prodPrice" placeholder="Price (₹)" step="0.01" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none">
-                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow hover:bg-brand-700">Add to Inventory</button>
+                                    
+                                    <input type="text" id="prodHSN" placeholder="HSN Code" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm outline-none font-medium">
+                                    
+                                    <div class="relative">
+                                        <span class="absolute left-4 top-3 text-slate-400 font-bold">₹</span>
+                                        <input type="number" id="prodPrice" placeholder="0.00" step="0.01" required class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-4 py-3 text-sm outline-none font-bold text-slate-800">
+                                    </div>
+                                    
+                                    <button type="submit" class="w-full bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/30 hover:bg-brand-700 transition mt-2">Add to Inventory</button>
                                 </form>
                             </div>
                         </div>
-                        <div class="lg:w-2/3 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                            <div class="p-4 bg-slate-50 border-b border-slate-100 font-bold text-slate-700">Product Inventory</div>
+
+                        <!-- Inventory Table -->
+                        <div class="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div class="p-5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                <h4 class="font-bold text-slate-700 text-lg">Product Inventory</h4>
+                                <button onclick="loadProducts()" class="text-brand-600 hover:text-brand-700"><span class="material-icons-round">refresh</span></button>
+                            </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm text-left">
-                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
-                                        <tr><th class="p-4">Item</th><th class="p-4">Category</th><th class="p-4">Price</th><th class="p-4 text-right">Delete</th></tr>
+                                    <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
+                                        <tr><th class="p-4 border-b">Item Name</th><th class="p-4 border-b">Category</th><th class="p-4 border-b">Price</th><th class="p-4 border-b text-right">Delete</th></tr>
                                     </thead>
-                                    <tbody id="product-list-body" class="divide-y divide-slate-100"></tbody>
+                                    <tbody id="product-list-body" class="divide-y divide-slate-100 text-slate-700">
+                                        <tr><td colspan="4" class="p-8 text-center text-slate-400 italic">Loading inventory...</td></tr>
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -377,101 +480,105 @@
                 </div>
 
                 <!-- ================= TAB 5: STAFF ================= -->
-                <div id="tab-staff" class="tab-content hidden">
-                    <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-                        <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <span class="material-icons-round text-3xl">badge</span>
+                <div id="tab-staff" class="tab-content hidden-tab">
+                    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+                        <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                            <span class="material-icons-round text-4xl">badge</span>
                         </div>
-                        <h3 class="text-xl font-bold text-slate-800 mb-2">Field Force</h3>
-                        <p class="text-slate-500 mb-6 text-sm">Active Salesmen currently registered in the system.</p>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-2">Field Force</h3>
+                        <p class="text-slate-500 mb-8">Active Salesmen currently registered in the system.</p>
                         
-                        <div class="text-left bg-slate-50 rounded-xl border border-slate-200 p-4">
-                            <ul id="salesmen-list" class="space-y-2 divide-y divide-slate-200">
-                                <li class="text-center text-slate-400 py-4">Loading list...</li>
+                        <div class="text-left bg-slate-50 rounded-2xl border border-slate-200 p-1 overflow-hidden">
+                            <ul id="salesmen-list" class="divide-y divide-slate-200">
+                                <li class="p-4 text-center text-slate-400 italic">Loading list...</li>
                             </ul>
                         </div>
+                        
+                        <p class="mt-6 text-xs text-slate-400">To add new staff, create a user in Firebase Auth and add a doc in 'users' collection.</p>
                     </div>
                 </div>
 
             </div> <!-- End Scrollable -->
         </main>
 
-        <!-- MOBILE BOTTOM NAV -->
-        <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 z-50 flex justify-around py-2 shadow-lg">
-            <button onclick="switchTab('tab-dashboard')" class="bottom-nav-item active flex flex-col items-center p-2 text-brand-600">
-                <span class="material-icons-round text-2xl">dashboard</span>
-                <span class="text-[10px] font-bold mt-1">Home</span>
+        <!-- MOBILE BOTTOM NAV (Visible only on small screens) -->
+        <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-slate-200 z-50 flex justify-around py-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe">
+            <button onclick="switchTab('tab-dashboard')" class="mobile-nav-item mobile-nav-active flex flex-col items-center p-2 rounded-xl transition">
+                <span class="material-icons-round text-2xl mb-0.5">dashboard</span>
+                <span class="text-[10px] font-bold">Home</span>
             </button>
-            <button onclick="switchTab('tab-outlets')" class="bottom-nav-item flex flex-col items-center p-2 text-slate-400 hover:text-slate-600">
-                <span class="material-icons-round text-2xl">store</span>
-                <span class="text-[10px] font-bold mt-1">Shops</span>
+            <button onclick="switchTab('tab-outlets')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
+                <span class="material-icons-round text-2xl mb-0.5">store</span>
+                <span class="text-[10px] font-bold">Shops</span>
             </button>
-            <button onclick="switchTab('tab-routes')" class="bottom-nav-item flex flex-col items-center p-2 text-slate-400 hover:text-slate-600">
-                <span class="material-icons-round text-2xl">map</span>
-                <span class="text-[10px] font-bold mt-1">Routes</span>
+            <button onclick="switchTab('tab-routes')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
+                <span class="material-icons-round text-2xl mb-0.5">alt_route</span>
+                <span class="text-[10px] font-bold">Route</span>
             </button>
-            <button onclick="switchTab('tab-products')" class="bottom-nav-item flex flex-col items-center p-2 text-slate-400 hover:text-slate-600">
-                <span class="material-icons-round text-2xl">inventory</span>
-                <span class="text-[10px] font-bold mt-1">Items</span>
+            <button onclick="switchTab('tab-products')" class="mobile-nav-item text-slate-400 hover:text-brand-500 flex flex-col items-center p-2 rounded-xl transition">
+                <span class="material-icons-round text-2xl mb-0.5">inventory_2</span>
+                <span class="text-[10px] font-bold">Items</span>
             </button>
         </nav>
 
     </div>
 
-    <!-- UI SCRIPTS -->
+    <!-- UI SCRIPT (TAB LOGIC) -->
     <script>
         // Update Date Display
         const dateEl = document.getElementById('currentDateDisplay');
         if(dateEl) {
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const options = { weekday: 'long', day: 'numeric', month: 'short' };
             dateEl.innerText = new Date().toLocaleDateString('en-US', options);
         }
 
-        // Tab Switching Logic (Syncs Desktop Sidebar and Mobile Bottom Nav)
+        // Tab Switching Logic
         window.switchTab = function(tabId) {
             // 1. Hide all contents
             document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.add('hidden');
-                el.classList.remove('block');
+                el.classList.add('hidden-tab');
+                el.classList.remove('block-tab');
             });
 
             // 2. Show active content
-            document.getElementById(tabId).classList.remove('hidden');
-            document.getElementById(tabId).classList.add('block');
+            document.getElementById(tabId).classList.remove('hidden-tab');
+            document.getElementById(tabId).classList.add('block-tab');
 
-            // 3. Update Sidebar (Desktop) styling
+            // 3. Update Desktop Sidebar
             document.querySelectorAll('.nav-item').forEach(btn => {
-                btn.classList.remove('bg-brand-600', 'text-white', 'shadow-md');
-                btn.classList.add('text-slate-300', 'hover:bg-slate-800');
-                // Check if this button targets the active tab
+                btn.classList.remove('bg-slate-800', 'text-white', 'shadow-md');
+                btn.classList.add('text-slate-300');
                 if(btn.getAttribute('onclick').includes(tabId)) {
-                    btn.classList.remove('text-slate-300', 'hover:bg-slate-800');
-                    btn.classList.add('bg-brand-600', 'text-white', 'shadow-md');
+                    btn.classList.remove('text-slate-300');
+                    btn.classList.add('bg-slate-800', 'text-white', 'shadow-md');
                 }
             });
 
-            // 4. Update Bottom Nav (Mobile) styling
-            document.querySelectorAll('.bottom-nav-item').forEach(btn => {
-                btn.classList.remove('text-brand-600', 'active');
+            // 4. Update Mobile Bottom Nav
+            document.querySelectorAll('.mobile-nav-item').forEach(btn => {
+                btn.classList.remove('mobile-nav-active', 'text-brand-600');
                 btn.classList.add('text-slate-400');
                 if(btn.getAttribute('onclick').includes(tabId)) {
                     btn.classList.remove('text-slate-400');
-                    btn.classList.add('text-brand-600', 'active');
+                    btn.classList.add('mobile-nav-active', 'text-brand-600');
                 }
             });
         };
 
-        // Initialize first tab active state in UI
-        document.querySelector('.nav-item').classList.remove('text-slate-300', 'hover:bg-slate-800');
-        document.querySelector('.nav-item').classList.add('bg-brand-600', 'text-white', 'shadow-md');
+        // Set initial active state
+        const firstBtn = document.querySelector('.nav-item');
+        if(firstBtn) {
+            firstBtn.classList.remove('text-slate-300');
+            firstBtn.classList.add('bg-slate-800', 'text-white', 'shadow-md');
+        }
 
-        // Logout Mobile
-        document.getElementById('logoutBtnMobile').addEventListener('click', () => {
+        // Mobile Logout
+        document.getElementById('logoutBtnMobile')?.addEventListener('click', () => {
             document.getElementById('logoutBtn').click();
         });
     </script>
 
-    <!-- LOGIC -->
+    <!-- FIREBASE LOGIC -->
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
