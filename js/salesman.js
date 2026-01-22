@@ -23,12 +23,21 @@ onAuthStateChanged(auth, async (user) => {
         return;
     }
 
-    if(loader) loader.style.display = 'none';
+    if (loader) loader.style.display = 'none';
     content.style.display = 'block';
 
-    // Load the Route
+    // ✅ Check today's attendance AFTER login & role validation
+    await checkTodayAttendance(user);
+
+    // Load assigned route
     loadAssignedRoute(user.uid);
+
+    // ✅ Attach event listener INSIDE auth block
+    document
+        .getElementById('checkInBtn')
+        .addEventListener('click', () => handleCheckIn(user));
 });
+
 
 document.getElementById('logoutBtn').addEventListener('click', logoutUser);
 
