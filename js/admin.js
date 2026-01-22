@@ -141,21 +141,44 @@ async function loadDashboardStats() {
     }
 }
 
-// Ensure this exists in js/admin.js
+// ==========================================
+//      ATTENDANCE & LEAVE LOGIC
+// ==========================================
+
+// 1. Load Today's Data (Called by Init)
+async function loadTodayAttendance() {
+    // Set the Date Picker Input to Today's Date
+    const today = new Date();
+    const todayStr = today.getFullYear() + "-" + 
+                     String(today.getMonth() + 1).padStart(2, '0') + "-" + 
+                     String(today.getDate()).padStart(2, '0');
+    
+    const dateInput = document.getElementById('attendanceDateFilter');
+    if (dateInput) {
+        dateInput.value = todayStr;
+    }
+
+    // Call the main filter function
+    if (window.loadAttendanceByDate) {
+        await window.loadAttendanceByDate();
+    }
+}
+
+// 2. Filter by Date (Called by Button & LoadToday)
 window.loadAttendanceByDate = async function() {
     const list = document.getElementById('attendance-list');
     const dateInput = document.getElementById('attendanceDateFilter').value;
     
-    if(!dateInput) return; // specific alert not needed on auto-load
+    if(!dateInput) return;
     
     list.innerHTML = "<tr><td colspan='3'>Loading data...</td></tr>";
 
     try {
-        // 1. Fetch CHECK-INS
+        // A. Fetch CHECK-INS
         const attendQuery = query(collection(db, "attendance"), where("date", "==", dateInput));
         const attendSnap = await getDocs(attendQuery);
 
-        // 2. Fetch APPROVED LEAVES
+        // B. Fetch APPROVED LEAVES
         const leaveQuery = query(collection(db, "leaves"), where("date", "==", dateInput), where("status", "==", "approved"));
         const leaveSnap = await getDocs(leaveQuery);
 
@@ -175,8 +198,8 @@ window.loadAttendanceByDate = async function() {
                 : "No Loc";
 
             list.innerHTML += `
-                <tr>
-                    <td>${data.salesmanEmail}</td>
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:10px;">${data.salesmanEmail}</td>
                     <td><span style="color:green; font-weight:bold;">Present</span></td>
                     <td>Checked In: ${time} | ${mapLink}</td>
                 </tr>
@@ -189,8 +212,8 @@ window.loadAttendanceByDate = async function() {
             const color = data.type === 'Half Day' ? '#fd7e14' : '#dc3545';
             
             list.innerHTML += `
-                <tr>
-                    <td>${data.salesmanEmail}</td>
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:10px;">${data.salesmanEmail}</td>
                     <td><span style="color:${color}; font-weight:bold;">${data.type}</span></td>
                     <td>Remark: ${data.reason}</td>
                 </tr>
@@ -202,6 +225,51 @@ window.loadAttendanceByDate = async function() {
     }
 };
 
+// 3. Load Pending Leaves (For Approval Box)
+async function loadPendingLeaves() {
+    const container = document.getElementById('leave-approval-section');
+    const list = document.getElementById('leave-approval-list');
+    if(!container) return;
+
+    try {
+        const q = query(collection(db, "leaves"), where("status", "==", "pending"), orderBy("date", "asc"));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = "";
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const row = `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><strong>${data.date}</strong><br>${data.type}</td>
+                    <td>${data.reason}</td>
+                    <td>
+                        <button onclick="processLeave('${docSnap.id}', 'approved')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px; cursor:pointer;">✔</button>
+                        <button onclick="processLeave('${docSnap.id}', 'rejected')" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✖</button>
+                    </td>
+                </tr>
+            `;
+            list.innerHTML += row;
+        });
+    } catch (e) { console.error("Leave Load Error:", e); }
+}
+
+window.processLeave = async function(leaveId, status) {
+    if(!confirm(`Mark request as ${status}?`)) return;
+    try {
+        await updateDoc(doc(db, "leaves", leaveId), { status: status });
+        alert("Updated!");
+        loadPendingLeaves(); // Refresh list
+        loadAttendanceByDate(); // Refresh attendance table
+    } catch (e) { alert("Error: " + e.message); }
+};
 // --- 4. SALESMAN LIST (WAS MISSING) ---
 
 async function loadSalesmenList() {
