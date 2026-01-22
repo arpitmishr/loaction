@@ -17,6 +17,8 @@ let watchId = null;
 let currentVisitId = null;
 let visitStartTime = null;
 let timerInterval = null;
+let currentOrderOutlet = null; // Stores {id, name, status}
+let orderCart = [];
 
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
@@ -125,17 +127,36 @@ async function loadShops(routeId) {
             const li = document.createElement('li');
             li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
             
+            // --- UPDATED HTML STRUCTURE FOR TWO BUTTONS ---
             li.innerHTML = `
                 <div>
                     <strong style="font-size:1.1rem;">${routeOutletData.outletName}</strong><br>
                     <small>Seq: ${routeOutletData.sequence}</small>
                 </div>
-                <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
-                    Open 🗺️
-                </button>
+                <div style="display:flex; gap:10px;">
+                    <!-- Phone Order Button -->
+                    <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">
+                        📞
+                    </button>
+                    
+                    <!-- Map/Visit Button -->
+                    <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
+                        Open 🗺️
+                    </button>
+                </div>
             `;
             
-            // Attach Click Event to open Map Panel
+            // --- 1. ATTACH PHONE ORDER LISTENER ---
+            li.querySelector('.btn-phone-order').onclick = () => {
+                // Ensure openOrderForm is defined (from the previous step)
+                if (window.openOrderForm) {
+                    window.openOrderForm(routeOutletData.outletId, routeOutletData.outletName);
+                } else {
+                    alert("Order system not loaded yet.");
+                }
+            };
+
+            // --- 2. ATTACH MAP LISTENER ---
             li.querySelector('.btn-open-map').onclick = () => {
                 if(shopLat === 0 && shopLng === 0) {
                     alert("This outlet has no GPS coordinates set by Admin.");
@@ -154,7 +175,6 @@ async function loadShops(routeId) {
         }
     }
 }
-
 
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
@@ -268,10 +288,9 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
 
         // Bind Button Actions
         document.getElementById('btn-take-order').onclick = () => {
-            alert("Opening Order Form..."); 
-            // TODO: Redirect to order.html?outletId=...
-        };
-
+    // Pass outlet ID and Name from the current visit context
+    openOrderForm(outletId, outletName);
+};
         document.getElementById('btn-end-visit').onclick = () => performEndVisit();
 
     } catch (error) {
@@ -485,3 +504,242 @@ function filterProducts(e) {
         });
     }
 }
+
+
+
+
+
+
+// ==========================================
+//      ORDER TAKING LOGIC
+// ==========================================
+
+// 1. OPEN ORDER FORM
+window.openOrderForm = async function(outletId, outletName) {
+    // A. Fetch Outlet Status First (Security Check)
+    try {
+        const docSnap = await getDoc(doc(db, "outlets", outletId));
+        if (!docSnap.exists()) return alert("Outlet not found.");
+        
+        const data = docSnap.data();
+        
+        // CHECK: Is Outlet Blocked?
+        if (data.status === 'blocked') {
+            alert("⛔ This outlet is BLOCKED. You cannot take orders.");
+            return;
+        }
+
+        currentOrderOutlet = { id: outletId, name: outletName, data: data };
+
+    } catch (e) {
+        console.error(e);
+        alert("Error verifying outlet.");
+        return;
+    }
+
+    // B. Switch UI
+    document.getElementById('visit-view').style.display = 'none'; // Hide visit/map
+    document.getElementById('order-view').style.display = 'block';
+    
+    document.getElementById('order-outlet-name').innerText = outletName;
+    
+    // Reset Form
+    orderCart = [];
+    document.getElementById('isPhoneOrder').checked = false;
+    document.getElementById('isPhoneOrder').disabled = false;
+    renderCart();
+
+    // Load Products for Dropdown
+    populateProductDropdown();
+    
+    // Attach Listener for Phone Toggle
+    document.getElementById('isPhoneOrder').onchange = renderCart; // Re-calc totals on toggle
+};
+
+window.cancelOrder = function() {
+    if(orderCart.length > 0 && !confirm("Discard current order?")) return;
+    document.getElementById('order-view').style.display = 'none';
+    
+    // If we were in a visit, go back to visit view. Else go to route view.
+    if(currentVisitId) {
+        document.getElementById('visit-view').style.display = 'block';
+    } else {
+        document.getElementById('route-view').style.display = 'block';
+    }
+};
+
+// 2. POPULATE DROPDOWN
+async function populateProductDropdown() {
+    const select = document.getElementById('order-product-select');
+    if(select.options.length > 1) return; // Already loaded
+
+    try {
+        // Query active products
+        const q = query(collection(db, "products"), orderBy("name")); // Ensure index exists
+        const snap = await getDocs(q);
+
+        select.innerHTML = '<option value="">Select Product...</option>';
+        
+        snap.forEach(doc => {
+            const p = doc.data();
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = `${p.name} (₹${p.price})`;
+            opt.dataset.price = p.price;
+            opt.dataset.name = p.name;
+            select.appendChild(opt);
+        });
+    } catch (e) { console.error("Prod Load Error:", e); }
+}
+
+// 3. ADD TO CART
+window.addToCart = function() {
+    const select = document.getElementById('order-product-select');
+    const qtyInput = document.getElementById('order-qty');
+    const qty = parseInt(qtyInput.value);
+
+    if (!select.value || !qty || qty <= 0) {
+        alert("Please select a product and valid quantity.");
+        return;
+    }
+
+    const productId = select.value;
+    const price = parseFloat(select.options[select.selectedIndex].dataset.price);
+    const name = select.options[select.selectedIndex].dataset.name;
+
+    // Check if exists
+    const existing = orderCart.find(item => item.productId === productId);
+    if (existing) {
+        existing.qty += qty;
+        existing.lineTotal = existing.qty * existing.price;
+    } else {
+        orderCart.push({
+            productId: productId,
+            name: name,
+            price: price,
+            qty: qty,
+            lineTotal: qty * price
+        });
+    }
+
+    qtyInput.value = ""; // Reset input
+    renderCart();
+};
+
+// 4. RENDER CART & CALCULATE TOTALS
+function renderCart() {
+    const tbody = document.getElementById('order-cart-body');
+    const isPhone = document.getElementById('isPhoneOrder').checked;
+    
+    tbody.innerHTML = "";
+    
+    let subtotal = 0;
+
+    orderCart.forEach((item, index) => {
+        subtotal += item.lineTotal;
+        tbody.innerHTML += `
+            <tr style="border-bottom:1px solid #eee;">
+                <td style="padding:5px;">${item.name}<br><small>@ ₹${item.price}</small></td>
+                <td style="text-align:center;">${item.qty}</td>
+                <td style="text-align:right;">₹${item.lineTotal.toFixed(2)}</td>
+                <td style="text-align:center; cursor:pointer;" onclick="removeFromCart(${index})">❌</td>
+            </tr>
+        `;
+    });
+
+    // GST Logic
+    let gstAmount = 0;
+    if (isPhone) {
+        gstAmount = subtotal * 0.05; // 5% GST
+        document.getElementById('tax-row').style.display = 'block';
+    } else {
+        document.getElementById('tax-row').style.display = 'none';
+    }
+
+    const grandTotal = subtotal + gstAmount;
+
+    document.getElementById('ord-subtotal').innerText = "₹" + subtotal.toFixed(2);
+    document.getElementById('ord-tax').innerText = "₹" + gstAmount.toFixed(2);
+    document.getElementById('ord-grand-total').innerText = "₹" + grandTotal.toFixed(2);
+}
+
+window.removeFromCart = function(index) {
+    orderCart.splice(index, 1);
+    renderCart();
+};
+
+// 5. SUBMIT ORDER
+window.submitOrder = async function() {
+    const isPhone = document.getElementById('isPhoneOrder').checked;
+    const btn = document.getElementById('btn-submit-order');
+
+    // VALIDATION 1: Empty Cart
+    if (orderCart.length === 0) return alert("Cart is empty!");
+
+    // VALIDATION 2: Geo-Fencing
+    if (!isPhone) {
+        // If NOT a phone order, User MUST be "Checked In" (Active Visit)
+        if (!currentVisitId) {
+            alert("❌ Geo-Fence Error:\nYou must be Checked-In to the shop to place a regular order.\n\nUse 'Phone Order' if you are taking this remotely.");
+            return;
+        }
+    }
+
+    if (!confirm("Confirm Order Submission?")) return;
+
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+
+    try {
+        const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
+        const tax = isPhone ? (subtotal * 0.05) : 0;
+        const total = subtotal + tax;
+
+        const orderData = {
+            salesmanId: auth.currentUser.uid,
+            outletId: currentOrderOutlet.id,
+            outletName: currentOrderOutlet.name,
+            visitId: isPhone ? null : currentVisitId, // Link to visit if present
+            orderDate: Timestamp.now(),
+            orderType: isPhone ? "Phone Call" : "Physical Visit",
+            items: orderCart,
+            financials: {
+                subtotal: subtotal,
+                tax: tax,
+                totalAmount: total
+            },
+            status: "pending"
+        };
+
+        // Write to Firestore
+        await addDoc(collection(db, "orders"), orderData);
+
+        // Optional: Update Outlet Current Balance (Requires a Cloud Function in real production, but we can do client-side here)
+        // Note: This updates the balance in the outlet document immediately
+        /*
+        const outletRef = doc(db, "outlets", currentOrderOutlet.id);
+        await updateDoc(outletRef, {
+            currentBalance: (currentOrderOutlet.data.currentBalance || 0) + total
+        });
+        */
+
+        alert("✅ Order Placed Successfully!");
+        
+        // Cleanup
+        document.getElementById('order-view').style.display = 'none';
+        
+        // Return to appropriate screen
+        if(currentVisitId) {
+            document.getElementById('visit-view').style.display = 'block';
+        } else {
+            document.getElementById('route-view').style.display = 'block';
+        }
+
+    } catch (error) {
+        console.error("Order Error:", error);
+        alert("Failed to submit order: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Confirm Order";
+    }
+};
