@@ -1,7 +1,7 @@
 // 1. IMPORTS
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
-    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint 
+    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -661,20 +661,18 @@ window.removeFromCart = function(index) {
 };
 
 // 5. SUBMIT ORDER
+// js/salesman.js - Updated submitOrder
+
 window.submitOrder = async function() {
     const isPhone = document.getElementById('isPhoneOrder').checked;
     const applyTax = document.getElementById('applyGst').checked;
     const btn = document.getElementById('btn-submit-order');
 
-    // VALIDATION 1: Empty Cart
+    // Validation
     if (orderCart.length === 0) return alert("Cart is empty!");
-
-    // VALIDATION 2: Geo-Fencing (Skipped if Phone Order is Checked)
-    if (!isPhone) {
-        if (!currentVisitId) {
-            alert("❌ Geo-Fence Error:\nYou must be Checked-In to the shop to place a regular order.\n\nUse 'Phone Order' toggle if you are taking this remotely.");
-            return;
-        }
+    if (!isPhone && !currentVisitId) {
+        alert("❌ Geo-Fence Error: You must be Checked-In.");
+        return;
     }
 
     if (!confirm("Confirm Order Submission?")) return;
@@ -683,10 +681,12 @@ window.submitOrder = async function() {
     btn.innerText = "Processing...";
 
     try {
+        // 1. Calculate Financials
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
-        const tax = applyTax ? (subtotal * 0.05) : 0; // Tax depends on checkbox
+        const tax = applyTax ? (subtotal * 0.05) : 0;
         const total = subtotal + tax;
 
+        // 2. Prepare Order Data
         const orderData = {
             salesmanId: auth.currentUser.uid,
             outletId: currentOrderOutlet.id,
@@ -694,7 +694,7 @@ window.submitOrder = async function() {
             visitId: isPhone ? null : currentVisitId,
             orderDate: Timestamp.now(),
             orderType: isPhone ? "Phone Call" : "Physical Visit",
-            isGstApplied: applyTax, // Record if tax was applied
+            isGstApplied: applyTax,
             items: orderCart,
             financials: {
                 subtotal: subtotal,
@@ -704,10 +704,20 @@ window.submitOrder = async function() {
             status: "pending"
         };
 
+        // 3. Save to 'orders' Collection
         await addDoc(collection(db, "orders"), orderData);
+
+        // 4. CRITICAL: Update Outlet Balance (Credit in Market)
+        // This adds the order amount to the shop's current debt
+        const outletRef = doc(db, "outlets", currentOrderOutlet.id);
+        await updateDoc(outletRef, {
+            currentBalance: increment(total),
+            lastOrderDate: Timestamp.now()
+        });
 
         alert("✅ Order Placed Successfully!");
         
+        // 5. Cleanup UI
         document.getElementById('order-view').style.display = 'none';
         
         if(currentVisitId) {
@@ -723,5 +733,4 @@ window.submitOrder = async function() {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
     }
-};
 };
