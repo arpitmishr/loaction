@@ -1107,3 +1107,56 @@ window.loadAttendanceByDate = async function() {
 
 // Also call this initially to load today's data
 // loadAttendanceByDate(); (This is called in init via the button click simulation or explicit call)
+
+
+
+// 1. Add to the salesman list loading part to also populate the target dropdown
+async function populateTargetSalesmanDropdown() {
+    const select = document.getElementById('targetSalesmanId');
+    if(!select) return;
+    
+    const q = query(collection(db, "users"), where("role", "==", "salesman"));
+    const snap = await getDocs(q);
+    
+    snap.forEach(doc => {
+        const d = doc.data();
+        const opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = d.fullName || d.email;
+        select.appendChild(opt);
+    });
+}
+
+// 2. Add the form submit listener
+const targetForm = document.getElementById('targetForm');
+if(targetForm) {
+    targetForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        
+        try {
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            await addDoc(collection(db, "daily_targets"), {
+                salesmanId: document.getElementById('targetSalesmanId').value,
+                date: document.getElementById('targetDate').value, // YYYY-MM-DD
+                targetBoxes: Number(document.getElementById('targetBoxes').value),
+                incentivePerBox: Number(document.getElementById('incentivePerBox').value),
+                createdBy: auth.currentUser.uid,
+                createdAt: serverTimestamp()
+            });
+
+            alert("Target assigned successfully!");
+            targetForm.reset();
+        } catch (error) {
+            console.error(error);
+            alert("Error: " + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Set Target";
+        }
+    });
+}
+
+// Ensure populateTargetSalesmanDropdown() is called in your admin init block
