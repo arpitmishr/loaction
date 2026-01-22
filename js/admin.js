@@ -166,13 +166,35 @@ async function loadTodayAttendance() {
 
 // --- 4. OUTLET MANAGEMENT ---
 
+// --- OUTLET MANAGEMENT FUNCTIONS ---
+
 function setupOutletForm() {
     const form = document.getElementById('addOutletForm');
     const geoBtn = document.getElementById('geoBtn');
+    const storeTypeSelect = document.getElementById('storeType');
+    const creditDaysInput = document.getElementById('creditDays');
+    const creditLimitInput = document.getElementById('creditLimit');
     
-    if (!form || !geoBtn) return; // Prevent error if elements don't exist
+    if (!form) return;
 
-    // Handle Geolocation
+    // 1. Dynamic Toggle: Enable/Disable Credit fields
+    storeTypeSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'Credit') {
+            creditDaysInput.disabled = false;
+            creditLimitInput.disabled = false;
+            creditDaysInput.required = true;
+            creditLimitInput.required = true;
+        } else {
+            creditDaysInput.disabled = true;
+            creditLimitInput.disabled = true;
+            creditDaysInput.required = false;
+            creditLimitInput.required = false;
+            creditDaysInput.value = "";
+            creditLimitInput.value = "";
+        }
+    });
+
+    // 2. Handle Geolocation
     geoBtn.addEventListener('click', () => {
         const display = document.getElementById('geoDisplay');
         const btn = document.getElementById('geoBtn');
@@ -188,80 +210,172 @@ function setupOutletForm() {
             (pos) => {
                 document.getElementById('lat').value = pos.coords.latitude;
                 document.getElementById('lng').value = pos.coords.longitude;
-                display.innerText = `Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
+                display.innerText = `✅ Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
                 display.style.color = "green";
-                btn.innerText = "📍 Location Captured";
+                btn.innerText = "📍 Update Location";
             },
             (err) => {
                 console.error(err);
-                alert("Could not get location.");
+                alert("Could not get location. Ensure GPS is on.");
                 btn.innerText = "Retry GPS";
             }
         );
     });
 
-    // Handle Submit
+    // 3. Handle Submit (Add OR Edit)
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const submitBtn = document.getElementById('submitBtn');
+        const editId = document.getElementById('editOutletId').value; // Check if we are editing
+        
         submitBtn.disabled = true;
-        submitBtn.innerText = "Saving...";
+        submitBtn.innerText = editId ? "Updating..." : "Saving...";
 
         const lat = document.getElementById('lat').value;
         const lng = document.getElementById('lng').value;
 
         if (!lat || !lng) {
-            alert("Please click 'Get GPS Location' first.");
+            alert("Please capture GPS Location first.");
             submitBtn.disabled = false;
-            submitBtn.innerText = "Save Outlet";
+            submitBtn.innerText = editId ? "Update Outlet" : "Save Outlet";
             return;
         }
 
         try {
-            await addDoc(collection(db, "outlets"), {
-                shopName: document.getElementById('shopName').value,
-                ownerName: document.getElementById('ownerName').value,
-                phone: document.getElementById('shopPhone').value,
-                category: document.getElementById('shopCategory').value,
+            // Prepare Data Object
+            const outletData = {
+                shopName: document.getElementById('shopName').value.trim(),
+                outletType: document.getElementById('outletType').value,
+                ownerName: document.getElementById('ownerName').value.trim(),
+                contactPerson: document.getElementById('contactPerson').value.trim(),
+                contactPhone: document.getElementById('contactPhone').value.trim(),
+                gstNumber: document.getElementById('gstNumber').value.trim() || "N/A",
+                storeType: document.getElementById('storeType').value,
+                creditDays: document.getElementById('creditDays').value ? Number(document.getElementById('creditDays').value) : 0,
+                creditLimit: document.getElementById('creditLimit').value ? Number(document.getElementById('creditLimit').value) : 0,
                 geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
-                status: 'active',
-                currentBalance: 0,
-                createdAt: serverTimestamp()
-            });
+                // Don't overwrite status or createdAt on edit unless necessary
+            };
 
-            alert("Outlet Added Successfully!");
-            form.reset();
-            document.getElementById('geoDisplay').innerText = "No location captured";
-            document.getElementById('geoBtn').innerText = "📍 Get GPS Location";
-            document.getElementById('lat').value = "";
-            document.getElementById('lng').value = "";
-            
-            loadOutlets();
+            if (editId) {
+                // --- UPDATE EXISTING ---
+                const docRef = doc(db, "outlets", editId);
+                await updateDoc(docRef, outletData);
+                alert("Outlet Updated Successfully!");
+            } else {
+                // --- CREATE NEW ---
+                outletData.status = 'active';
+                outletData.currentBalance = 0;
+                outletData.createdAt = serverTimestamp();
+                await addDoc(collection(db, "outlets"), outletData);
+                alert("Outlet Added Successfully!");
+            }
+
+            cancelEdit(); // Helper to reset form
+            loadOutlets(); // Refresh Table
 
         } catch (error) {
-            console.error("Add Outlet Error:", error);
+            console.error("Save Error:", error);
             alert("Error: " + error.message);
         } finally {
             submitBtn.disabled = false;
-            submitBtn.innerText = "Save Outlet";
+            submitBtn.innerText = editId ? "Update Outlet" : "Save Outlet";
         }
     });
 }
+
+// Global Function: Populate form for Editing
+window.editOutlet = async function(id) {
+    try {
+        // Scroll to form
+        document.getElementById('addOutletForm').scrollIntoView({ behavior: 'smooth' });
+
+        const docRef = doc(db, "outlets", id);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+            alert("Outlet not found!");
+            return;
+        }
+
+        const data = docSnap.data();
+
+        // 1. Fill Hidden ID
+        document.getElementById('editOutletId').value = id;
+
+        // 2. Fill Text/Select Inputs
+        document.getElementById('shopName').value = data.shopName;
+        document.getElementById('outletType').value = data.outletType;
+        document.getElementById('ownerName').value = data.ownerName;
+        document.getElementById('contactPerson').value = data.contactPerson;
+        document.getElementById('contactPhone').value = data.contactPhone;
+        document.getElementById('gstNumber').value = data.gstNumber;
+        document.getElementById('storeType').value = data.storeType;
+
+        // 3. Handle Credit Logic
+        const creditDaysInput = document.getElementById('creditDays');
+        const creditLimitInput = document.getElementById('creditLimit');
+        
+        if (data.storeType === 'Credit') {
+            creditDaysInput.disabled = false;
+            creditLimitInput.disabled = false;
+            creditDaysInput.value = data.creditDays;
+            creditLimitInput.value = data.creditLimit;
+        } else {
+            creditDaysInput.disabled = true;
+            creditLimitInput.disabled = true;
+            creditDaysInput.value = "";
+            creditLimitInput.value = "";
+        }
+
+        // 4. Fill GPS (Keep existing unless they click capture again)
+        document.getElementById('lat').value = data.geo.lat;
+        document.getElementById('lng').value = data.geo.lng;
+        document.getElementById('geoDisplay').innerText = `Existing: ${data.geo.lat}, ${data.geo.lng}`;
+        document.getElementById('geoDisplay').style.color = "blue";
+
+        // 5. Update UI Buttons
+        document.getElementById('formTitle').innerText = "Edit Outlet";
+        document.getElementById('submitBtn').innerText = "Update Outlet";
+        document.getElementById('cancelEditBtn').style.display = "block";
+
+    } catch (error) {
+        console.error("Edit fetch error:", error);
+        alert("Failed to fetch outlet details.");
+    }
+};
+
+// Global Function: Reset Form
+window.cancelEdit = function() {
+    document.getElementById('addOutletForm').reset();
+    document.getElementById('editOutletId').value = ""; // Clear ID
+    document.getElementById('formTitle').innerText = "Add New Outlet";
+    document.getElementById('submitBtn').innerText = "Save Outlet";
+    document.getElementById('cancelEditBtn').style.display = "none";
+    
+    // Reset GPS UI
+    document.getElementById('geoDisplay').innerText = "Location required";
+    document.getElementById('geoDisplay').style.color = "#333";
+    document.getElementById('lat').value = "";
+    document.getElementById('lng').value = "";
+    
+    // Reset Credit inputs
+    document.getElementById('creditDays').disabled = true;
+    document.getElementById('creditLimit').disabled = true;
+};
 
 async function loadOutlets() {
     const tableBody = document.getElementById('outlets-table-body');
     if (!tableBody) return;
     
     try {
-        // Simple query. If you want order, use: query(collection(db, "outlets"), orderBy("createdAt", "desc"));
-        // Note: orderBy requires an index if mixed with filters later
         const q = query(collection(db, "outlets")); 
         const snap = await getDocs(q);
 
         tableBody.innerHTML = "";
 
         if (snap.empty) {
-            tableBody.innerHTML = "<tr><td colspan='5'>No outlets found.</td></tr>";
+            tableBody.innerHTML = "<tr><td colspan='6'>No outlets found.</td></tr>";
             return;
         }
 
@@ -270,21 +384,42 @@ async function loadOutlets() {
             const id = docSnap.id;
             const isBlocked = data.status === 'blocked';
             
+            // Status Badge
             const statusBadge = isBlocked 
-                ? `<span class="badge badge-blocked" style="background:#f8d7da; color:#721c24; padding:5px 10px; border-radius:20px;">Blocked</span>` 
-                : `<span class="badge badge-active" style="background:#d4edda; color:#155724; padding:5px 10px; border-radius:20px;">Active</span>`;
+                ? `<span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px; font-size:0.8rem;">Blocked</span>` 
+                : `<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px; font-size:0.8rem;">Active</span>`;
 
-            const actionBtn = isBlocked
-                ? `<button style="background:#28a745; color:white; border:none; padding:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
-                : `<button style="background:#dc3545; color:white; border:none; padding:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
+            // Action Buttons (Block & Edit)
+            const blockBtn = isBlocked
+                ? `<button style="background:#28a745; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
+                : `<button style="background:#dc3545; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
+
+            const editBtn = `<button style="background:#007bff; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="editOutlet('${id}')">Edit</button>`;
+
+            const creditInfo = data.storeType === 'Credit' 
+                ? `<small style="color:#d63384;">Limit: ₹${data.creditLimit}<br>Days: ${data.creditDays}</small>` 
+                : `<small style="color:#28a745;">Cash Only</small>`;
 
             const row = `
                 <tr>
-                    <td><strong>${data.shopName}</strong><br><small>${data.ownerName}</small></td>
-                    <td>${data.category}</td>
-                    <td><a href="tel:${data.phone}">${data.phone}</a></td>
+                    <td>
+                        <strong>${data.shopName}</strong>
+                        <br><small style="color:#666;">${data.outletType}</small>
+                    </td>
+                    <td>
+                        ${data.contactPerson}
+                        <br><small><a href="tel:${data.contactPhone}">${data.contactPhone}</a></small>
+                    </td>
+                    <td>
+                        ${data.storeType}
+                        <br>${creditInfo}
+                    </td>
+                    <td><small>${data.gstNumber}</small></td>
                     <td>${statusBadge}</td>
-                    <td>${actionBtn}</td>
+                    <td>
+                        ${editBtn}
+                        ${blockBtn}
+                    </td>
                 </tr>
             `;
             tableBody.innerHTML += row;
@@ -292,47 +427,6 @@ async function loadOutlets() {
 
     } catch (error) {
         console.error("Load Outlets Error:", error);
-        tableBody.innerHTML = "<tr><td colspan='5'>Error loading data.</td></tr>";
+        tableBody.innerHTML = "<tr><td colspan='6'>Error loading data.</td></tr>";
     }
 }
-
-async function loadSalesmenList() {
-    const list = document.getElementById('salesmen-list');
-    if(!list) return;
-    list.innerHTML = '';
-
-    try {
-        const q = query(collection(db, "users"), where("role", "==", "salesman"));
-        const snap = await getDocs(q);
-        
-        if(snap.empty) { list.innerHTML = "<li>No salesmen found.</li>"; return; }
-
-        snap.forEach(doc => {
-            const d = doc.data();
-            const li = document.createElement('li');
-            li.textContent = `👤 ${d.fullName || d.email}`;
-            list.appendChild(li);
-        });
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-// Utility: Format Number
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-    }).format(amount);
-}
-
-// Global function for buttons
-window.toggleOutletStatus = async function(id, newStatus) {
-    if(!confirm(`Change status to ${newStatus}?`)) return;
-    try {
-        await updateDoc(doc(db, "outlets", id), { status: newStatus });
-        loadOutlets();
-    } catch (error) {
-        alert("Failed to update status.");
-    }
-};
