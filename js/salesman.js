@@ -897,60 +897,116 @@ window.submitLeaveRequest = async function() {
 
 
 
+
+    // Make sure fullMapInstance is declared at the top of your file
+let fullMapInstance = null;
+
 window.initFullRouteMap = async function() {
-    console.log("Initializing Map...");
+    console.log("Initializing Full Route Map...");
     const container = document.getElementById('all-shops-map');
     
     if (!container) {
-        console.error("Map container not found!");
+        console.error("Map container 'all-shops-map' not found in DOM");
         return;
     }
 
-    // Cleanup
+    // 1. Cleanup old map instance to avoid "Map already initialized" error
     if (fullMapInstance) {
         fullMapInstance.remove();
         fullMapInstance = null;
     }
 
-    // Create Map
-    fullMapInstance = L.map('all-shops-map').setView([20.5, 78.9], 5);
+    // 2. Initialize the Map
+    // Using CartoDB tiles which are more reliable for browser tracking prevention
+    fullMapInstance = L.map('all-shops-map', {
+        zoomControl: true,
+        dragging: true,
+        touchZoom: true
+    }).setView([20.5937, 78.9629], 5);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '©OpenStreetMap',
+        maxZoom: 18
     }).addTo(fullMapInstance);
 
-    // CRITICAL: Force Tile Refresh
+    // 3. Force Leaflet to recalculate its container size
     setTimeout(() => {
         fullMapInstance.invalidateSize();
-        console.log("Map size invalidated/refreshed.");
     }, 400);
 
     try {
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", auth.currentUser.uid));
-        const routeSnap = await getDocs(q);
-        if (routeSnap.empty) return;
+        // 4. Get the current Salesman's assigned route
+        const routeQuery = query(
+            collection(db, "routes"), 
+            where("assignedSalesmanId", "==", auth.currentUser.uid)
+        );
+        const routeSnap = await getDocs(routeQuery);
+
+        if (routeSnap.empty) {
+            console.warn("No route assigned to this salesman.");
+            return;
+        }
 
         const routeId = routeSnap.docs[0].id;
-        const shopsQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
-        const shopsSnap = await getDocs(shopsQ);
+
+        // 5. Get all outlets associated with this route
+        const shopsQuery = query(
+            collection(db, "route_outlets"), 
+            where("routeId", "==", routeId), 
+            orderBy("sequence", "asc")
+        );
+        const shopsSnap = await getDocs(shopsQuery);
+
+        if (shopsSnap.empty) {
+            console.warn("Route found but it has no outlets.");
+            return;
+        }
 
         const markers = [];
+
+        // 6. Loop through outlets and add markers
         for (const docSnap of shopsSnap.docs) {
-            const rData = docSnap.data();
-            const oDoc = await getDoc(doc(db, "outlets", rData.outletId));
-            if (oDoc.exists() && oDoc.data().geo) {
-                const g = oDoc.data().geo;
-                L.marker([g.lat, g.lng])
-                    .addTo(fullMapInstance)
-                    .bindPopup(`<b>${oDoc.data().shopName}</b>`);
-                markers.push([g.lat, g.lng]);
+            const routeOutletData = docSnap.data();
+            
+            // Get the actual outlet details for coordinates
+            const outletDoc = await getDoc(doc(db, "outlets", routeOutletData.outletId));
+            
+            if (outletDoc.exists()) {
+                const outletData = outletDoc.data();
+                
+                if (outletData.geo && outletData.geo.lat && outletData.geo.lng) {
+                    const lat = outletData.geo.lat;
+                    const lng = outletData.geo.lng;
+                    
+                    // Add marker to map
+                    const marker = L.marker([lat, lng]).addTo(fullMapInstance);
+                    
+                    // Add popup with shop name
+                    marker.bindPopup(`
+                        <div style="text-align:center;">
+                            <strong style="color:#2563eb;">${outletData.shopName}</strong><br>
+                            <span style="font-size:12px;">Sequence: ${routeOutletData.sequence}</span>
+                        </div>
+                    `);
+                    
+                    markers.push([lat, lng]);
+                }
             }
         }
 
+        // 7. If we have markers, zoom the map to show all of them at once
         if (markers.length > 0) {
-            fullMapInstance.fitBounds(L.latLngBounds(markers), { padding: [50, 50] });
+            const bounds = L.latLngBounds(markers);
+            fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
+        } else {
+            console.warn("No valid GPS coordinates found for outlets in this route.");
         }
-    } catch (e) {
-        console.error("Map data error:", e);
+
+    } catch (error) {
+        console.error("Error loading route markers:", error);
+        // Alert only if it's not a missing index error (which shows in console)
+        if(!error.message.includes("index")) {
+            alert("Failed to load map markers.");
+        }
     }
 };
