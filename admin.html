@@ -10,20 +10,32 @@
     <div id="loader">Verifying Admin Access...</div>
 
     <!-- Hidden Content -->
-    <div id="content" style="display: none;">
-        <nav>
-            <h1>Admin Panel</h1>
-            <button id="logoutBtn">Logout</button>
-        </nav>
-        <div class="main-body">
-            <p>Welcome, <span id="user-email"></span></p>
-            <div class="card">
-                <h3>Admin Controls</h3>
-                <p>Add/Remove Routes, Manage Users.</p>
-            </div>
+    <!-- admin.html -->
+<div id="content" style="display: none;">
+    <nav>
+        <h1>Admin Panel</h1>
+        <button id="logoutBtn">Logout</button>
+    </nav>
+    
+    <div class="container">
+        <!-- Section 1: List of Salesmen -->
+        <div class="card">
+            <h3>👨‍💼 Active Salesmen</h3>
+            <ul id="salesmen-list">
+                <li>Loading...</li>
+            </ul>
+        </div>
+
+        <!-- Section 2: Product Inventory -->
+        <div class="card">
+            <h3>📦 Product Inventory</h3>
+            <ul id="product-list">
+                <li>Loading...</li>
+            </ul>
         </div>
     </div>
-
-    <script type="module" src="js/admin.js"></script>
+</div>
+<script type="module" src="js/admin.js"></script>
+    
 </body>
 </html>
