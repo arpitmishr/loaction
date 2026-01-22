@@ -19,6 +19,7 @@ let visitStartTime = null;
 let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
+let fullMapInstance = null;
 
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
@@ -887,5 +888,71 @@ window.submitLeaveRequest = async function() {
     } finally {
         btn.disabled = false;
         btn.innerText = "Submit";
+    }
+};
+
+
+
+
+
+
+
+window.initFullRouteMap = async function() {
+    const mapContainer = document.getElementById('all-shops-map');
+    
+    // 1. Initialize Map if not already done
+    if (fullMapInstance) {
+        fullMapInstance.remove(); // Reset to prevent double-init errors
+    }
+    
+    fullMapInstance = L.map('all-shops-map').setView([20.5937, 78.9629], 5); // Default India center
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(fullMapInstance);
+
+    try {
+        // 2. Get Assigned Route
+        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", auth.currentUser.uid));
+        const routeSnap = await getDocs(q);
+        if (routeSnap.empty) return;
+
+        const routeId = routeSnap.docs[0].id;
+
+        // 3. Get all shops in route
+        const shopsQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
+        const shopsSnap = await getDocs(shopsQ);
+
+        const markers = [];
+
+        for (const docSnap of shopsSnap.docs) {
+            const routeOutlet = docSnap.data();
+            const outletDoc = await getDoc(doc(db, "outlets", routeOutlet.outletId));
+            
+            if (outletDoc.exists()) {
+                const outletData = outletDoc.data();
+                if (outletData.geo) {
+                    const marker = L.marker([outletData.geo.lat, outletData.geo.lng])
+                        .addTo(fullMapInstance)
+                        .bindPopup(`
+                            <div style="font-family: sans-serif;">
+                                <b style="color:#2563eb;">${outletData.shopName}</b><br>
+                                <span style="font-size:10px; color:#666;">Stop #${routeOutlet.sequence}</span><br>
+                                <button onclick="switchView('route')" style="background:#2563eb; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; margin-top:5px; cursor:pointer;">Go to Route List</button>
+                            </div>
+                        `);
+                    markers.push([outletData.geo.lat, outletData.geo.lng]);
+                }
+            }
+        }
+
+        // 4. Zoom map to fit all markers
+        if (markers.length > 0) {
+            const bounds = L.latLngBounds(markers);
+            fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+    } catch (error) {
+        console.error("Full Map Error:", error);
     }
 };
