@@ -23,7 +23,16 @@
       <button id="logoutBtn" style="background:#dc3545;">Logout</button>
     </div>
   </nav>
-
+<div class="card">
+  <!-- Inside the Attendance Card -->
+<div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+    <!-- Existing Check In Button -->
+    <button id="checkInBtn" class="btn-primary">📍 Check In Now</button>
+    
+    <!-- NEW Leave Button -->
+    <button onclick="openLeaveModal()" style="background: #ffc107; color: black; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer;">📅 Request Leave</button>
+</div>
+</div>
   <div class="container">
 
     <!-- ================= ROUTE VIEW ================= -->
