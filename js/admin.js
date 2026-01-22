@@ -61,6 +61,10 @@ loadProducts();
 setupProductForm();
         // ... inside onAuthStateChanged ...
 loadPendingPayments();
+        // Inside the admin success block:
+loadPendingLeaves();
+// Set default date picker to today
+document.getElementById('attendanceDateFilter').valueAsDate = new Date();
 
     } catch (error) {
         console.error("Dashboard Init Error:", error);
@@ -137,40 +141,66 @@ async function loadDashboardStats() {
     }
 }
 
-async function loadTodayAttendance() {
+// Ensure this exists in js/admin.js
+window.loadAttendanceByDate = async function() {
     const list = document.getElementById('attendance-list');
-    if (!list) return;
-
-    const d = new Date();
-    const todayStr = d.getFullYear() + "-" + 
-           String(d.getMonth() + 1).padStart(2, '0') + "-" + 
-           String(d.getDate()).padStart(2, '0');
+    const dateInput = document.getElementById('attendanceDateFilter').value;
+    
+    if(!dateInput) return; // specific alert not needed on auto-load
+    
+    list.innerHTML = "<tr><td colspan='3'>Loading data...</td></tr>";
 
     try {
-        const q = query(
-            collection(db, "attendance"),
-            where("date", "==", todayStr),
-            orderBy("checkInTime", "desc")
-        );
-        const snap = await getDocs(q);
+        // 1. Fetch CHECK-INS
+        const attendQuery = query(collection(db, "attendance"), where("date", "==", dateInput));
+        const attendSnap = await getDocs(attendQuery);
+
+        // 2. Fetch APPROVED LEAVES
+        const leaveQuery = query(collection(db, "leaves"), where("date", "==", dateInput), where("status", "==", "approved"));
+        const leaveSnap = await getDocs(leaveQuery);
+
         list.innerHTML = "";
-        if (snap.empty) {
-            list.innerHTML = "<tr><td colspan='3' style='text-align:center'>No check-ins today.</td></tr>";
+        
+        if (attendSnap.empty && leaveSnap.empty) {
+            list.innerHTML = "<tr><td colspan='3' style='text-align:center'>No records found for this date.</td></tr>";
             return;
         }
-        snap.forEach(doc => {
+
+        // Render Check-ins
+        attendSnap.forEach(doc => {
             const data = doc.data();
             const time = data.checkInTime ? data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
-            let mapLink = data.location 
-                ? `<a href="https://www.google.com/maps/search/?api=1&query=${data.location.latitude},${data.location.longitude}" target="_blank">View 📍</a>` 
+            const mapLink = data.location 
+                ? `<a href="https://www.google.com/maps/search/?api=1&query=${data.location.latitude},${data.location.longitude}" target="_blank">View Map 📍</a>` 
                 : "No Loc";
-            
-            list.innerHTML += `<tr style="border-bottom: 1px solid #eee;"><td style="padding:10px;">${data.salesmanEmail}</td><td>${time}</td><td>${mapLink}</td></tr>`;
+
+            list.innerHTML += `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><span style="color:green; font-weight:bold;">Present</span></td>
+                    <td>Checked In: ${time} | ${mapLink}</td>
+                </tr>
+            `;
         });
+
+        // Render Leaves
+        leaveSnap.forEach(doc => {
+            const data = doc.data();
+            const color = data.type === 'Half Day' ? '#fd7e14' : '#dc3545';
+            
+            list.innerHTML += `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><span style="color:${color}; font-weight:bold;">${data.type}</span></td>
+                    <td>Remark: ${data.reason}</td>
+                </tr>
+            `;
+        });
+
     } catch (error) {
-        console.error("Attendance Error:", error);
+        console.error("Attendance Filter Error:", error);
     }
-}
+};
 
 // --- 4. SALESMAN LIST (WAS MISSING) ---
 
@@ -876,3 +906,127 @@ window.processPayment = async function(paymentId, outletId, amount, action) {
         alert("Failed: " + error);
     }
 };
+
+
+
+
+// ==========================================
+//      LEAVE MANAGEMENT LOGIC
+// ==========================================
+
+async function loadPendingLeaves() {
+    const container = document.getElementById('leave-approval-section');
+    const list = document.getElementById('leave-approval-list');
+    if(!container) return;
+
+    try {
+        const q = query(collection(db, "leaves"), where("status", "==", "pending"), orderBy("date", "asc"));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = "";
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const row = `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><strong>${data.date}</strong><br>${data.type}</td>
+                    <td>${data.reason}</td>
+                    <td>
+                        <button onclick="processLeave('${docSnap.id}', 'approved')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px; cursor:pointer;">✔</button>
+                        <button onclick="processLeave('${docSnap.id}', 'rejected')" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✖</button>
+                    </td>
+                </tr>
+            `;
+            list.innerHTML += row;
+        });
+    } catch (e) { console.error("Leave Load Error:", e); }
+}
+
+window.processLeave = async function(leaveId, status) {
+    if(!confirm(`Mark request as ${status}?`)) return;
+    try {
+        await updateDoc(doc(db, "leaves", leaveId), { status: status });
+        alert("Updated!");
+        loadPendingLeaves(); // Refresh list
+        loadAttendanceByDate(); // Refresh attendance table if date matches
+    } catch (e) { alert("Error: " + e.message); }
+};
+
+// ==========================================
+//      DATE-WISE ATTENDANCE LOGIC
+// ==========================================
+
+// Replace your old loadTodayAttendance with this enhanced version
+window.loadAttendanceByDate = async function() {
+    const list = document.getElementById('attendance-list');
+    const dateInput = document.getElementById('attendanceDateFilter').value;
+    
+    if(!dateInput) return alert("Select a date");
+    
+    list.innerHTML = "<tr><td colspan='3'>Loading data...</td></tr>";
+
+    try {
+        // 1. Fetch CHECK-INS for this date
+        // Note: Make sure 'date' field in attendance collection is 'YYYY-MM-DD' string
+        const attendQuery = query(collection(db, "attendance"), where("date", "==", dateInput));
+        const attendSnap = await getDocs(attendQuery);
+
+        // 2. Fetch APPROVED LEAVES for this date
+        const leaveQuery = query(collection(db, "leaves"), where("date", "==", dateInput), where("status", "==", "approved"));
+        const leaveSnap = await getDocs(leaveQuery);
+
+        list.innerHTML = "";
+        
+        if (attendSnap.empty && leaveSnap.empty) {
+            list.innerHTML = "<tr><td colspan='3' style='text-align:center'>No records found for this date.</td></tr>";
+            return;
+        }
+
+        // Render Check-ins
+        attendSnap.forEach(doc => {
+            const data = doc.data();
+            const time = data.checkInTime ? data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
+            const mapLink = data.location 
+                ? `<a href="https://www.google.com/maps/search/?api=1&query=${data.location.latitude},${data.location.longitude}" target="_blank">View Map 📍</a>` 
+                : "No Loc";
+
+            list.innerHTML += `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><span style="color:green; font-weight:bold;">Present</span></td>
+                    <td>Checked In: ${time} | ${mapLink}</td>
+                </tr>
+            `;
+        });
+
+        // Render Leaves
+        leaveSnap.forEach(doc => {
+            const data = doc.data();
+            const color = data.type === 'Half Day' ? '#fd7e14' : '#dc3545'; // Orange or Red
+            
+            list.innerHTML += `
+                <tr>
+                    <td>${data.salesmanEmail}</td>
+                    <td><span style="color:${color}; font-weight:bold;">${data.type}</span></td>
+                    <td>Remark: ${data.reason}</td>
+                </tr>
+            `;
+        });
+
+    } catch (error) {
+        console.error("Attendance Filter Error:", error);
+        if(error.message.includes("index")) {
+            list.innerHTML = "<tr><td colspan='3' style='color:red'>Missing Index. Check Console.</td></tr>";
+        }
+    }
+};
+
+// Also call this initially to load today's data
+// loadAttendanceByDate(); (This is called in init via the button click simulation or explicit call)
