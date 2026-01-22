@@ -15,6 +15,17 @@
     </nav>
     
     <div class="container">
+<!-- Add this inside <div class="container"> before the Route card -->
+<div class="card" style="text-align: center;">
+    <h3>⏱ Daily Attendance</h3>
+    <div id="attendance-section">
+        <p id="attendance-status">Checking status...</p>
+        <button id="checkInBtn" class="btn-primary" disabled>
+            📍 Check In Now
+        </button>
+    </div>
+</div>
+        
         <div class="card">
             <h3>📍 My Route Today</h3>
             <h2 id="route-name">Loading Route...</h2>
