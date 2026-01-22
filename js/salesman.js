@@ -106,7 +106,7 @@ async function loadShops(routeId) {
         list.innerHTML = "";
         
         if(snap.empty) { 
-            list.innerHTML = "<li style='padding:15px;'>No shops in this route.</li>"; 
+            list.innerHTML = "<li style='padding:15px; text-align:center;'>No shops in this route.</li>"; 
             return; 
         }
 
@@ -118,58 +118,58 @@ async function loadShops(routeId) {
             const outletDocRef = doc(db, "outlets", routeOutletData.outletId);
             const outletDoc = await getDoc(outletDocRef);
             
-            if(!outletDoc.exists()) continue; // Skip if outlet was deleted
+            if(!outletDoc.exists()) continue; 
             
             const outletData = outletDoc.data();
             const shopLat = outletData.geo ? outletData.geo.lat : 0;
             const shopLng = outletData.geo ? outletData.geo.lng : 0;
 
             const li = document.createElement('li');
-            li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
+            // Clean modern styling for the list item
+            li.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between gap-3";
             
-            // --- UPDATED HTML STRUCTURE FOR TWO BUTTONS ---
             li.innerHTML = `
-                <div>
-                    <strong style="font-size:1.1rem;">${routeOutletData.outletName}</strong><br>
-                    <small>Seq: ${routeOutletData.sequence}</small>
+                <div class="flex-grow">
+                    <h4 class="font-bold text-slate-800 text-base">${routeOutletData.outletName}</h4>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Stop ${routeOutletData.sequence}</p>
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <!-- Phone Order Button -->
-                    <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">
-                        📞
+                <div class="flex gap-2">
+                    <!-- NEW: Direct Payment Button (Green) -->
+                    <button class="btn-collect-direct bg-emerald-50 text-emerald-600 p-2 rounded-xl border border-emerald-100 active:scale-95 transition-transform" title="Collect Payment">
+                        <span class="material-icons-round text-lg">payments</span>
                     </button>
                     
-                    <!-- Map/Visit Button -->
-                    <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
-                        Open 🗺️
+                    <!-- Phone Order Button (Yellow) -->
+                    <button class="btn-phone-order bg-amber-50 text-amber-600 p-2 rounded-xl border border-amber-100 active:scale-95 transition-transform" title="Phone Order">
+                        <span class="material-icons-round text-lg">phone_callback</span>
+                    </button>
+                    
+                    <!-- Visit/Map Button (Blue) -->
+                    <button class="btn-open-map bg-blue-50 text-blue-600 p-2 rounded-xl border border-blue-100 active:scale-95 transition-transform">
+                        <span class="material-icons-round text-lg">directions</span>
                     </button>
                 </div>
             `;
             
-            // --- 1. ATTACH PHONE ORDER LISTENER ---
+            // 1. ATTACH PAYMENT LISTENER
+            li.querySelector('.btn-collect-direct').onclick = () => {
+                const payEl = document.getElementById('pay-outlet-name');
+                payEl.dataset.id = routeOutletData.outletId;
+                payEl.innerText = routeOutletData.outletName;
+                window.openPaymentModal();
+            };
+
+            // 2. ATTACH PHONE ORDER LISTENER
             li.querySelector('.btn-phone-order').onclick = () => {
-                // Ensure openOrderForm is defined (from the previous step)
                 if (window.openOrderForm) {
                     window.openOrderForm(routeOutletData.outletId, routeOutletData.outletName);
-                } else {
-                    alert("Order system not loaded yet.");
                 }
             };
 
-
-            // Add this listener right below the others (phone-order/open-map):
-li.querySelector('.btn-collect-direct').onclick = () => {
-    // Set global info for the payment modal
-    const payEl = document.getElementById('pay-outlet-name');
-    payEl.dataset.id = routeOutletData.outletId;
-    payEl.innerText = routeOutletData.outletName;
-    window.openPaymentModal();
-};
-
-            // --- 2. ATTACH MAP LISTENER ---
+            // 3. ATTACH MAP LISTENER
             li.querySelector('.btn-open-map').onclick = () => {
                 if(shopLat === 0 && shopLng === 0) {
-                    alert("This outlet has no GPS coordinates set by Admin.");
+                    alert("This outlet has no GPS coordinates set.");
                 } else {
                     openVisitPanel(routeOutletData.outletId, routeOutletData.outletName, shopLat, shopLng);
                 }
@@ -180,9 +180,7 @@ li.querySelector('.btn-collect-direct').onclick = () => {
 
     } catch (error) {
         console.error("Load Shops Error:", error);
-        if (error.message.includes("index")) {
-            list.innerHTML = `<li style="color:red; font-weight:bold;">⚠️ Database Index Missing (Check Console)</li>`;
-        }
+        list.innerHTML = `<li class="p-4 text-red-500 text-center font-bold">Error loading shops. Check console.</li>`;
     }
 }
 
@@ -795,21 +793,21 @@ window.submitPayment = async function() {
 
     if(!amount || amount <= 0) return alert("Enter valid amount");
 
-    // Start UI Loading
+    // UI State
     btn.disabled = true;
-    btn.innerText = "Capturing GPS...";
+    btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Capturing GPS...`;
 
-    // 1. Mandatory GPS Capture
+    // FORCE GPS CAPTURE
     if (!navigator.geolocation) {
-        alert("GPS not supported. Cannot collect payment.");
+        alert("GPS not supported.");
         btn.disabled = false;
+        btn.innerText = "Collect";
         return;
     }
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
-            // 2. Prepare Data based on new schema
-            const paymentData = {
+            await addDoc(collection(db, "payments"), {
                 salesmanId: auth.currentUser.uid,
                 outletId: outletId,
                 outletName: outletName,
@@ -818,36 +816,30 @@ window.submitPayment = async function() {
                 date: Timestamp.now(),
                 status: "pending",
                 
-                // NEW FIELDS
+                // NEW MANDATORY GPS FIELDS
                 collectedWithoutVisit: currentVisitId ? false : true,
                 gpsLat: pos.coords.latitude,
                 gpsLng: pos.coords.longitude,
-                
-                // Optional: Store accuracy for verification
-                gpsAccuracy: pos.coords.accuracy 
-            };
+                gpsAccuracy: pos.coords.accuracy
+            });
 
-            // 3. Save to Firestore
-            await addDoc(collection(db, "payments"), paymentData);
-
-            alert("Payment recorded with GPS coordinates! Awaiting Admin approval.");
-            modal.style.display = 'none';
+            alert("Payment recorded! GPS coordinates saved.");
+            modal.classList.add('hidden'); // Close modal
             document.getElementById('payAmount').value = "";
 
         } catch (error) {
-            console.error("Payment Error:", error);
-            alert("Failed to record payment: " + error.message);
+            console.error("Payment Submission Error:", error);
+            alert("Error: " + error.message);
         } finally {
             btn.disabled = false;
             btn.innerText = "Collect";
         }
     }, (err) => {
-        alert("GPS Error: Could not verify your location. Payment cancelled.");
+        alert("GPS Error: You must allow location access to collect payment.");
         btn.disabled = false;
         btn.innerText = "Collect";
-    }, { enableHighAccuracy: true, timeout: 10000 });
+    }, { enableHighAccuracy: true, timeout: 8000 });
 };
-
 
 
 
