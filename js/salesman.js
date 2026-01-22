@@ -156,6 +156,16 @@ async function loadShops(routeId) {
                 }
             };
 
+
+            // Add this listener right below the others (phone-order/open-map):
+li.querySelector('.btn-collect-direct').onclick = () => {
+    // Set global info for the payment modal
+    const payEl = document.getElementById('pay-outlet-name');
+    payEl.dataset.id = routeOutletData.outletId;
+    payEl.innerText = routeOutletData.outletName;
+    window.openPaymentModal();
+};
+
             // --- 2. ATTACH MAP LISTENER ---
             li.querySelector('.btn-open-map').onclick = () => {
                 if(shopLat === 0 && shopLng === 0) {
@@ -781,33 +791,62 @@ window.submitPayment = async function() {
     const amount = parseFloat(document.getElementById('payAmount').value);
     const method = document.getElementById('payMethod').value;
     const modal = document.getElementById('paymentModal');
+    const btn = document.querySelector('#paymentModal button[onclick="submitPayment()"]');
 
     if(!amount || amount <= 0) return alert("Enter valid amount");
 
-    // 1. Close Modal immediately
-    modal.style.display = 'none';
+    // Start UI Loading
+    btn.disabled = true;
+    btn.innerText = "Capturing GPS...";
 
-    try {
-        // 2. Add 'Pending' Payment
-        await addDoc(collection(db, "payments"), {
-            salesmanId: auth.currentUser.uid,
-            outletId: outletId,
-            outletName: outletName,
-            amount: amount,
-            method: method,
-            date: Timestamp.now(),
-            status: "pending" // Critical: Admin must approve
-        });
-
-        alert("Payment Recorded! Waiting for Admin Approval.");
-
-    } catch (error) {
-        console.error("Payment Error:", error);
-        alert("Failed to record payment: " + error.message);
-        modal.style.display = 'flex'; // Reopen on error
+    // 1. Mandatory GPS Capture
+    if (!navigator.geolocation) {
+        alert("GPS not supported. Cannot collect payment.");
+        btn.disabled = false;
+        return;
     }
-};
 
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+            // 2. Prepare Data based on new schema
+            const paymentData = {
+                salesmanId: auth.currentUser.uid,
+                outletId: outletId,
+                outletName: outletName,
+                amount: amount,
+                method: method,
+                date: Timestamp.now(),
+                status: "pending",
+                
+                // NEW FIELDS
+                collectedWithoutVisit: currentVisitId ? false : true,
+                gpsLat: pos.coords.latitude,
+                gpsLng: pos.coords.longitude,
+                
+                // Optional: Store accuracy for verification
+                gpsAccuracy: pos.coords.accuracy 
+            };
+
+            // 3. Save to Firestore
+            await addDoc(collection(db, "payments"), paymentData);
+
+            alert("Payment recorded with GPS coordinates! Awaiting Admin approval.");
+            modal.style.display = 'none';
+            document.getElementById('payAmount').value = "";
+
+        } catch (error) {
+            console.error("Payment Error:", error);
+            alert("Failed to record payment: " + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Collect";
+        }
+    }, (err) => {
+        alert("GPS Error: Could not verify your location. Payment cancelled.");
+        btn.disabled = false;
+        btn.innerText = "Collect";
+    }, { enableHighAccuracy: true, timeout: 10000 });
+};
 
 
 
