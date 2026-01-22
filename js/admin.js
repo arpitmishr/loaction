@@ -982,7 +982,7 @@ window.processPayment = async function(paymentId, outletId, amount, action) {
 //      LEAVE MANAGEMENT LOGIC
 // ==========================================
 
-async function loadPendingLeaves() {
+window.loadPendingLeaves = async function () {
     const container = document.getElementById('leave-approval-section');
     const list = document.getElementById('leave-approval-list');
     if(!container) return;
