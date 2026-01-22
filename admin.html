@@ -195,6 +195,57 @@
     </div>
 </div>
 
+
+
+<!-- Add this below the Route Management section in admin.html -->
+
+<div class="card" style="margin-top: 30px;">
+    <h3>📦 Product Management</h3>
+
+    <!-- Add Product Form -->
+    <div class="form-box">
+        <h4>Add New Product</h4>
+        <form id="addProductForm">
+            <div class="form-grid">
+                <input type="text" id="prodName" placeholder="Product Name (e.g. Chips 50g)" required>
+                <input type="text" id="prodCategory" placeholder="Category (e.g. Snacks)" list="catSuggestions" required>
+                <!-- Datalist for suggestions -->
+                <datalist id="catSuggestions">
+                    <option value="Beverages">
+                    <option value="Snacks">
+                    <option value="Dairy">
+                </datalist>
+                
+                <input type="text" id="prodHSN" placeholder="HSN Code (Optional)">
+                <input type="number" id="prodPrice" placeholder="Unit Price (₹)" step="0.01" required>
+            </div>
+            <button type="submit" class="btn-primary" style="margin-top: 10px;">Add Product</button>
+        </form>
+    </div>
+
+    <!-- Product List -->
+    <h4 style="margin-top: 20px;">Current Inventory</h4>
+    <div class="table-responsive">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>HSN</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="product-list-body">
+                <tr><td colspan="5">Loading products...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+    
+
     <!-- 2. Outlets List -->
     <h4>All Outlets</h4>
     <div class="table-responsive">
