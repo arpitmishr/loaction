@@ -756,67 +756,78 @@ function formatCurrency(amount) {
 
 
 // ==========================================
-//      PAYMENT APPROVAL LOGIC
+//      PAYMENT TRANSACTION LOGIC
 // ==========================================
 
-async function loadPendingPayments() {
-    console.log("Checking for pending payments..."); // DEBUG LOG
-    const container = document.getElementById('approval-section');
-    const list = document.getElementById('approval-list');
+// Make this function GLOBAL so HTML onclick can see it
+window.processPayment = async function(paymentId, outletId, amount, action) {
+    console.log(`Attempting to ${action} payment: ${paymentId}`); // Debug Log
 
-    if(!container) {
-        console.error("Error: HTML element 'approval-section' not found in admin.html");
+    const reason = action === 'reject' ? prompt("Enter rejection reason:") : "Approved";
+    if (action === 'reject' && !reason) return; // User cancelled prompt
+
+    // Verify inputs aren't null
+    if(!paymentId || !outletId || !amount) {
+        alert("Error: Missing payment details.");
         return;
     }
 
     try {
-        // Query: Status is 'pending', ordered by newest first
-        const q = query(
-            collection(db, "payments"), 
-            where("status", "==", "pending"),
-            orderBy("date", "desc")
-        );
-        
-        const snap = await getDocs(q);
+        await runTransaction(db, async (transaction) => {
+            // 1. References
+            const payRef = doc(db, "payments", paymentId);
+            const outletRef = doc(db, "outlets", outletId);
 
-        console.log(`Found ${snap.size} pending payments.`); // DEBUG LOG
+            // 2. READ (Must come before any writes)
+            const payDoc = await transaction.get(payRef);
+            const outletDoc = await transaction.get(outletRef);
 
-        if (snap.empty) {
-            container.style.display = 'none';
-            return;
-        }
+            // 3. Validations
+            if (!payDoc.exists()) throw "Payment record not found!";
+            const payData = payDoc.data();
+            
+            if (payData.status !== 'pending') throw "This payment was already processed.";
 
-        container.style.display = 'block';
-        list.innerHTML = "";
+            if (action === 'approve') {
+                if (!outletDoc.exists()) throw "Outlet not found! Cannot adjust balance.";
+                
+                // 4. Calculate New Balance
+                const currentBal = Number(outletDoc.data().currentBalance) || 0;
+                const newBal = currentBal - Number(amount);
 
-        snap.forEach(docSnap => {
-            const data = docSnap.data();
-            const row = `
-                <tr>
-                    <td>
-                        <strong>${data.outletName}</strong><br>
-                        <small>By: ${data.salesmanId.slice(0,5)}...</small>
-                    </td>
-                    <td style="font-weight:bold; color:green;">₹${data.amount}</td>
-                    <td>${data.method}</td>
-                    <td>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="cursor:pointer; background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px;">✔</button>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="cursor:pointer; background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px;">✖</button>
-                    </td>
-                </tr>
-            `;
-            list.innerHTML += row;
+                // 5. WRITE: Update Outlet
+                transaction.update(outletRef, { 
+                    currentBalance: newBal,
+                    lastPaymentDate: serverTimestamp()
+                });
+
+                // 6. WRITE: Update Payment Status
+                transaction.update(payRef, { 
+                    status: 'approved',
+                    adminNote: reason,
+                    processedAt: serverTimestamp()
+                });
+
+            } else {
+                // REJECT: Only update payment status
+                transaction.update(payRef, { 
+                    status: 'rejected',
+                    adminNote: reason,
+                    processedAt: serverTimestamp()
+                });
+            }
         });
 
+        // Success Feedback
+        alert(`Payment ${action}ed successfully.`);
+        
+        // Refresh UI
+        loadPendingPayments(); // Remove from notification list
+        loadDashboardStats();  // Update total credit stats
+        loadOutlets();         // Update outlet list if visible
+
     } catch (error) {
-        console.error("Approval Load Error:", error);
-        if(error.message.includes("index")) {
-            // SHOW ERROR ON SCREEN SO YOU DON'T MISS IT
-            container.style.display = 'block';
-            list.innerHTML = `<tr><td colspan="4" style="color:red; font-weight:bold;">
-                ⚠️ ERROR: Missing Database Index.<br>
-                Open Console (F12) and click the link from Firebase.
-            </td></tr>`;
-        }
+        console.error("Transaction Error:", error);
+        alert("Failed: " + error);
     }
-}
+};
