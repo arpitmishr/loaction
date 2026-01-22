@@ -41,34 +41,24 @@
         .bottom-nav-item.active span { color: #2563eb; }
 
 
-/* FORCE the map container to exist with physical dimensions */
-#full-map-view {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: white;
-    z-index: 30; /* Above content, below modals */
-}
-
+/* Force the map container to be visible and sized */
 #all-shops-map {
-    position: absolute !important;
-    top: 60px !important;    /* Header height */
-    bottom: 72px !important; /* Nav height */
-    left: 0;
-    right: 0;
-    width: 100% !important;
-    height: auto !important; /* Height is calculated by top/bottom */
-    background: #e5e7eb;     /* Gray color to prove container exists */
+    display: block;
+    background-color: #f1f5f9; /* Gray background while tiles load */
 }
 
-/* Fix for Leaflet tiles appearing gray/blank */
+/* Ensure Leaflet tiles and markers show up */
 .leaflet-container {
-    background: #f8fafc !important;
-    outline: 0;
+    height: 100% !important;
+    width: 100% !important;
+    z-index: 1;
 }
 
+/* Ensure the Map View sits correctly between Header and Nav */
+#full-map-view:not(.hidden) {
+    display: flex !important;
+    flex-direction: column;
+}
     </style>
 </head>
 <body class="pb-20"> <!-- Padding bottom for nav bar -->
@@ -418,5 +408,26 @@ window.switchView = function(viewName) {
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/salesman.js"></script>
+
+
+
+
+    <!-- Place this right above the </body> tag -->
+    <div id="full-map-view" class="view-section hidden fixed inset-0 bg-white z-[60]">
+        <!-- Header for Map Tab -->
+        <div class="h-16 bg-white border-b flex items-center px-4 shadow-sm">
+            <h1 class="text-xl font-bold text-slate-800">Route Map</h1>
+        </div>
+        
+        <!-- The Actual Map Container -->
+        <div id="all-shops-map" style="height: calc(100vh - 136px); width: 100vw;"></div>
+    </div>
+
+    <!-- MAIN LOGIC FILE -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="js/salesman.js"></script>
+
+
+    
 </body>
 </html>
