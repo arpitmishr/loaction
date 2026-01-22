@@ -885,20 +885,29 @@ async function loadPendingPayments() {
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
-            const row = `
-                <tr>
-                    <td>
-                        <strong>${data.outletName}</strong><br>
-                        <small>By: ${data.salesmanId ? data.salesmanId.slice(0,5) : 'Unknown'}...</small>
-                    </td>
-                    <td style="font-weight:bold; color:green;">₹${data.amount}</td>
-                    <td>${data.method}</td>
-                    <td>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="cursor:pointer; background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px;">✔</button>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="cursor:pointer; background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px;">✖</button>
-                    </td>
-                </tr>
-            `;
+            const isOffsite = data.collectedWithoutVisit ? 
+    `<span style="color:red; font-size:10px;">[OFF-SITE]</span>` : 
+    `<span style="color:blue; font-size:10px;">[ON-VISIT]</span>`;
+
+const mapLink = `https://www.google.com/maps/search/?api=1&query=${data.gpsLat},${data.gpsLng}`;
+
+const row = `
+    <tr>
+        <td>
+            <strong>${data.outletName}</strong> ${isOffsite}<br>
+            <small>By: ${data.salesmanId ? data.salesmanId.slice(0,5) : 'Unknown'}</small>
+        </td>
+        <td style="font-weight:bold; color:green;">₹${data.amount}</td>
+        <td>
+            ${data.method}<br>
+            <a href="${mapLink}" target="_blank" style="color:blue; text-decoration:underline; font-size:10px;">View GPS 📍</a>
+        </td>
+        <td>
+            <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" ...>✔</button>
+            <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" ...>✖</button>
+        </td>
+    </tr>
+`;
             list.innerHTML += row;
         });
 
