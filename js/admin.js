@@ -760,11 +760,17 @@ function formatCurrency(amount) {
 // ==========================================
 
 async function loadPendingPayments() {
+    console.log("Checking for pending payments..."); // DEBUG LOG
     const container = document.getElementById('approval-section');
     const list = document.getElementById('approval-list');
 
+    if(!container) {
+        console.error("Error: HTML element 'approval-section' not found in admin.html");
+        return;
+    }
+
     try {
-        // Query only 'pending' payments
+        // Query: Status is 'pending', ordered by newest first
         const q = query(
             collection(db, "payments"), 
             where("status", "==", "pending"),
@@ -773,93 +779,44 @@ async function loadPendingPayments() {
         
         const snap = await getDocs(q);
 
+        console.log(`Found ${snap.size} pending payments.`); // DEBUG LOG
+
         if (snap.empty) {
-            container.style.display = 'none'; // Hide if no notifications
+            container.style.display = 'none';
             return;
         }
 
         container.style.display = 'block';
         list.innerHTML = "";
 
-        for (const docSnap of snap.docs) {
+        snap.forEach(docSnap => {
             const data = docSnap.data();
-            
-            // Get Salesman Name (Optional, fetch user doc if needed)
             const row = `
                 <tr>
-                    <td>${data.outletName}</td>
+                    <td>
+                        <strong>${data.outletName}</strong><br>
+                        <small>By: ${data.salesmanId.slice(0,5)}...</small>
+                    </td>
                     <td style="font-weight:bold; color:green;">₹${data.amount}</td>
-                    <td><small>${data.salesmanId.slice(0,5)}...</small></td>
                     <td>${data.method}</td>
                     <td>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✔</button>
-                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✖</button>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="cursor:pointer; background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px;">✔</button>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="cursor:pointer; background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px;">✖</button>
                     </td>
                 </tr>
             `;
             list.innerHTML += row;
-        }
+        });
 
     } catch (error) {
         console.error("Approval Load Error:", error);
-        if(error.message.includes("index")) console.warn("Missing Index for Payments");
+        if(error.message.includes("index")) {
+            // SHOW ERROR ON SCREEN SO YOU DON'T MISS IT
+            container.style.display = 'block';
+            list.innerHTML = `<tr><td colspan="4" style="color:red; font-weight:bold;">
+                ⚠️ ERROR: Missing Database Index.<br>
+                Open Console (F12) and click the link from Firebase.
+            </td></tr>`;
+        }
     }
 }
-
-// TRANSACTION HANDLER
-window.processPayment = async function(paymentId, outletId, amount, action) {
-    const reason = action === 'reject' ? prompt("Enter rejection reason:") : "Approved";
-    if (action === 'reject' && !reason) return; // Cancelled
-
-    try {
-        await runTransaction(db, async (transaction) => {
-            // 1. Get Payment Doc Reference
-            const payRef = doc(db, "payments", paymentId);
-            const outletRef = doc(db, "outlets", outletId);
-
-            // 2. Read Fresh Data (Crucial for Transactions)
-            const payDoc = await transaction.get(payRef);
-            const outletDoc = await transaction.get(outletRef);
-
-            if (!payDoc.exists()) throw "Payment record missing!";
-            if (payDoc.data().status !== 'pending') throw "Payment already processed by another admin!";
-            
-            if (action === 'approve') {
-                if (!outletDoc.exists()) throw "Outlet does not exist!";
-                
-                // 3. Calculate New Balance
-                const currentBal = outletDoc.data().currentBalance || 0;
-                const newBal = currentBal - amount;
-
-                // 4. Update Outlet Balance
-                transaction.update(outletRef, { 
-                    currentBalance: newBal,
-                    lastPaymentDate: serverTimestamp()
-                });
-
-                // 5. Update Payment Status
-                transaction.update(payRef, { 
-                    status: 'approved',
-                    adminNote: reason,
-                    processedAt: serverTimestamp()
-                });
-
-            } else {
-                // REJECT: Just update payment status, don't touch balance
-                transaction.update(payRef, { 
-                    status: 'rejected',
-                    adminNote: reason,
-                    processedAt: serverTimestamp()
-                });
-            }
-        });
-
-        alert(`Payment ${action}ed successfully.`);
-        loadPendingPayments(); // Refresh list
-        loadDashboardStats(); // Refresh dashboard numbers
-
-    } catch (error) {
-        console.error("Transaction Failed:", error);
-        alert("Transaction Failed: " + error);
-    }
-};
