@@ -368,22 +368,22 @@
     <script>
         // Tab Switcher
 window.switchView = function(viewName) {
-    console.log("Switching to view:", viewName);
+    console.log("Switching to:", viewName);
     
-    // Hide all view sections
+    // 1. Hide all sections
     document.querySelectorAll('.view-section').forEach(el => {
         el.classList.add('hidden');
     });
 
-    // Show the target section
+    // 2. Show the targeted section
     const target = document.getElementById(viewName + '-view');
     if (target) {
         target.classList.remove('hidden');
     }
 
-    // Special logic for Map
+    // 3. Initialize Map if Map Tab selected
     if (viewName === 'full-map') {
-        // Small delay to let Tailwind remove the 'hidden' class first
+        // Small delay to ensure Tailwind 'hidden' class is fully removed before Leaflet calculates size
         setTimeout(() => {
             if (window.initFullRouteMap) {
                 window.initFullRouteMap();
@@ -391,7 +391,7 @@ window.switchView = function(viewName) {
         }, 300);
     }
 
-    // Nav UI Highlight
+    // 4. Update Bottom Navigation UI
     document.querySelectorAll('.bottom-nav-item').forEach(el => {
         el.classList.remove('active', 'text-blue-600');
         el.classList.add('text-gray-400');
@@ -402,7 +402,6 @@ window.switchView = function(viewName) {
         btn.classList.remove('text-gray-400');
     }
 };
-
         // Payment Method Toggle Helper
         window.setPayMethod = function(method) {
             document.getElementById('payMethod').value = method;
