@@ -12,3 +12,58 @@ nav button { width: auto; background: #d9534f; }
 .main-body { padding: 20px; }
 .card { background: white; padding: 20px; margin-top: 15px; border-radius: 5px; border: 1px solid #ddd; }
 #loader { text-align: center; margin-top: 50px; font-size: 1.2rem; color: #666; }
+
+
+
+
+
+
+/* --- Dashboard Grid System --- */
+.dashboard-grid {
+    display: grid;
+    /* responsive columns: min width 140px, otherwise stretch */
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    text-align: center;
+    border: 1px solid #f0f0f0;
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+    margin: 5px 0;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Color coding for specific stats */
+.text-blue { color: #007bff; }
+.text-green { color: #28a745; }
+.text-purple { color: #6f42c1; }
+.text-orange { color: #fd7e14; }
