@@ -75,36 +75,63 @@ if (logoutBtn) logoutBtn.addEventListener('click', logoutUser);
 
 async function loadDashboardStats() {
     try {
+        // 1. Define "Today" time range
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
         const startTs = Timestamp.fromDate(startOfDay);
         const endTs = Timestamp.fromDate(endOfDay);
 
+        // 2. Execute Queries
         const [attendanceSnap, ordersSnap, outletsSnap] = await Promise.all([
+            // Attendance Count
             getDocs(query(collection(db, "attendance"), where("checkInTime", ">=", startTs), where("checkInTime", "<", endTs))),
+            
+            // Orders Today
             getDocs(query(collection(db, "orders"), where("orderDate", ">=", startTs), where("orderDate", "<", endTs))),
+            
+            // All Outlets (To sum up Credit)
             getDocs(collection(db, "outlets"))
         ]);
 
+        // 3. Calculate "Orders Today" & "Sales Today"
+        const attendanceCount = attendanceSnap.size;
+        let totalOrders = ordersSnap.size;
         let totalSales = 0;
-        ordersSnap.forEach(doc => totalSales += Number(doc.data().totalAmount) || 0);
+        
+        ordersSnap.forEach(doc => {
+            const data = doc.data();
+            // Check inside 'financials' object first, fallback to root (backward compatibility)
+            const amount = (data.financials && data.financials.totalAmount) ? data.financials.totalAmount : (data.totalAmount || 0);
+            totalSales += Number(amount);
+        });
 
+        // 4. Calculate "Credit in Market"
         let totalCredit = 0;
-        outletsSnap.forEach(doc => totalCredit += Number(doc.data().currentBalance) || 0);
+        outletsSnap.forEach(doc => {
+            const data = doc.data();
+            // Sum up currentBalance of all shops
+            totalCredit += Number(data.currentBalance) || 0;
+        });
 
+        // 5. Update UI
         const elAttend = document.getElementById('stat-attendance');
         const elOrders = document.getElementById('stat-orders');
         const elSales = document.getElementById('stat-sales');
         const elCredit = document.getElementById('stat-credit');
 
-        if(elAttend) elAttend.innerText = attendanceSnap.size;
-        if(elOrders) elOrders.innerText = ordersSnap.size;
+        if(elAttend) elAttend.innerText = attendanceCount;
+        if(elOrders) elOrders.innerText = totalOrders;
         if(elSales) elSales.innerText = formatCurrency(totalSales);
         if(elCredit) elCredit.innerText = formatCurrency(totalCredit);
 
     } catch (error) {
-        console.error("Stats Error (Check Indexes):", error);
+        console.error("Error loading stats:", error);
+        // Usually caused by missing index on 'orderDate'
+        if(error.message.includes("index")) {
+            console.warn("Please create the Index via the link in console.");
+        }
     }
 }
 
