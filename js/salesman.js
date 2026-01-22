@@ -898,30 +898,34 @@ window.submitLeaveRequest = async function() {
 
 
 window.initFullRouteMap = async function() {
-    const mapContainer = document.getElementById('all-shops-map');
-    if (!mapContainer) return;
+    console.log("Initializing Map...");
+    const container = document.getElementById('all-shops-map');
+    
+    if (!container) {
+        console.error("Map container not found!");
+        return;
+    }
 
-    // 1. Clean up existing instance to prevent "Map already initialized" error
+    // Cleanup
     if (fullMapInstance) {
         fullMapInstance.remove();
         fullMapInstance = null;
     }
 
-    // 2. Create the Map Instance
-    fullMapInstance = L.map('all-shops-map').setView([20.5937, 78.9629], 5);
+    // Create Map
+    fullMapInstance = L.map('all-shops-map').setView([20.5, 78.9], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
+        maxZoom: 19
     }).addTo(fullMapInstance);
 
-    // 3. FORCE LEAFLET TO RE-CALCULATE SIZE (The Fix)
+    // CRITICAL: Force Tile Refresh
     setTimeout(() => {
         fullMapInstance.invalidateSize();
-    }, 200);
+        console.log("Map size invalidated/refreshed.");
+    }, 400);
 
     try {
-        // 4. Fetch the route data
         const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", auth.currentUser.uid));
         const routeSnap = await getDocs(q);
         if (routeSnap.empty) return;
@@ -931,30 +935,22 @@ window.initFullRouteMap = async function() {
         const shopsSnap = await getDocs(shopsQ);
 
         const markers = [];
-
         for (const docSnap of shopsSnap.docs) {
-            const routeOutlet = docSnap.data();
-            const outletDoc = await getDoc(doc(db, "outlets", routeOutlet.outletId));
-            
-            if (outletDoc.exists() && outletDoc.data().geo) {
-                const geo = outletDoc.data().geo;
-                const shopName = outletDoc.data().shopName;
-
-                const m = L.marker([geo.lat, geo.lng])
+            const rData = docSnap.data();
+            const oDoc = await getDoc(doc(db, "outlets", rData.outletId));
+            if (oDoc.exists() && oDoc.data().geo) {
+                const g = oDoc.data().geo;
+                L.marker([g.lat, g.lng])
                     .addTo(fullMapInstance)
-                    .bindPopup(`<b>${shopName}</b><br>Stop ${routeOutlet.sequence}`);
-                
-                markers.push([geo.lat, geo.lng]);
+                    .bindPopup(`<b>${oDoc.data().shopName}</b>`);
+                markers.push([g.lat, g.lng]);
             }
         }
 
-        // 5. Fit the view to show all markers
         if (markers.length > 0) {
-            const bounds = L.latLngBounds(markers);
-            fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
+            fullMapInstance.fitBounds(L.latLngBounds(markers), { padding: [50, 50] });
         }
-
-    } catch (error) {
-        console.error("Full Map Loading Error:", error);
+    } catch (e) {
+        console.error("Map data error:", e);
     }
 };
