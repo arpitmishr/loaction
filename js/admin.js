@@ -756,17 +756,70 @@ function formatCurrency(amount) {
 
 
 // ==========================================
-//      PAYMENT TRANSACTION LOGIC
+//      PAYMENT APPROVAL & TRANSACTION LOGIC
 // ==========================================
 
-// Make this function GLOBAL so HTML onclick can see it
+// 1. Function to Load the List (Must exist for the dashboard to show alerts)
+async function loadPendingPayments() {
+    console.log("Checking for pending payments...");
+    const container = document.getElementById('approval-section');
+    const list = document.getElementById('approval-list');
+
+    if(!container) return;
+
+    try {
+        // Query: Status is 'pending', ordered by newest first
+        const q = query(
+            collection(db, "payments"), 
+            where("status", "==", "pending"),
+            orderBy("date", "desc")
+        );
+        
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        list.innerHTML = "";
+
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const row = `
+                <tr>
+                    <td>
+                        <strong>${data.outletName}</strong><br>
+                        <small>By: ${data.salesmanId ? data.salesmanId.slice(0,5) : 'Unknown'}...</small>
+                    </td>
+                    <td style="font-weight:bold; color:green;">₹${data.amount}</td>
+                    <td>${data.method}</td>
+                    <td>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="cursor:pointer; background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px;">✔</button>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="cursor:pointer; background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px;">✖</button>
+                    </td>
+                </tr>
+            `;
+            list.innerHTML += row;
+        });
+
+    } catch (error) {
+        console.error("Approval Load Error:", error);
+        if(error.message.includes("index")) {
+            container.style.display = 'block';
+            list.innerHTML = `<tr><td colspan="4" style="color:red; font-weight:bold;">⚠️ Missing Index. Check Console.</td></tr>`;
+        }
+    }
+}
+
+// 2. Global Function to Handle Click (Must match what is in HTML)
 window.processPayment = async function(paymentId, outletId, amount, action) {
-    console.log(`Attempting to ${action} payment: ${paymentId}`); // Debug Log
+    console.log(`Processing payment: ${paymentId}, Action: ${action}`);
 
     const reason = action === 'reject' ? prompt("Enter rejection reason:") : "Approved";
-    if (action === 'reject' && !reason) return; // User cancelled prompt
+    if (action === 'reject' && !reason) return; 
 
-    // Verify inputs aren't null
     if(!paymentId || !outletId || !amount) {
         alert("Error: Missing payment details.");
         return;
@@ -774,42 +827,34 @@ window.processPayment = async function(paymentId, outletId, amount, action) {
 
     try {
         await runTransaction(db, async (transaction) => {
-            // 1. References
             const payRef = doc(db, "payments", paymentId);
             const outletRef = doc(db, "outlets", outletId);
 
-            // 2. READ (Must come before any writes)
             const payDoc = await transaction.get(payRef);
             const outletDoc = await transaction.get(outletRef);
 
-            // 3. Validations
-            if (!payDoc.exists()) throw "Payment record not found!";
-            const payData = payDoc.data();
-            
-            if (payData.status !== 'pending') throw "This payment was already processed.";
+            if (!payDoc.exists()) throw "Payment record missing!";
+            if (payDoc.data().status !== 'pending') throw "Already processed.";
 
             if (action === 'approve') {
-                if (!outletDoc.exists()) throw "Outlet not found! Cannot adjust balance.";
+                if (!outletDoc.exists()) throw "Outlet not found.";
                 
-                // 4. Calculate New Balance
+                // Deduct Balance
                 const currentBal = Number(outletDoc.data().currentBalance) || 0;
                 const newBal = currentBal - Number(amount);
 
-                // 5. WRITE: Update Outlet
                 transaction.update(outletRef, { 
                     currentBalance: newBal,
                     lastPaymentDate: serverTimestamp()
                 });
 
-                // 6. WRITE: Update Payment Status
                 transaction.update(payRef, { 
                     status: 'approved',
                     adminNote: reason,
                     processedAt: serverTimestamp()
                 });
-
             } else {
-                // REJECT: Only update payment status
+                // Reject
                 transaction.update(payRef, { 
                     status: 'rejected',
                     adminNote: reason,
@@ -818,13 +863,13 @@ window.processPayment = async function(paymentId, outletId, amount, action) {
             }
         });
 
-        // Success Feedback
         alert(`Payment ${action}ed successfully.`);
         
-        // Refresh UI
-        loadPendingPayments(); // Remove from notification list
-        loadDashboardStats();  // Update total credit stats
-        loadOutlets();         // Update outlet list if visible
+        // REFRESH THE UI
+        loadPendingPayments(); // This refreshes the list (removing the button)
+        loadDashboardStats();  // This updates the total credit stats
+        
+        if(typeof loadOutlets === 'function') loadOutlets(); // Refresh outlet table if visible
 
     } catch (error) {
         console.error("Transaction Error:", error);
