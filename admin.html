@@ -2,40 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- Initial Loader -->
-    <div id="loader">Verifying Admin Access...</div>
+    <div id="loader">Loading Dashboard...</div>
 
-    <!-- Hidden Content -->
-    <!-- admin.html -->
-<div id="content" style="display: none;">
-    <nav>
-        <h1>Admin Panel</h1>
-        <button id="logoutBtn">Logout</button>
-    </nav>
-    
-    <div class="container">
-        <!-- Section 1: List of Salesmen -->
-        <div class="card">
-            <h3>👨‍💼 Active Salesmen</h3>
-            <ul id="salesmen-list">
-                <li>Loading...</li>
-            </ul>
-        </div>
+    <div id="content" style="display: none;">
+        <nav>
+            <h1>Admin Panel</h1>
+            <button id="logoutBtn">Logout</button>
+        </nav>
+        
+        <div class="container">
+            <p>Welcome, <span id="user-email">Admin</span></p>
 
-        <!-- Section 2: Product Inventory -->
-        <div class="card">
-            <h3>📦 Product Inventory</h3>
-            <ul id="product-list">
-                <li>Loading...</li>
-            </ul>
+            <!-- STATISTICS GRID -->
+            <div class="dashboard-grid">
+                <!-- Card 1: Attendance -->
+                <div class="stat-card">
+                    <span class="stat-icon">🙋‍♂️</span>
+                    <div class="stat-value text-blue" id="stat-attendance">0</div>
+                    <div class="stat-label">Present Today</div>
+                </div>
+
+                <!-- Card 2: Orders Count -->
+                <div class="stat-card">
+                    <span class="stat-icon">📦</span>
+                    <div class="stat-value text-purple" id="stat-orders">0</div>
+                    <div class="stat-label">Orders Today</div>
+                </div>
+
+                <!-- Card 3: Total Sales -->
+                <div class="stat-card">
+                    <span class="stat-icon">💰</span>
+                    <div class="stat-value text-green" id="stat-sales">$0</div>
+                    <div class="stat-label">Sales Today</div>
+                </div>
+
+                <!-- Card 4: Outstanding Credit -->
+                <div class="stat-card">
+                    <span class="stat-icon">📉</span>
+                    <div class="stat-value text-orange" id="stat-credit">$0</div>
+                    <div class="stat-label">Market Credit</div>
+                </div>
+            </div>
+
+            <!-- Existing lists (Optional, keep or remove) -->
+            <div class="card">
+                <h3>Active Salesmen</h3>
+                <ul id="salesmen-list"><li>Loading...</li></ul>
+            </div>
         </div>
     </div>
-</div>
-<script type="module" src="js/admin.js"></script>
-    
+
+    <script type="module" src="js/admin.js"></script>
 </body>
 </html>
