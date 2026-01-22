@@ -899,7 +899,7 @@ window.submitLeaveRequest = async function() {
 
 
     // Make sure fullMapInstance is declared at the top of your file
-let fullMapInstance = null;
+
 
 window.initFullRouteMap = async function() {
     console.log("Initializing Full Route Map...");
