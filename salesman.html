@@ -1,255 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Salesman Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesman App</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb', // Blue-600
+                        success: '#16a34a', // Green-600
+                        danger: '#dc2626',  // Red-600
+                        warning: '#ca8a04', // Yellow-600
+                        dark: '#1e293b',    // Slate-800
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Icons (Optional, using SVG directly is better but CDN for simplicity) -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        /* Hide scrollbar for clean app feel */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        .bottom-nav-item.active { color: #2563eb; }
+        .bottom-nav-item.active span { color: #2563eb; }
+    </style>
 </head>
-<body>
+<body class="pb-20"> <!-- Padding bottom for nav bar -->
 
-<div id="loader">Loading...</div>
-
-<div id="content" style="display:none;">
-
-  <!-- NAVBAR -->
-  <nav>
-    <h1>Sales App</h1>
-    <div>
-      <button onclick="switchView('route')">Route</button>
-      <button onclick="switchView('catalog')">Catalog</button>
-      <button id="logoutBtn" style="background:#dc3545;">Logout</button>
-    </div>
-  </nav>
-<div class="card">
-  <!-- Inside the Attendance Card -->
-<div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-    <!-- Existing Check In Button -->
-    <button id="checkInBtn" class="btn-primary">📍 Check In Now</button>
-    
-    <!-- NEW Leave Button -->
-    <button onclick="openLeaveModal()" style="background: #ffc107; color: black; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer;">📅 Request Leave</button>
-</div>
-</div>
-  <div class="container">
-
-    <!-- ================= ROUTE VIEW ================= -->
-    <div id="route-view">
-
-      <div class="card">
-        <h3>📍 My Route Today</h3>
-        <h2 id="route-name">Loading...</h2>
-      </div>
-
-      <div class="card">
-        <h3>🏬 Shops to Visit</h3>
-        <ul id="shops-list">
-          <li>Loading...</li>
-        </ul>
-      </div>
-
+    <!-- LOADER -->
+    <div id="loader" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 class="text-lg font-semibold text-gray-600">Loading App...</h2>
+        </div>
     </div>
 
-    <!-- ================= CATALOG VIEW ================= -->
-    <div id="catalog-view" style="display:none;">
-
-      <div class="card">
-        <h3>📋 Product Catalog</h3>
-
-        <input
-          type="text"
-          id="searchProd"
-          placeholder="🔍 Search products..."
-          style="width:100%; padding:10px; margin-bottom:15px;"
-        />
-
-        <div
-          id="catalog-list"
-          style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;"
-        ></div>
-      </div>
-
-    </div>
-
-
-<div id="order-view" style="display: none;">
-    <button onclick="cancelOrder()" style="margin-bottom:10px; background:#6c757d; color:white; border:none; padding:5px 10px; border-radius:4px;">⬅ Cancel</button>
-    
-    <div class="card">
-        <h3>📝 New Order</h3>
-        <h4 id="order-outlet-name" style="color:#007bff; margin-top:0;">Outlet Name</h4>
+    <!-- MAIN APP CONTAINER -->
+    <div id="content" style="display:none;" class="max-w-md mx-auto min-h-screen bg-gray-50 relative shadow-2xl">
         
-        <!-- SETTINGS SECTION -->
-        <div style="display: grid; gap: 10px; margin-bottom: 15px;">
+        <!-- HEADER -->
+        <header class="bg-white shadow-sm sticky top-0 z-40 px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="text-blue-600">⚡</span> Sales App
+            </h1>
+            <button id="logoutBtn" class="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-medium border border-red-100 hover:bg-red-100 transition">
+                Logout
+            </button>
+        </header>
+
+        <!-- CONTENT AREA -->
+        <main class="p-4 space-y-4">
+
+            <!-- 1. ROUTE VIEW (HOME) -->
+            <div id="route-view" class="view-section block">
+                
+                <!-- Attendance Card -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-gray-700">Daily Attendance</h3>
+                        <span id="attendance-status" class="text-xs text-gray-400">Not checked in</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="checkInBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-sm font-semibold shadow-blue-100 flex flex-col items-center justify-center gap-1 transition active:scale-95">
+                            <span class="material-icons-round">place</span>
+                            Check In
+                        </button>
+                        <button onclick="openLeaveModal()" class="bg-amber-100 hover:bg-amber-200 text-amber-700 py-3 rounded-xl text-sm font-semibold flex flex-col items-center justify-center gap-1 transition active:scale-95">
+                            <span class="material-icons-round">event_busy</span>
+                            Request Leave
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Route Info -->
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-lg mb-4">
+                    <p class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Assigned Route</p>
+                    <h2 id="route-name" class="text-2xl font-bold">Loading...</h2>
+                </div>
+
+                <!-- Shops List -->
+                <h3 class="font-bold text-gray-800 text-lg mb-2">Shops to Visit</h3>
+                <ul id="shops-list" class="space-y-3 pb-20">
+                    <li class="text-center text-gray-400 py-4">Loading shops...</li>
+                </ul>
+            </div>
+
+            <!-- 2. CATALOG VIEW -->
+            <div id="catalog-view" class="view-section hidden pb-20">
+                <div class="sticky top-[60px] z-30 bg-gray-50 pb-2">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                            <span class="material-icons-round text-sm">search</span>
+                        </span>
+                        <input type="text" id="searchProd" placeholder="Search products..." class="w-full pl-10 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                    </div>
+                </div>
+                
+                <div id="catalog-list" class="grid grid-cols-2 gap-3">
+                    <!-- Products injected here -->
+                </div>
+            </div>
+
+            <!-- 3. VISIT / MAP VIEW -->
+            <div id="visit-view" class="view-section hidden fixed inset-0 bg-white z-50 overflow-y-auto">
+                <div class="p-4">
+                    <button onclick="closeVisitPanel()" class="flex items-center text-gray-500 mb-4 hover:text-gray-800">
+                        <span class="material-icons-round mr-1">arrow_back</span> Back to Route
+                    </button>
+
+                    <h2 id="visit-shop-name" class="text-2xl font-bold text-gray-900 mb-4">Shop Name</h2>
+
+                    <!-- Map -->
+                    <div class="relative w-full h-64 bg-gray-100 rounded-2xl overflow-hidden shadow-inner mb-4">
+                        <div id="map" class="w-full h-full z-0"></div>
+                        <div class="absolute bottom-2 left-2 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold shadow text-gray-700 z-[1000]">
+                            Dist: <span id="dist-display">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Pre-Checkin Action -->
+                    <button id="btn-geo-checkin" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg mb-4 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+                        <span class="material-icons-round">pin_drop</span>
+                        Check In (Enter Fence)
+                    </button>
+
+                    <!-- Active Visit Controls -->
+                    <div id="in-shop-controls" class="hidden space-y-3">
+                        <div class="bg-green-50 border border-green-100 p-4 rounded-xl text-center mb-4">
+                            <p class="text-green-700 font-bold flex items-center justify-center gap-1">
+                                <span class="material-icons-round">check_circle</span> Checked In
+                            </p>
+                            <p class="text-gray-500 text-sm mt-1">Time: <span id="visit-timer" class="font-mono">00:00</span></p>
+                        </div>
+
+                        <!-- Outstanding Balance Card -->
+                        <div class="bg-red-50 border border-red-100 p-4 rounded-xl flex justify-between items-center">
+                            <div>
+                                <p class="text-xs text-red-600 uppercase font-bold">Outstanding</p>
+                                <p id="visit-outstanding-bal" class="text-xl font-bold text-red-800">₹0.00</p>
+                            </div>
+                            <button onclick="openPaymentModal()" class="bg-white text-red-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm border border-red-100 hover:bg-red-50">
+                                Collect
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 mt-4">
+                            <button id="btn-take-order" class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-blue-200 hover:bg-blue-700">
+                                New Order
+                            </button>
+                            <button id="btn-end-visit" class="bg-white text-gray-700 border border-gray-300 py-3 rounded-xl font-bold hover:bg-gray-50">
+                                End Visit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. ORDER VIEW -->
+            <div id="order-view" class="view-section hidden fixed inset-0 bg-gray-50 z-50 flex flex-col">
+                <!-- Order Header -->
+                <div class="bg-white px-4 py-3 shadow-sm flex items-center justify-between">
+                    <button onclick="cancelOrder()" class="text-gray-500 hover:text-red-500">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                    <h3 class="font-bold text-lg">New Order</h3>
+                    <div class="w-6"></div> <!-- Spacer -->
+                </div>
+
+                <div class="flex-grow overflow-y-auto p-4 space-y-4">
+                    <div class="text-center">
+                        <h4 id="order-outlet-name" class="text-xl font-bold text-blue-600">Outlet Name</h4>
+                    </div>
+
+                    <!-- Toggles -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center justify-between p-3 bg-white rounded-xl border border-yellow-200 shadow-sm cursor-pointer">
+                            <span class="text-xs font-bold text-yellow-700">📞 Phone Order</span>
+                            <input type="checkbox" id="isPhoneOrder" class="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500">
+                        </label>
+                        <label class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer">
+                            <span class="text-xs font-bold text-gray-600">💵 Apply GST</span>
+                            <input type="checkbox" id="applyGst" class="w-5 h-5 text-blue-500 rounded focus:ring-blue-500">
+                        </label>
+                    </div>
+
+                    <!-- Product Select -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                        <select id="order-product-select" class="w-full p-3 bg-gray-50 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Product...</option>
+                        </select>
+                        <div class="flex gap-2">
+                            <input type="number" id="order-qty" placeholder="Qty" min="1" class="w-24 p-3 bg-gray-50 border-none rounded-lg text-center font-bold">
+                            <button onclick="addToCart()" class="flex-grow bg-slate-800 text-white rounded-lg font-bold">Add Item</button>
+                        </div>
+                    </div>
+
+                    <!-- Cart -->
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-100 text-gray-500 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Item</th>
+                                    <th class="p-3 text-center">Qty</th>
+                                    <th class="p-3 text-right">Total</th>
+                                    <th class="p-3 w-8"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="order-cart-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Order Footer (Totals) -->
+                <div class="bg-white border-t p-4 pb-8 space-y-3 shadow-lg">
+                    <div class="flex justify-between text-sm text-gray-500">
+                        <span>Subtotal</span>
+                        <span id="ord-subtotal">₹0.00</span>
+                    </div>
+                    <div id="tax-row" class="flex justify-between text-sm text-gray-500 hidden">
+                        <span>GST (5%)</span>
+                        <span id="ord-tax">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between text-xl font-bold text-slate-800">
+                        <span>Total</span>
+                        <span id="ord-grand-total">₹0.00</span>
+                    </div>
+                    <button id="btn-submit-order" onclick="submitOrder()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-blue-200 hover:bg-blue-700 transition">
+                        Confirm Order
+                    </button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 z-40 max-w-md mx-auto">
+            <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
+                <span class="material-icons-round text-2xl">map</span>
+                <span class="text-[10px] font-bold">Route</span>
+            </button>
+            <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
+                <span class="material-icons-round text-2xl">inventory_2</span>
+                <span class="text-[10px] font-bold">Catalog</span>
+            </button>
+        </nav>
+
+        <!-- MODALS -->
+        
+        <!-- Leave Modal -->
+        <div id="leaveModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4">
+                <h3 class="text-lg font-bold">Request Leave</h3>
+                <div class="space-y-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-gray-500 uppercase">Date</label>
+                        <input type="date" id="leaveDate" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-gray-500 uppercase">Type</label>
+                        <select id="leaveType" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <option value="Full Day">Full Day</option>
+                            <option value="Half Day">Half Day</option>
+                            <option value="Sick Leave">Sick Leave</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-bold text-gray-500 uppercase">Reason</label>
+                        <textarea id="leaveReason" rows="2" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200" placeholder="Why?"></textarea>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="document.getElementById('leaveModal').classList.add('hidden')" class="py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Cancel</button>
+                    <button onclick="submitLeaveRequest()" class="py-3 text-white font-bold bg-blue-600 rounded-xl">Submit</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Modal -->
+        <div id="paymentModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4">
+                <div class="text-center">
+                    <h3 class="text-lg font-bold">Collect Payment</h3>
+                    <p class="text-sm text-gray-500">From: <span id="pay-outlet-name" class="font-semibold text-gray-800"></span></p>
+                </div>
+                
+                <div class="relative">
+                    <span class="absolute left-4 top-3.5 text-gray-400 font-bold">₹</span>
+                    <input type="number" id="payAmount" placeholder="0.00" class="w-full pl-8 p-3 bg-gray-50 rounded-xl border border-gray-200 text-lg font-bold">
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="setPayMethod('Cash')" class="pay-method-btn bg-green-50 border border-green-200 text-green-700 py-2 rounded-lg text-sm font-bold active">Cash</button>
+                    <button onclick="setPayMethod('UPI')" class="pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">UPI</button>
+                    <button onclick="setPayMethod('Cheque')" class="pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">Cheque</button>
+                </div>
+                <input type="hidden" id="payMethod" value="Cash">
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="document.getElementById('paymentModal').classList.add('hidden')" class="py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Cancel</button>
+                    <button onclick="submitPayment()" class="py-3 text-white font-bold bg-green-600 rounded-xl shadow-green-200">Collect</button>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- End Main Container -->
+
+    <!-- HELPER SCRIPT FOR UI -->
+    <script>
+        // Tab Switcher
+        window.switchView = function(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             
-            <!-- 1. Phone Order Toggle (Skips GPS) -->
-            <div style="background:#fff3cd; padding:10px; border-radius:5px; border:1px solid #ffeeba; display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <strong>📞 Phone Order?</strong><br>
-                    <small style="color:#856404;">(Skip Location Check)</small>
-                </div>
-                <input type="checkbox" id="isPhoneOrder" style="width:20px; height:20px;">
-            </div>
+            // Show selected
+            if(viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
+            if(viewName === 'catalog') {
+                document.getElementById('catalog-view').classList.remove('hidden');
+                if(window.loadProductCatalog) window.loadProductCatalog();
+            }
 
-            <!-- 2. GST Toggle (Optional Tax) -->
-            <div style="background:#e2e3e5; padding:10px; border-radius:5px; border:1px solid #d6d8db; display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <strong>💵 Apply 5% GST?</strong><br>
-                    <small style="color:#383d41;">(Optional for all orders)</small>
-                </div>
-                <input type="checkbox" id="applyGst" style="width:20px; height:20px;">
-            </div>
-        </div>
+            // Update Bottom Nav
+            document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
+            const activeBtn = document.getElementById('nav-' + viewName);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'text-blue-600');
+                activeBtn.classList.remove('text-gray-400');
+            }
+        };
 
-        <!-- PRODUCT SELECTOR -->
-        <div style="display:grid; grid-template-columns: 2fr 1fr auto; gap:5px; margin-bottom:15px;">
-            <select id="order-product-select" style="padding:8px;">
-                <option value="">Select Product...</option>
-                <!-- JS populates this -->
-            </select>
-            <input type="number" id="order-qty" placeholder="Qty" min="1" style="padding:8px;">
-            <button onclick="addToCart()" style="background:#28a745; color:white; border:none; border-radius:4px;">➕</button>
-        </div>
+        // Payment Method Toggle Helper
+        window.setPayMethod = function(method) {
+            document.getElementById('payMethod').value = method;
+            document.querySelectorAll('.pay-method-btn').forEach(btn => {
+                btn.className = "pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold w-full";
+            });
+            event.target.className = "pay-method-btn bg-green-50 border border-green-200 text-green-700 py-2 rounded-lg text-sm font-bold w-full ring-2 ring-green-500";
+        }
+    </script>
 
-        <!-- CART TABLE -->
-        <table style="width:100%; font-size:0.9rem; border-collapse:collapse; margin-bottom:15px;">
-            <thead>
-                <tr style="background:#eee; text-align:left;">
-                    <th style="padding:5px;">Item</th>
-                    <th>Qty</th>
-                    <th>Total</th>
-                    <th>❌</th>
-                </tr>
-            </thead>
-            <tbody id="order-cart-body">
-                <!-- Cart items here -->
-            </tbody>
-        </table>
-
-        <!-- TOTALS -->
-        <div style="text-align:right; border-top:2px solid #ddd; padding-top:10px;">
-            <div>Subtotal: <span id="ord-subtotal">₹0.00</span></div>
-            <div id="tax-row" style="color:#d63384; display:none;">GST (5%): <span id="ord-tax">₹0.00</span></div>
-            <div style="font-size:1.2rem; font-weight:bold; margin-top:5px;">Total: <span id="ord-grand-total">₹0.00</span></div>
-        </div>
-
-        <button id="btn-submit-order" onclick="submitOrder()" class="btn-primary" style="width:100%; margin-top:15px;">Confirm Order</button>
-    </div>
-</div>
-    
-
-    <!-- ================= VISIT VIEW ================= -->
-    <div id="visit-view" style="display:none;">
-
-      <button onclick="closeVisitPanel()" style="margin-bottom:10px;">
-        ⬅ Back to List
-      </button>
-
-      <div class="card">
-
-        <h3 id="visit-shop-name">Shop Name</h3>
-
-        <div
-          id="map"
-          style="height:250px; width:100%; border-radius:8px; margin:10px 0;"
-        ></div>
-
-        <div style="background:#eee; padding:10px; border-radius:5px; margin-bottom:10px;">
-          <strong>Distance to Shop:</strong>
-          <span id="dist-display">Calculating...</span>
-        </div>
-
-        <!-- ACTIONS -->
-        <div id="visit-actions">
-
-          <!-- CHECK IN -->
-          <button
-            id="btn-geo-checkin"
-            class="btn-primary"
-            style="width:100%;"
-          >
-            📍 Check In (Enter Fence)
-          </button>
-
-          <!-- IN-SHOP CONTROLS -->
-          <div id="in-shop-controls" style="display:none; margin-top:15px;">
-    <p style="color:green; font-weight:bold;">✅ You are Checked In</p>
-    
-    <!-- OUTSTANDING BALANCE DISPLAY -->
-    <div style="background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin-bottom:10px; text-align:center;">
-        <small>Current Outstanding:</small><br>
-        <strong style="font-size:1.2rem;" id="visit-outstanding-bal">₹0.00</strong>
-    </div>
-
-    <p>Duration: <span id="visit-timer">00:00</span></p>
-    
-    <button id="btn-take-order" class="btn-primary" style="background: #6f42c1; width:100%; margin-bottom:10px;">📝 Take Order</button>
-    
-    <!-- NEW PAYMENT BUTTON -->
-    <button id="btn-collect-payment" onclick="openPaymentModal()" style="background: #28a745; color: white; width:100%; padding:10px; border:none; border-radius:50px; margin-bottom:10px;">💰 Collect Payment</button>
-    
-    <button id="btn-end-visit" style="background: #dc3545; color: white; width:100%; padding:10px; border:none; border-radius:50px;">⏹ End Visit</button>
-</div>
-
-<!-- PAYMENT MODAL (Add at the bottom of the body) -->
-<div id="paymentModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-    <div style="background:white; padding:20px; border-radius:8px; width:80%; max-width:300px;">
-        <h3>💰 Collect Payment</h3>
-        <p>From: <b id="pay-outlet-name"></b></p>
-        
-        <input type="number" id="payAmount" placeholder="Amount (₹)" style="width:100%; padding:10px; margin-bottom:10px;">
-        
-        <select id="payMethod" style="width:100%; padding:10px; margin-bottom:10px;">
-            <option value="Cash">Cash</option>
-            <option value="UPI">UPI / Online</option>
-            <option value="Cheque">Cheque</option>
-        </select>
-
-        <div style="display:flex; gap:10px;">
-            <button onclick="document.getElementById('paymentModal').style.display='none'" style="flex:1; padding:10px; border:none; background:#ccc;">Cancel</button>
-            <button onclick="submitPayment()" style="flex:1; padding:10px; border:none; background:#28a745; color:white;">Submit</button>
-        </div>
-    </div>
-</div>
-
-
-        </div>
-
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script type="module" src="js/salesman.js"></script>
-<!-- LEAVE REQUEST MODAL -->
-<div id="leaveModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-    <div style="background:white; padding:20px; border-radius:8px; width:85%; max-width:320px;">
-        <h3>📅 Request Leave / Half Day</h3>
-        
-        <label>Select Date:</label>
-        <input type="date" id="leaveDate" style="width:100%; padding:8px; margin-bottom:10px;">
-        
-        <label>Type:</label>
-        <select id="leaveType" style="width:100%; padding:8px; margin-bottom:10px;">
-            <option value="Full Day">Full Day Leave</option>
-            <option value="Half Day">Half Day</option>
-            <option value="Sick Leave">Sick Leave</option>
-        </select>
-
-        <label>Reason / Remark:</label>
-        <textarea id="leaveReason" rows="3" placeholder="e.g. Doctor appointment" style="width:100%; padding:8px; margin-bottom:15px;"></textarea>
-
-        <div style="display:flex; gap:10px;">
-            <button onclick="document.getElementById('leaveModal').style.display='none'" style="flex:1; padding:10px; border:none; background:#ccc;">Cancel</button>
-            <button onclick="submitLeaveRequest()" style="flex:1; padding:10px; border:none; background:#007bff; color:white;">Submit</button>
-        </div>
-    </div>
-</div>
-
-  
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="js/salesman.js"></script>
 </body>
 </html>
