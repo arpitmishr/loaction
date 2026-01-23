@@ -1112,56 +1112,86 @@ window.loadAttendanceByDate = async function() {
 
 
 
-// 1. Add to the salesman list loading part to also populate the target dropdown
+// ==========================================
+//      DAILY TARGET LOGIC (Fixed)
+// ==========================================
+
+// 1. Populate Target Dropdown
 async function populateTargetSalesmanDropdown() {
     const select = document.getElementById('targetSalesmanId');
     if(!select) return;
     
-    const q = query(collection(db, "users"), where("role", "==", "salesman"));
-    const snap = await getDocs(q);
-    
-    snap.forEach(doc => {
-        const d = doc.data();
-        const opt = document.createElement('option');
-        opt.value = doc.id;
-        opt.textContent = d.fullName || d.email;
-        select.appendChild(opt);
-    });
+    // Reset options
+    select.innerHTML = '<option value="">Select Staff...</option>';
+
+    try {
+        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        const snap = await getDocs(q);
+        
+        snap.forEach(doc => {
+            const d = doc.data();
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = d.fullName || d.email;
+            select.appendChild(opt);
+        });
+        
+        // Auto-set date to today
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        
+        const dateInput = document.getElementById('targetDate');
+        if(dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
+
+    } catch (e) { console.error("Target Dropdown Error:", e); }
 }
 
-// 2. Add the form submit listener
+// 2. Handle Target Form Submit
 const targetForm = document.getElementById('targetForm');
 if(targetForm) {
     targetForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = e.target.querySelector('button');
-        
+        const btn = targetForm.querySelector('button');
+        const originalText = btn.innerText;
+
         try {
             btn.disabled = true;
             btn.innerText = "Saving...";
 
-            await addDoc(collection(db, "daily_targets"), {
-                salesmanId: document.getElementById('targetSalesmanId').value,
-                date: document.getElementById('targetDate').value, // YYYY-MM-DD
+            const salesmanId = document.getElementById('targetSalesmanId').value;
+            const date = document.getElementById('targetDate').value; // YYYY-MM-DD
+            
+            // Generate a unique ID: "salesmanID_YYYY-MM-DD"
+            // This prevents creating 2 targets for the same person on the same day.
+            const targetId = `${salesmanId}_${date}`; 
+
+            // Use setDoc instead of addDoc to enable overwriting/updating
+            await setDoc(doc(db, "daily_targets", targetId), {
+                salesmanId: salesmanId,
+                date: date,
                 targetBoxes: Number(document.getElementById('targetBoxes').value),
                 incentivePerBox: Number(document.getElementById('incentivePerBox').value),
-                createdBy: auth.currentUser.uid,
-                createdAt: serverTimestamp()
+                assignedBy: auth.currentUser.uid,
+                updatedAt: serverTimestamp()
             });
 
-            alert("Target assigned successfully!");
-            targetForm.reset();
+            alert("✅ Target Assigned Successfully!");
+            
+            // Reset fields but keep date/salesman for easier bulk entry
+            document.getElementById('targetBoxes').value = "";
+            document.getElementById('incentivePerBox').value = "";
+
         } catch (error) {
             console.error(error);
             alert("Error: " + error.message);
         } finally {
             btn.disabled = false;
-            btn.innerText = "Set Target";
+            btn.innerText = originalText;
         }
     });
 }
-
-// Ensure populateTargetSalesmanDropdown() is called in your admin init block
 
 
 
