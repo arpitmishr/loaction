@@ -1202,14 +1202,15 @@ if(targetForm) {
 
 
 
-// --- TARGET MANAGEMENT LOGIC ---
+// ==========================================
+//      DAILY TARGET LOGIC (FINAL VERSION)
+// ==========================================
 
-// 1. Populate the target dropdown (Reuse existing user query or fetch new)
 async function populateTargetSalesmanDropdown() {
     const select = document.getElementById('targetSalesmanId');
     if(!select) return;
     
-    // Clear existing options except first
+    // Reset options
     select.innerHTML = '<option value="">Select Staff...</option>';
 
     try {
@@ -1224,13 +1225,18 @@ async function populateTargetSalesmanDropdown() {
             select.appendChild(opt);
         });
         
-        // Set default date to today
-        document.getElementById('targetDate').valueAsDate = new Date();
+        // Auto-set date to today
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        
+        const dateInput = document.getElementById('targetDate');
+        if(dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
 
     } catch (e) { console.error("Target Dropdown Error:", e); }
 }
 
-// 2. Handle Form Submit
 const targetForm = document.getElementById('targetForm');
 if(targetForm) {
     targetForm.addEventListener('submit', async (e) => {
@@ -1245,21 +1251,24 @@ if(targetForm) {
             const salesmanId = document.getElementById('targetSalesmanId').value;
             const date = document.getElementById('targetDate').value; // YYYY-MM-DD
             
-            // Create a unique ID for the doc so we can overwrite if target exists for same day/user
+            // Unique ID: salesmanID_YYYY-MM-DD
             const targetId = `${salesmanId}_${date}`; 
 
+            // Use setDoc to allow updating existing targets
             await setDoc(doc(db, "daily_targets", targetId), {
                 salesmanId: salesmanId,
                 date: date,
                 targetBoxes: Number(document.getElementById('targetBoxes').value),
                 incentivePerBox: Number(document.getElementById('incentivePerBox').value),
+                assignedBy: auth.currentUser.uid,
                 updatedAt: serverTimestamp()
             });
 
             alert("✅ Target Assigned Successfully!");
-            targetForm.reset();
-            document.getElementById('targetDate').valueAsDate = new Date(); // Reset date to today
             
+            // Clear values but keep date/salesman selected for convenience
+            document.getElementById('targetBoxes').value = "";
+            document.getElementById('incentivePerBox').value = "";
 
         } catch (error) {
             console.error(error);
