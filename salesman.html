@@ -72,6 +72,19 @@
 
 
 
+
+
+                <!-- Floating Add Shop Button -->
+<button onclick="openAddShopModal()" class="fixed bottom-24 right-5 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg shadow-indigo-200 flex items-center justify-center z-30 active:scale-90 transition-transform">
+    <span class="material-icons-round text-3xl">add_business</span>
+</button>
+
+
+
+                
+
+
+
 <!-- TARGET PROGRESS CARD (New) -->
 <div id="target-card" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4 hidden">
     <div class="flex justify-between items-end mb-2">
@@ -432,5 +445,70 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/salesman.js"></script>
+
+
+
+
+
+<!-- Add Shop Modal -->
+<div id="addShopModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-slate-800">Add New Outlet</h3>
+        
+        <form id="newShopForm" class="space-y-3" onsubmit="event.preventDefault(); submitNewShop();">
+            
+            <!-- Shop Name -->
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Name</label>
+                <input type="text" id="newShopName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- Owner & Phone -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Owner Name</label>
+                    <input type="text" id="newOwnerName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Phone</label>
+                    <input type="tel" id="newShopPhone" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- Type -->
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+                <select id="newShopType" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+                    <option value="Shop">Grocery / Kirana</option>
+                    <option value="Restaurant">Restaurant / Hotel</option>
+                    <option value="Cafe">Cafe / Bakery</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <!-- GPS Capture -->
+            <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-bold text-indigo-700">Location</p>
+                    <p id="newShopGeoMsg" class="text-[10px] text-indigo-400">Coordinates required</p>
+                    <input type="hidden" id="newShopLat">
+                    <input type="hidden" id="newShopLng">
+                </div>
+                <button type="button" onclick="captureNewShopLocation()" class="bg-white text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold shadow-sm border border-indigo-100">
+                    Capture GPS
+                </button>
+            </div>
+
+            <!-- Buttons -->
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button type="button" onclick="document.getElementById('addShopModal').classList.add('hidden')" class="py-3 text-slate-500 font-bold bg-slate-100 rounded-xl">Cancel</button>
+                <button type="submit" id="btnSaveShop" class="py-3 text-white font-bold bg-indigo-600 rounded-xl shadow-indigo-200">Save Shop</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+    
 </body>
 </html>
