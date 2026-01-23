@@ -176,6 +176,105 @@ async function loadShops(routeId) {
     }
 }
 
+
+
+
+
+
+
+// --- ROUTE MAP LOGIC ---
+
+let routeMapInstance = null; // Separate variable to avoid conflict with visit map
+
+async function loadRouteOnMap() {
+    console.log("Loading Route Map...");
+    
+    // 1. Initialize Map (Leaflet)
+    // We check if it exists to avoid "Map container is already initialized" error
+    if (routeMapInstance) {
+        routeMapInstance.remove();
+    }
+    
+    // Default center (will change later)
+    routeMapInstance = L.map('routeMap').setView([20.5937, 78.9629], 5); 
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(routeMapInstance);
+
+    // 2. Get Current User ID
+    const uid = auth.currentUser.uid;
+    const markers = []; // To store marker objects for auto-zooming
+
+    try {
+        // 3. Fetch Assigned Route
+        const routeQ = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        const routeSnap = await getDocs(routeQ);
+
+        if (routeSnap.empty) {
+            alert("No route assigned to you.");
+            return;
+        }
+
+        const routeId = routeSnap.docs[0].id;
+
+        // 4. Fetch Route Outlets (Sequence)
+        const roQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId));
+        const roSnap = await getDocs(roQ);
+
+        if (roSnap.empty) return;
+
+        // 5. Loop through assigned outlets and fetch their REAL GPS data
+        // We use Promise.all to fetch all outlets in parallel (Faster than await in loop)
+        const outletPromises = roSnap.docs.map(async (docSnap) => {
+            const linkData = docSnap.data();
+            const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
+            
+            if (outletDoc.exists()) {
+                const outData = outletDoc.data();
+                if (outData.geo && outData.geo.lat && outData.geo.lng) {
+                    return {
+                        name: outData.shopName,
+                        lat: outData.geo.lat,
+                        lng: outData.geo.lng,
+                        seq: linkData.sequence
+                    };
+                }
+            }
+            return null; // Skip if no geo or deleted
+        });
+
+        const validOutlets = (await Promise.all(outletPromises)).filter(o => o !== null);
+
+        // 6. Plot Markers
+        validOutlets.forEach(shop => {
+            const marker = L.marker([shop.lat, shop.lng])
+                .addTo(routeMapInstance)
+                .bindPopup(`<b>${shop.seq}. ${shop.name}</b>`);
+            
+            markers.push(marker);
+        });
+
+        // 7. Auto-Fit Map to show all markers
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            routeMapInstance.fitBounds(group.getBounds().pad(0.1)); // pad(0.1) adds a little breathing room
+        }
+
+    } catch (error) {
+        console.error("Map Load Error:", error);
+        alert("Error loading map data.");
+    }
+}
+
+
+
+
+
+
+
+
+
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
 window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
@@ -452,17 +551,31 @@ function deg2rad(deg) {
 
 
 window.switchView = function(viewName) {
-    // Hide all
-    document.getElementById('route-view').style.display = 'none';
-    document.getElementById('visit-view').style.display = 'none';
-    document.getElementById('catalog-view').style.display = 'none';
+    // 1. Hide all views
+    document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
-    // Show selected
-    if(viewName === 'route') document.getElementById('route-view').style.display = 'block';
-    if(viewName === 'visit') document.getElementById('visit-view').style.display = 'block';
-    if(viewName === 'catalog') {
-        document.getElementById('catalog-view').style.display = 'block';
-        loadProductCatalog(); // Load data when tab is clicked
+    // 2. Show selected view
+    if (viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
+    if (viewName === 'visit') document.getElementById('visit-view').classList.remove('hidden');
+    if (viewName === 'catalog') {
+        document.getElementById('catalog-view').classList.remove('hidden');
+        if(window.loadProductCatalog) window.loadProductCatalog();
+    }
+    if (viewName === 'map') {
+        document.getElementById('map-view').classList.remove('hidden');
+        loadRouteOnMap(); // <--- New Function we will write below
+    }
+
+    // 3. Update Bottom Nav Styles
+    document.querySelectorAll('.bottom-nav-item').forEach(el => {
+        el.classList.remove('active', 'text-blue-600'); 
+        el.classList.add('text-gray-400');
+    });
+
+    const activeBtn = document.getElementById('nav-' + viewName);
+    if(activeBtn) {
+        activeBtn.classList.add('active', 'text-blue-600');
+        activeBtn.classList.remove('text-gray-400');
     }
 };
 
