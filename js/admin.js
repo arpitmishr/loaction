@@ -1392,3 +1392,12 @@ async function runRetentionCleanup() {
         alert("Error during cleanup: " + e.message);
     }
 }
+
+
+
+
+// ... (Your existing attendance logic) ...
+
+// EXPOSE FUNCTIONS TO HTML
+window.loadAttendanceSheet = loadAttendanceSheet;
+window.runRetentionCleanup = runRetentionCleanup;
