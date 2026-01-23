@@ -10,7 +10,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
-    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc 
+    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, getDocs, query, where, collection 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -1203,3 +1203,192 @@ if(targetForm) {
 // IMPORTANT: Add 'populateTargetSalesmanDropdown()' to your main onAuthStateChanged success block
 // alongside loadDashboardStats(), loadOutlets(), etc.
 // Add 'setDoc' to your imports from firebase-firestore.js at the top of the file.
+
+
+
+
+// ==========================================
+//      MONTHLY ATTENDANCE SHEET LOGIC
+// ==========================================
+
+// 1. Initialize Month Picker to Current Month
+const sheetPicker = document.getElementById('sheetMonthPicker');
+if(sheetPicker) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    sheetPicker.value = `${yyyy}-${mm}`;
+}
+
+// 2. Main Function to Load and Render the Sheet
+async function loadAttendanceSheet() {
+    const picker = document.getElementById('sheetMonthPicker');
+    const tbody = document.getElementById('sheet-body');
+    const theadRow = document.getElementById('sheet-header-row');
+    
+    if(!picker || !picker.value) return alert("Select a month");
+    
+    tbody.innerHTML = '<tr><td colspan="32" class="p-6 text-center">Generating Matrix...</td></tr>';
+    
+    const [year, month] = picker.value.split('-');
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    // --- A. Build Table Header (Days) ---
+    let headerHTML = `<th class="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-sm text-left">Staff Name</th>`;
+    for(let i = 1; i <= daysInMonth; i++) {
+        const dateObj = new Date(year, month - 1, i);
+        const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'narrow' }); // M, T, W...
+        const isWeekend = (dateObj.getDay() === 0); // Sunday
+        
+        headerHTML += `
+            <th class="p-1 border-b border-slate-100 text-center min-w-[35px] ${isWeekend ? 'bg-red-50 text-red-400' : ''}">
+                <div class="text-[10px]">${dayName}</div>
+                <div>${i}</div>
+            </th>
+        `;
+    }
+    theadRow.innerHTML = headerHTML;
+
+    try {
+        // --- B. Fetch Data ---
+        // 1. Get all Salesmen
+        const usersQ = query(collection(db, "users"), where("role", "==", "salesman"));
+        const usersSnap = await getDocs(usersQ);
+        
+        if(usersSnap.empty) {
+            tbody.innerHTML = '<tr><td colspan="32" class="p-6 text-center">No salesmen found.</td></tr>';
+            return;
+        }
+
+        // 2. Get Attendance for this Month (String comparison works for YYYY-MM-DD)
+        const startStr = `${year}-${month}-01`;
+        const endStr = `${year}-${month}-${daysInMonth}`;
+        
+        const attendQ = query(collection(db, "attendance"), 
+            where("date", ">=", startStr), 
+            where("date", "<=", endStr)
+        );
+        const attendSnap = await getDocs(attendQ);
+
+        // 3. Get Approved Leaves
+        const leaveQ = query(collection(db, "leaves"), 
+            where("status", "==", "approved"),
+            where("date", ">=", startStr),
+            where("date", "<=", endStr)
+        );
+        const leaveSnap = await getDocs(leaveQ);
+
+        // --- C. Process Data into Maps ---
+        // Map: userId -> day -> Status (P, L, HD)
+        const attendanceMap = {};
+        
+        attendSnap.forEach(doc => {
+            const d = doc.data();
+            const day = parseInt(d.date.split('-')[2]); // Extract Day
+            if(!attendanceMap[d.salesmanId]) attendanceMap[d.salesmanId] = {};
+            attendanceMap[d.salesmanId][day] = 'P'; // Present
+        });
+
+        leaveSnap.forEach(doc => {
+            const d = doc.data();
+            // Note: Leaves collection uses 'salesmanId' or similar. Check your DB.
+            // Assuming 'salesmanId' exists in leaves collection based on previous code.
+            const uid = d.salesmanId || d.userId; 
+            const day = parseInt(d.date.split('-')[2]);
+            if(uid) {
+                if(!attendanceMap[uid]) attendanceMap[uid] = {};
+                attendanceMap[uid][day] = (d.type === 'Half Day') ? 'HD' : 'L';
+            }
+        });
+
+        // --- D. Render Rows ---
+        tbody.innerHTML = "";
+        
+        usersSnap.forEach(uDoc => {
+            const user = uDoc.data();
+            const uid = uDoc.id;
+            const userName = user.fullName || user.email;
+            const record = attendanceMap[uid] || {};
+
+            let rowHTML = `<td class="p-3 border-b border-r border-slate-200 sticky left-0 bg-white z-10 font-medium whitespace-nowrap shadow-sm text-xs">${userName}</td>`;
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                const status = record[i];
+                let cellContent = `<span class="block w-2 h-2 rounded-full bg-slate-200 mx-auto"></span>`; // Default: Absent/Empty
+                
+                if (status === 'P') {
+                    cellContent = `<span class="block w-4 h-4 rounded-full bg-green-500 mx-auto shadow-sm" title="Present"></span>`;
+                } else if (status === 'HD') {
+                    cellContent = `<span class="block w-4 h-4 rounded-full bg-amber-500 mx-auto shadow-sm" title="Half Day"></span>`;
+                } else if (status === 'L') {
+                    cellContent = `<span class="block w-4 h-4 rounded-full bg-red-500 mx-auto shadow-sm" title="Leave"></span>`;
+                }
+                
+                // Highlight Sundays column lightly
+                const dateObj = new Date(year, month - 1, i);
+                const isSun = (dateObj.getDay() === 0);
+                const bgClass = isSun ? 'bg-slate-50' : '';
+
+                rowHTML += `<td class="border-b border-slate-100 p-1 text-center ${bgClass}">${cellContent}</td>`;
+            }
+
+            tbody.innerHTML += `<tr>${rowHTML}</tr>`;
+        });
+
+    } catch (e) {
+        console.error("Sheet Error:", e);
+        if(e.message.includes("index")) alert("Index missing. See Console.");
+        tbody.innerHTML = `<tr><td colspan="32" class="text-red-500 p-4">Error loading data.</td></tr>`;
+    }
+}
+
+// 3. Retention Policy: Delete data older than 3 months
+async function runRetentionCleanup() {
+    if(!confirm("⚠️ This will PERMANENTLY delete attendance records older than 3 months.\n\nAre you sure?")) return;
+
+    try {
+        const btn = document.querySelector('button[onclick="runRetentionCleanup()"]');
+        if(btn) btn.innerText = "Cleaning...";
+        
+        // Calculate Cutoff Date (3 months ago from 1st of current month)
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+        cutoffDate.setDate(1); // Set to 1st of that month
+        
+        // Format to YYYY-MM-DD
+        const yyyy = cutoffDate.getFullYear();
+        const mm = String(cutoffDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(cutoffDate.getDate()).padStart(2, '0');
+        const cutoffStr = `${yyyy}-${mm}-${dd}`;
+
+        console.log("Deleting records older than:", cutoffStr);
+
+        // Query Old Data
+        const q = query(collection(db, "attendance"), where("date", "<", cutoffStr));
+        const snap = await getDocs(q);
+
+        if(snap.empty) {
+            alert("No old records found to clean.");
+            if(btn) btn.innerText = "Clean Old Data (>3 Months)";
+            return;
+        }
+
+        // Batch Delete (Firestore limit is 500 ops per batch)
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snap.docs.forEach((doc) => {
+            batch.delete(doc.ref);
+            count++;
+        });
+
+        await batch.commit();
+        
+        alert(`Cleanup Complete! Deleted ${count} old records.`);
+        if(btn) btn.innerText = "Clean Old Data (>3 Months)";
+
+    } catch (e) {
+        console.error("Cleanup Error:", e);
+        alert("Error during cleanup: " + e.message);
+    }
+}
