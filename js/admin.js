@@ -1229,7 +1229,7 @@ if(targetForm) {
             alert("✅ Target Assigned Successfully!");
             targetForm.reset();
             document.getElementById('targetDate').valueAsDate = new Date(); // Reset date to today
-            populateTargetSalesmanDropdown(); // Refresh dropdown if needed
+            
 
         } catch (error) {
             console.error(error);
