@@ -50,6 +50,7 @@ onAuthStateChanged(auth, async (user) => {
         // C. Load Initial Data
         checkTodayAttendance(user);
         loadAssignedRoute(user.uid);
+        loadDailyTarget(user.uid); 
 
         // D. Attach Global Listener for Daily Attendance
         const checkInBtn = document.getElementById('checkInBtn');
@@ -368,7 +369,10 @@ async function performEndVisit() {
 
 function getTodayDateString() {
     const d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 async function checkTodayAttendance(user) {
@@ -1012,54 +1016,74 @@ window.initFullRouteMap = async function() {
 
 
 async function loadDailyTarget(uid) {
-    const today = getTodayDateString(); // Ensure you have this helper function from previous steps
+    console.log("Loading Daily Target for:", uid);
+    const today = getTodayDateString();
     const card = document.getElementById('target-card');
     
+    if (!card) return;
+
     try {
-        // 1. Fetch Target
-        const targetQ = query(collection(db, "daily_targets"), 
+        // 1. Fetch the Target for Today
+        const targetQ = query(
+            collection(db, "daily_targets"), 
             where("salesmanId", "==", uid), 
             where("date", "==", today)
         );
         const targetSnap = await getDocs(targetQ);
 
         if (targetSnap.empty) {
+            console.log("No target found for today:", today);
             card.classList.add('hidden');
             return;
         }
 
+        // Show the card if data exists
         const targetData = targetSnap.docs[0].data();
         card.classList.remove('hidden');
-        document.getElementById('total-target').innerText = targetData.targetBoxes;
+        
+        const targetBoxes = targetData.targetBoxes || 0;
+        document.getElementById('total-target').innerText = targetBoxes;
         document.getElementById('target-incentive').innerText = `₹${targetData.incentivePerBox}/box incentive`;
 
-        // 2. Fetch Today's Achievement (Sum items in orders)
-        // Note: You need an index for orders: salesmanId + orderDate
-        const ordersQ = query(collection(db, "orders"), 
-            where("salesmanId", "==", uid),
-            where("status", "==", "pending") // Or approved
+        // 2. Calculate Achievement (Sum of boxes sold today)
+        // We look at orders placed by this salesman today
+        const ordersQ = query(
+            collection(db, "orders"), 
+            where("salesmanId", "==", uid)
         );
         const ordersSnap = await getDocs(ordersQ);
         
         let totalSold = 0;
-        ordersSnap.forEach(doc => {
-            const order = doc.data();
-            // Assuming orderDate is Timestamp and belongs to today
-            const orderDate = order.orderDate.toDate().toISOString().split('T')[0];
-            if(orderDate === today) {
-                order.items.forEach(item => {
-                    totalSold += item.qty;
-                });
+        ordersSnap.forEach(docSnap => {
+            const order = docSnap.data();
+            // Convert Firestore Timestamp to YYYY-MM-DD
+            if (order.orderDate) {
+                const orderDate = order.orderDate.toDate().toISOString().split('T')[0];
+                if (orderDate === today) {
+                    // Sum the 'qty' of all items in this order
+                    order.items.forEach(item => {
+                        totalSold += (Number(item.qty) || 0);
+                    });
+                }
             }
         });
 
-        // 3. Update UI
-        const percent = Math.min(Math.round((totalSold / targetData.targetBoxes) * 100), 100);
-        document.getElementById('current-progress').innerText = totalSold;
-        document.getElementById('percent-label').innerText = percent + "%";
-        document.getElementById('target-progress-bar').style.width = percent + "%";
+        console.log("Total Sold Today:", totalSold);
+
+        // 3. Update the UI Progress
+        const progressEl = document.getElementById('current-progress');
+        const percentEl = document.getElementById('percent-label');
+        const barEl = document.getElementById('target-progress-bar');
+
+        progressEl.innerText = totalSold;
+        
+        // Calculate percentage (max 100)
+        const percent = targetBoxes > 0 ? Math.min(Math.round((totalSold / targetBoxes) * 100), 100) : 0;
+        
+        percentEl.innerText = percent + "%";
+        barEl.style.width = percent + "%";
 
     } catch (error) {
-        console.error("Target Load Error:", error);
+        console.error("Target Progress Calculation Error:", error);
     }
 }
