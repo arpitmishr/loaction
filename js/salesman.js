@@ -983,38 +983,46 @@ window.submitLeaveRequest = async function() {
 
 
 
-// --- DAILY TARGET SYSTEM ---
+// --- DAILY TARGET SYSTEM (FIXED) ---
 
 async function loadDailyTarget() {
     const card = document.getElementById('target-card');
     const uid = auth.currentUser.uid;
-    const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    
+
+    // 1. FIX: Generate Local Date String (YYYY-MM-DD) manually to match Admin Input
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    console.log("Looking for Target ID:", `${uid}_${todayStr}`); // Debugging
+
     try {
-        // 1. Fetch Target for Today
-        // We use the ID convention: salesmanId_date
+        // 2. Fetch Target Document
         const targetId = `${uid}_${todayStr}`;
         const targetSnap = await getDoc(doc(db, "daily_targets", targetId));
 
         if (!targetSnap.exists()) {
-            card.style.display = 'none'; // No target assigned
+            console.log("No target found for today.");
+            card.style.display = 'none';
             return;
         }
 
         const targetData = targetSnap.data();
-        const targetBoxes = targetData.targetBoxes;
-        const incentiveRate = targetData.incentivePerBox;
+        const targetBoxes = Number(targetData.targetBoxes) || 0;
+        const incentiveRate = Number(targetData.incentivePerBox) || 0;
 
         card.classList.remove('hidden'); // Show card
+        card.style.display = 'block';    // Force display
 
-        // 2. Calculate Actual Sales (Boxes) from Orders
-        // Define Time Range for Today
+        // 3. Calculate Actual Sales
         const startOfDay = new Date();
         startOfDay.setHours(0,0,0,0);
+        
         const endOfDay = new Date();
         endOfDay.setHours(23,59,59,999);
 
-        // Query Orders
         const q = query(
             collection(db, "orders"), 
             where("salesmanId", "==", uid),
@@ -1028,23 +1036,24 @@ async function loadDailyTarget() {
         
         orderSnaps.forEach(doc => {
             const order = doc.data();
+            // Count items only if status is NOT rejected (optional, based on your rule)
             if(order.items && Array.isArray(order.items)) {
                 order.items.forEach(item => {
-                    // Assuming 'qty' is the number of boxes/units
                     totalBoxesSold += (Number(item.qty) || 0);
                 });
             }
         });
 
-        // 3. UI Logic & Calculations
-        const progress = Math.min((totalBoxesSold / targetBoxes) * 100, 100);
+        console.log(`Target: ${targetBoxes}, Sold: ${totalBoxesSold}`);
+
+        // 4. Update UI
+        const progress = targetBoxes > 0 ? Math.min((totalBoxesSold / targetBoxes) * 100, 100) : 0;
         const remaining = Math.max(0, targetBoxes - totalBoxesSold);
         
         // Incentive: Only for boxes ABOVE target
         const extraBoxes = Math.max(0, totalBoxesSold - targetBoxes);
         const incentiveEarned = extraBoxes * incentiveRate;
 
-        // Update DOM
         document.getElementById('tgt-total').innerText = targetBoxes;
         document.getElementById('tgt-max').innerText = targetBoxes;
         document.getElementById('tgt-achieved').innerText = totalBoxesSold;
@@ -1053,35 +1062,33 @@ async function loadDailyTarget() {
         document.getElementById('tgt-rate').innerText = incentiveRate;
         document.getElementById('tgt-incentive-amt').innerText = `₹${incentiveEarned.toFixed(2)}`;
 
-        // Handle States
+        // Message Logic
         const msgRemaining = document.getElementById('msg-remaining');
         const msgAlmost = document.getElementById('msg-almost');
         const msgSuccess = document.getElementById('msg-success');
         const bar = document.getElementById('tgt-bar');
 
-        // Reset
         msgRemaining.classList.add('hidden');
         msgAlmost.classList.add('hidden');
         msgSuccess.classList.add('hidden');
-        bar.classList.remove('bg-amber-500', 'bg-green-500', 'bg-blue-600');
+        bar.className = "h-3 rounded-full transition-all duration-1000 ease-out"; // Reset colors
 
-        if (totalBoxesSold >= targetBoxes) {
-            // Target Met
+        if (totalBoxesSold >= targetBoxes && targetBoxes > 0) {
             msgSuccess.classList.remove('hidden');
-            bar.classList.add('bg-green-500'); // Green Bar
+            bar.classList.add('bg-green-500');
         } else if (progress >= 80) {
-            // Almost There
             msgAlmost.classList.remove('hidden');
-            bar.classList.add('bg-amber-500'); // Gold/Orange Bar
+            bar.classList.add('bg-amber-500');
         } else {
-            // Normal Progress
             msgRemaining.classList.remove('hidden');
-            bar.classList.add('bg-blue-600'); // Blue Bar
+            bar.classList.add('bg-blue-600');
         }
 
     } catch (error) {
         console.error("Target Load Error:", error);
-        // Important: If index is missing, this will fail.
-        if(error.message.includes("index")) console.warn("Missing Index: orders (salesmanId, orderDate)");
+        // CRITICAL: Check console if index is missing
+        if(error.message.includes("index")) {
+            alert("⚠️ Admin needs to create a Database Index. Check Console.");
+        }
     }
 }
