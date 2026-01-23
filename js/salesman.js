@@ -1099,55 +1099,60 @@ async function loadDailyTarget() {
 
 
 // ==========================================
-//      ADD NEW SHOP LOGIC
+//      ADD NEW SHOP LOGIC (UPDATED)
 // ==========================================
 
 function openAddShopModal() {
     document.getElementById('addShopModal').classList.remove('hidden');
     document.getElementById('newShopForm').reset();
-    document.getElementById('newShopGeoMsg').innerText = "Coordinates required";
+    document.getElementById('newShopGeoMsg').innerText = "Required to save";
     document.getElementById('newShopGeoMsg').className = "text-[10px] text-indigo-400";
+    toggleCreditFields(); // Ensure correct initial state
 }
 
-function captureNewShopLocation() {
-    const msg = document.getElementById('newShopGeoMsg');
-    
-    if(!navigator.geolocation) return alert("GPS not supported");
-
-    msg.innerText = "Locating...";
-    
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            
-            document.getElementById('newShopLat').value = lat;
-            document.getElementById('newShopLng').value = lng;
-            
-            msg.innerText = `✅ ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            msg.className = "text-[10px] text-green-600 font-bold";
-        },
-        (err) => {
-            console.error(err);
-            msg.innerText = "GPS Failed. Try again.";
-            msg.className = "text-[10px] text-red-500 font-bold";
-        },
-        { enableHighAccuracy: true }
-    );
-}
+// Toggle Credit Fields Visibility
+window.toggleCreditFields = function() {
+    const type = document.getElementById('newStoreType').value;
+    const fields = document.getElementById('creditFields');
+    if(type === 'Credit') {
+        fields.classList.remove('hidden');
+        document.getElementById('newCreditDays').required = true;
+        document.getElementById('newCreditLimit').required = true;
+    } else {
+        fields.classList.add('hidden');
+        document.getElementById('newCreditDays').required = false;
+        document.getElementById('newCreditLimit').required = false;
+        document.getElementById('newCreditDays').value = "";
+        document.getElementById('newCreditLimit').value = "";
+    }
+};
 
 async function submitNewShop() {
-    const name = document.getElementById('newShopName').value;
-    const owner = document.getElementById('newOwnerName').value;
-    const phone = document.getElementById('newShopPhone').value;
-    const type = document.getElementById('newShopType').value;
+    const btn = document.getElementById('btnSaveShop');
+    
+    // 1. Gather Basic Data
+    const name = document.getElementById('newShopName').value.trim();
+    const owner = document.getElementById('newOwnerName').value.trim();
+    const phone = document.getElementById('newShopPhone').value.trim();
+    
+    // 2. Gather Extended Data
+    const authName = document.getElementById('newAuthName').value.trim() || owner; // Default to owner if empty
+    const authPhone = document.getElementById('newAuthPhone').value.trim() || phone;
+    const address = document.getElementById('newShopAddress').value.trim();
+    const gst = document.getElementById('newShopGST').value.trim() || "N/A";
+    
+    // 3. Gather Types & Credit
+    const catType = document.getElementById('newShopType').value;
+    const storeType = document.getElementById('newStoreType').value;
+    const creditDays = storeType === 'Credit' ? Number(document.getElementById('newCreditDays').value) : 0;
+    const creditLimit = storeType === 'Credit' ? Number(document.getElementById('newCreditLimit').value) : 0;
+
+    // 4. Gather GPS
     const lat = document.getElementById('newShopLat').value;
     const lng = document.getElementById('newShopLng').value;
-    
-    const btn = document.getElementById('btnSaveShop');
 
     if(!lat || !lng) {
-        alert("⚠️ GPS Location is required. Please click 'Capture GPS'.");
+        alert("⚠️ GPS Location is required. Please click 'Capture'.");
         return;
     }
 
@@ -1155,33 +1160,41 @@ async function submitNewShop() {
         btn.disabled = true;
         btn.innerText = "Saving...";
 
-        // 1. Add to 'outlets' collection
-        // We set currentBalance to 0 and credit details to default (Cash)
-        const docRef = await addDoc(collection(db, "outlets"), {
+        // 5. Construct Data Object (Matching Admin Schema)
+        const shopData = {
             shopName: name,
             ownerName: owner,
-            contactPerson: owner, // Default to owner
             contactPhone: phone,
-            outletType: type,
-            storeType: 'Cash', // Default
-            currentBalance: 0,
+            
+            // Extended Fields
+            contactPerson: authName, // Admin calls this 'contactPerson'
+            authPhone: authPhone,    // Extra field
+            address: address,
+            gstNumber: gst,
+            
+            outletType: catType,     // e.g. Restaurant, Shop
+            storeType: storeType,    // Cash vs Credit
+            creditDays: creditDays,
+            creditLimit: creditLimit,
+            
+            currentBalance: 0,       // New shops start with 0 debt
+            
             geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
+            
             createdBySalesman: auth.currentUser.uid,
             createdAt: serverTimestamp(),
-            status: 'active'
-        });
+            status: 'active'         // Default active
+        };
 
-        // 2. Optional: Add to 'route_outlets' so it appears immediately?
-        // Ideally, Admin assigns routes. 
-        // BUT, to let the salesman visit it NOW, let's create a temporary link or just Alert.
-        
-        alert("✅ Shop Added Successfully!\n\nThe shop is now in the database. Contact Admin to assign it to your permanent route.");
-        
+        // 6. Save to Firestore
+        await addDoc(collection(db, "outlets"), shopData);
+
+        alert("✅ Shop Added Successfully!");
         document.getElementById('addShopModal').classList.add('hidden');
 
     } catch (e) {
         console.error("Add Shop Error:", e);
-        alert("Error saving shop: " + e.message);
+        alert("Error saving shop: " + e.message); // If this still says permission denied, check Part 1
     } finally {
         btn.disabled = false;
         btn.innerText = "Save Shop";
