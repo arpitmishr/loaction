@@ -10,7 +10,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
-    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch 
+    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, limit  
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -1457,66 +1457,100 @@ async function setupTransactionTab() {
 }
 
 // 2. Main Fetch Function (Hits Database)
+// 2. Main Fetch Function (Optimized for Cost)
 async function loadTransactions() {
     const tbody = document.getElementById('trans-table-body');
     const startStr = document.getElementById('transStart').value;
     const endStr = document.getElementById('transEnd').value;
     const selectedSalesman = document.getElementById('transSalesman').value;
+    const selectedType = document.getElementById('transType').value; // Get the active filter
 
     if(!startStr || !endStr) return alert("Select Date Range");
 
-    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Loading 5 data sources...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Fetching data...</td></tr>';
 
     try {
-        // Prepare Date Objects for Timestamp Queries
         const startTs = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
         const endTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
 
-        // Build Queries (Arrays to store promises)
-        const queries = [];
+        const promises = [];
 
-        // A. ATTENDANCE (String Date)
-        let qAtt = query(collection(db, "attendance"), where("date", ">=", startStr), where("date", "<=", endStr));
-        if(selectedSalesman !== 'all') qAtt = query(qAtt, where("salesmanId", "==", selectedSalesman));
-        queries.push(getDocs(qAtt).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Attendance', _sortTime: d.data().checkInTime}))));
+        // Helper to add query safely
+        const addQuery = (colName, dateField, isTimestamp, typeLabel, sortField) => {
+            let q = query(collection(db, colName));
 
-        // B. VISITS (Timestamp)
-        let qVis = query(collection(db, "visits"), where("checkInTime", ">=", startTs), where("checkInTime", "<=", endTs));
-        if(selectedSalesman !== 'all') qVis = query(qVis, where("salesmanId", "==", selectedSalesman));
-        queries.push(getDocs(qVis).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Visit', _sortTime: d.data().checkInTime}))));
+            // Date Filter
+            if (isTimestamp) {
+                q = query(q, where(dateField, ">=", startTs), where(dateField, "<=", endTs));
+            } else {
+                q = query(q, where(dateField, ">=", startStr), where(dateField, "<=", endStr));
+            }
 
-        // C. ORDERS (Timestamp)
-        let qOrd = query(collection(db, "orders"), where("orderDate", ">=", startTs), where("orderDate", "<=", endTs));
-        if(selectedSalesman !== 'all') qOrd = query(qOrd, where("salesmanId", "==", selectedSalesman));
-        queries.push(getDocs(qOrd).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Order', _sortTime: d.data().orderDate}))));
+            // Salesman Filter
+            if (selectedSalesman !== 'all') {
+                q = query(q, where("salesmanId", "==", selectedSalesman));
+            }
 
-        // D. PAYMENTS (Timestamp)
-        let qPay = query(collection(db, "payments"), where("date", ">=", startTs), where("date", "<=", endTs));
-        if(selectedSalesman !== 'all') qPay = query(qPay, where("salesmanId", "==", selectedSalesman));
-        queries.push(getDocs(qPay).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Payment', _sortTime: d.data().date}))));
+            // SAFETY LIMIT: Read max 50 docs per collection to save costs
+            q = query(q, limit(50)); 
 
-        // E. TARGETS (String Date)
-        // Targets doc ID is complex, so we query simply by date range
-        let qTgt = query(collection(db, "daily_targets"), where("date", ">=", startStr), where("date", "<=", endStr));
-        if(selectedSalesman !== 'all') qTgt = query(qTgt, where("salesmanId", "==", selectedSalesman));
-        queries.push(getDocs(qTgt).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Target', _sortTime: Timestamp.fromDate(new Date(d.data().date + "T08:00:00"))}))));
+            // Add to execution list
+            promises.push(
+                getDocs(q).then(snap => 
+                    snap.docs.map(d => ({
+                        ...d.data(), 
+                        _type: typeLabel, 
+                        _sortTime: isTimestamp ? d.data()[sortField] : Timestamp.fromDate(new Date(d.data()[dateField] + "T08:00:00")) 
+                    }))
+                )
+            );
+        };
 
-        // EXECUTE ALL QUERIES
-        const results = await Promise.all(queries);
+        // --- CONDITIONAL FETCHING (Saves Reads) ---
+        
+        // 1. Attendance
+        if (selectedType === 'all' || selectedType === 'Attendance') {
+            addQuery("attendance", "date", false, "Attendance", "checkInTime");
+        }
+
+        // 2. Visits
+        if (selectedType === 'all' || selectedType === 'Visit') {
+            addQuery("visits", "checkInTime", true, "Visit", "checkInTime");
+        }
+
+        // 3. Orders
+        if (selectedType === 'all' || selectedType === 'Order') {
+            addQuery("orders", "orderDate", true, "Order", "orderDate");
+        }
+
+        // 4. Payments
+        if (selectedType === 'all' || selectedType === 'Payment') {
+            addQuery("payments", "date", true, "Payment", "date");
+        }
+
+        // 5. Targets
+        if (selectedType === 'all' || selectedType === 'Target') {
+            addQuery("daily_targets", "date", false, "Target", "date");
+        }
+
+        // EXECUTE ONLY SELECTED QUERIES
+        const results = await Promise.all(promises);
 
         // Merge & Flatten
         allFetchedTransactions = results.flat();
 
-        // Sort by Date Descending (Newest First)
-        allFetchedTransactions.sort((a, b) => b._sortTime.seconds - a._sortTime.seconds);
+        // Sort by Date Descending
+        allFetchedTransactions.sort((a, b) => {
+            const timeA = a._sortTime ? a._sortTime.seconds : 0;
+            const timeB = b._sortTime ? b._sortTime.seconds : 0;
+            return timeB - timeA;
+        });
 
-        // Render Initial View
         renderTransactions(allFetchedTransactions);
 
     } catch (e) {
         console.error("Trans Load Error:", e);
         tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
-        if(e.message.includes("index")) alert("Missing Index. Check Console Link.");
     }
 }
 
@@ -1586,20 +1620,19 @@ function renderTransactions(data) {
 }
 
 // 4. Client-Side Filter (Instant)
+// 4. Client-Side Filter (Outlet Search Only)
 function filterTransactionsClientSide() {
-    const typeFilter = document.getElementById('transType').value;
+    // We NO LONGER filter by Type here, because the "Apply Filters" button handles that logic 
+    // to save database reads. We only handle the Outlet Name search here.
+    
     const outletSearch = document.getElementById('transOutletSearch').value.toLowerCase();
 
     const filtered = allFetchedTransactions.filter(item => {
-        // Type Filter
-        if(typeFilter !== 'all' && item._type !== typeFilter) return false;
-        
         // Outlet Name Search
         if(outletSearch) {
             const outletName = (item.outletName || "").toLowerCase();
             if(!outletName.includes(outletSearch)) return false;
         }
-
         return true;
     });
 
