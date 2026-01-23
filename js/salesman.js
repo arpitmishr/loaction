@@ -410,12 +410,13 @@ function handleDailyAttendance(user) {
     navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
             await addDoc(collection(db, "attendance"), {
-                salesmanId: user.uid,
-                salesmanEmail: user.email,
-                date: getTodayDateString(),
-                checkInTime: Timestamp.now(),
-                location: new GeoPoint(pos.coords.latitude, pos.coords.longitude)
-            });
+    salesmanId: user.uid,
+    salesmanEmail: user.email,
+    date: getTodayDateString(),
+    checkInTime: Timestamp.now(),
+    location: new GeoPoint(pos.coords.latitude, pos.coords.longitude),
+    status: 'full_day' // DEFAULT TYPE ON CHECK-IN
+});
             alert("Daily Attendance Marked!");
             checkTodayAttendance(user);
         } catch (e) { 
