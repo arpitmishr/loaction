@@ -162,6 +162,63 @@
                     </div>
                 </div>
 
+
+
+
+
+
+
+
+<!-- TARGET ASSIGNMENT SECTION (New) -->
+<div class="bg-surface p-5 rounded-2xl shadow-card border border-indigo-100 mb-6">
+    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        </span>
+        Assign Daily Target
+    </h3>
+    <form id="targetForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        
+        <!-- Select Salesman -->
+        <div class="md:col-span-1">
+            <label class="text-xs font-bold text-slate-400 uppercase">Salesman</label>
+            <select id="targetSalesmanId" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                <option value="">Select Staff...</option>
+                <!-- Populated by JS -->
+            </select>
+        </div>
+
+        <!-- Date -->
+        <div class="md:col-span-1">
+            <label class="text-xs font-bold text-slate-400 uppercase">Target Date</label>
+            <input type="date" id="targetDate" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Target Boxes -->
+        <div class="md:col-span-1">
+            <label class="text-xs font-bold text-slate-400 uppercase">Target (Boxes)</label>
+            <input type="number" id="targetBoxes" placeholder="e.g. 50" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Incentive -->
+        <div class="md:col-span-1">
+            <label class="text-xs font-bold text-slate-400 uppercase">Incentive / Box</label>
+            <input type="number" id="incentivePerBox" placeholder="₹ per extra box" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Submit -->
+        <div class="md:col-span-1">
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-all">
+                Set Target
+            </button>
+        </div>
+    </form>
+</div>
+
+
+
+                
+
                 <!-- STATS CARDS -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <!-- Attendance -->
