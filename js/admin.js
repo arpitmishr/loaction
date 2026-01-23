@@ -146,9 +146,7 @@ async function loadDashboardStats() {
 //        ATTENDANCE REGISTER (FINAL)
 // ==========================================
 
-// ------------------------------------------
 // 1. STATUS STYLE MAPPING
-// ------------------------------------------
 const statusStyles = {
     full_day:   { label: 'Full Day',   color: 'bg-emerald-100 text-emerald-700' },
     half_day:   { label: 'Half Day',   color: 'bg-orange-100 text-orange-700' },
@@ -157,11 +155,9 @@ const statusStyles = {
     absent:     { label: 'Not Logged', color: 'bg-slate-100 text-slate-500' }
 };
 
-
-// ------------------------------------------
 // 2. LOAD TODAY (INIT HELPER)
-// ------------------------------------------
-async function loadTodayAttendance() {
+// We export this to window so it can be called from our main init block
+window.loadTodayAttendance = async function() {
     const today = new Date();
     const todayStr =
         today.getFullYear() + "-" +
@@ -169,24 +165,28 @@ async function loadTodayAttendance() {
         String(today.getDate()).padStart(2, '0');
 
     const input = document.getElementById('attendanceDateFilter');
-    if (input) input.value = todayStr;
+    if (input) {
+        input.value = todayStr;
+        // Call the loader immediately after setting date
+        await window.loadAttendanceByDate();
+    }
+};
 
-    await loadAttendanceByDate();
-}
-
-
-// ------------------------------------------
 // 3. MAIN REGISTER LOADER
-// ------------------------------------------
 window.loadAttendanceByDate = async function () {
     const list = document.getElementById('attendance-list');
-    const date = document.getElementById('attendanceDateFilter').value;
-    if (!date) return;
+    const dateInput = document.getElementById('attendanceDateFilter');
+    
+    if (!dateInput || !dateInput.value) return;
+    const date = dateInput.value;
 
     list.innerHTML = `
         <tr>
             <td colspan="3" class="p-6 text-center text-slate-500">
-                Syncing attendance records...
+                <div class="flex items-center justify-center gap-2">
+                    <svg class="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Syncing attendance records...
+                </div>
             </td>
         </tr>
     `;
@@ -202,16 +202,16 @@ window.loadAttendanceByDate = async function () {
             ...d.data()
         }));
 
-        // B. FETCH ATTENDANCE FOR DATE
+        // B. FETCH ATTENDANCE RECORDS FOR THIS DATE
         const attendSnap = await getDocs(
             query(collection(db, "attendance"), where("date", "==", date))
         );
 
         const attendanceMap = {};
-        attendSnap.forEach(doc => {
-            attendanceMap[doc.data().salesmanId] = {
-                docId: doc.id,
-                ...doc.data()
+        attendSnap.forEach(docSnap => {
+            attendanceMap[docSnap.data().salesmanId] = {
+                docId: docSnap.id,
+                ...docSnap.data()
             };
         });
 
@@ -230,7 +230,7 @@ window.loadAttendanceByDate = async function () {
                 : '--:--';
 
             const tr = document.createElement('tr');
-            tr.className = "hover:bg-slate-50 transition";
+            tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
 
             tr.innerHTML = `
                 <td class="p-4">
@@ -238,39 +238,32 @@ window.loadAttendanceByDate = async function () {
                         ${staff.fullName || staff.email}
                     </div>
                     <div class="text-[10px] text-slate-400 font-mono">
-                        ${staff.id.slice(0, 8)}
+                        UID: ${staff.id.slice(0, 8)}...
                     </div>
                 </td>
 
                 <td class="p-4 text-xs text-slate-500">
-                    In: ${checkInTime}
+                    <span class="flex items-center gap-1">
+                        <span class="material-icons-round text-sm">schedule</span>
+                        ${checkInTime}
+                    </span>
                 </td>
 
                 <td class="p-4">
                     <select
-                        class="text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm ${statusStyles[status].color}"
-                        onchange="updateAttendanceStatus(
+                        class="text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-primary/20 ${statusStyles[status].color}"
+                        onchange="window.updateAttendanceStatus(
                             '${staff.id}',
                             '${date}',
                             this.value,
                             '${record ? record.docId : ''}'
                         )"
                     >
-                        <option value="absent" ${status === 'absent' ? 'selected' : ''}>
-                            Absent / No Log
-                        </option>
-                        <option value="full_day" ${status === 'full_day' ? 'selected' : ''}>
-                            Full Day
-                        </option>
-                        <option value="half_day" ${status === 'half_day' ? 'selected' : ''}>
-                            Half Day
-                        </option>
-                        <option value="sick_leave" ${status === 'sick_leave' ? 'selected' : ''}>
-                            Sick Leave
-                        </option>
-                        <option value="leave" ${status === 'leave' ? 'selected' : ''}>
-                            On Leave
-                        </option>
+                        <option value="absent" ${status === 'absent' ? 'selected' : ''}>Absent / No Log</option>
+                        <option value="full_day" ${status === 'full_day' ? 'selected' : ''}>Full Day</option>
+                        <option value="half_day" ${status === 'half_day' ? 'selected' : ''}>Half Day</option>
+                        <option value="sick_leave" ${status === 'sick_leave' ? 'selected' : ''}>Sick Leave</option>
+                        <option value="leave" ${status === 'leave' ? 'selected' : ''}>On Leave</option>
                     </select>
                 </td>
             `;
@@ -280,16 +273,43 @@ window.loadAttendanceByDate = async function () {
 
     } catch (error) {
         console.error("Attendance Load Error:", error);
-        list.innerHTML = `
-            <tr>
-                <td colspan="3" class="p-4 text-red-600 text-center">
-                    Failed to load attendance register
-                </td>
-            </tr>
-        `;
+        list.innerHTML = `<tr><td colspan="3" class="p-4 text-red-600 text-center font-bold">Failed to load register</td></tr>`;
     }
 };
 
+// 4. UPDATE / OVERRIDE FUNCTION (THE MISSING PIECE)
+window.updateAttendanceStatus = async function (staffId, date, newStatus, existingDocId) {
+    try {
+        if (existingDocId) {
+            // Case 1: Record exists, just update the status
+            const docRef = doc(db, "attendance", existingDocId);
+            await updateDoc(docRef, {
+                status: newStatus,
+                updatedBy: auth.currentUser.uid,
+                updatedAt: serverTimestamp()
+            });
+        } else if (newStatus !== 'absent') {
+            // Case 2: No record exists, and admin selected a status other than "Absent"
+            // Create a manual override record
+            await addDoc(collection(db, "attendance"), {
+                salesmanId: staffId,
+                date: date,
+                status: newStatus,
+                checkInTime: null, // No GPS check-in time
+                isManual: true,
+                updatedBy: auth.currentUser.uid,
+                createdAt: serverTimestamp()
+            });
+        }
+        
+        // Refresh the table to apply new colors and UI state
+        await window.loadAttendanceByDate();
+        
+    } catch (error) {
+        console.error("Attendance Update Error:", error);
+        alert("Failed to update status: " + error.message);
+    }
+};
 
 // ------------------------------------------
 // 4. UPDATE / MANUAL OVERRIDE
