@@ -10,7 +10,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
-    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, limit  
+    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, limit, startAfter   
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -1409,13 +1409,14 @@ window.runRetentionCleanup = runRetentionCleanup;
 
 
 // ==========================================
-//      TRANSACTION / ACTIVITY LOGIC
+//      TRANSACTION / ACTIVITY LOGIC (PAGINATED)
 // ==========================================
 
-let allFetchedTransactions = []; // Store data here for client-side filtering
-let salesmanMap = {}; // Cache names: { uid: "John Doe" }
+let allFetchedTransactions = []; 
+let salesmanMap = {}; 
+let paginationCursorTime = null; // Tracks the timestamp of the last loaded item
 
-// 1. Setup: Populate Salesman Dropdown & Default Dates
+// 1. Setup
 async function setupTransactionTab() {
     const select = document.getElementById('transSalesman');
     const startInput = document.getElementById('transStart');
@@ -1428,7 +1429,6 @@ async function setupTransactionTab() {
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
     const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     
-    // Format YYYY-MM-DD using local time hack
     const formatDate = (d) => {
         const offset = d.getTimezoneOffset() * 60000;
         return new Date(d.getTime() - offset).toISOString().split('T')[0];
@@ -1437,135 +1437,186 @@ async function setupTransactionTab() {
     if(startInput) startInput.value = formatDate(firstDay);
     if(endInput) endInput.value = formatDate(lastDay);
 
-    // Populate Salesman Dropdown & Build Map
+    // Populate Salesman Dropdown
     select.innerHTML = '<option value="all">All Staff</option>';
     try {
         const q = query(collection(db, "users"), where("role", "==", "salesman"));
         const snap = await getDocs(q);
-        
         snap.forEach(doc => {
-            const d = doc.data();
-            const name = d.fullName || d.email;
-            salesmanMap[doc.id] = name; // Cache for table display
-            
+            salesmanMap[doc.id] = doc.data().fullName || doc.data().email;
             const opt = document.createElement('option');
             opt.value = doc.id;
-            opt.textContent = name;
+            opt.textContent = salesmanMap[doc.id];
             select.appendChild(opt);
         });
     } catch (e) { console.error("Trans Setup Error:", e); }
 }
 
-// 2. Main Fetch Function (Hits Database)
-// 2. Main Fetch Function (Optimized for Cost)
-async function loadTransactions() {
+// 2. Main Fetch Function (Paginated & Optimized)
+async function loadTransactions(isLoadMore = false) {
     const tbody = document.getElementById('trans-table-body');
+    const loadMoreBtn = document.getElementById('btnTransLoadMore');
+    
     const startStr = document.getElementById('transStart').value;
     const endStr = document.getElementById('transEnd').value;
     const selectedSalesman = document.getElementById('transSalesman').value;
-    const selectedType = document.getElementById('transType').value; // Get the active filter
+    const selectedType = document.getElementById('transType').value;
 
     if(!startStr || !endStr) return alert("Select Date Range");
 
-    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Fetching data...</td></tr>';
+    // RESET if this is a fresh filter application
+    if (!isLoadMore) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Fetching data...</td></tr>';
+        allFetchedTransactions = [];
+        paginationCursorTime = null; // Reset cursor
+        loadMoreBtn.classList.add('hidden');
+    } else {
+        loadMoreBtn.innerText = "Loading...";
+        loadMoreBtn.disabled = true;
+    }
 
     try {
+        // Define Time Range
+        // If loading more, we fetch items OLDER (less than) the last loaded timestamp
+        // If fresh load, we fetch items OLDER (less than) the selected End Date
+        
+        let queryEndTs;
+        if (isLoadMore && paginationCursorTime) {
+            queryEndTs = paginationCursorTime; 
+        } else {
+            queryEndTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
+        }
+        
         const startTs = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
-        const endTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
 
+        // Helper Query Builder
         const promises = [];
+        const PAGE_SIZE = 10; // Load 10 at a time
 
-        // Helper to add query safely
         const addQuery = (colName, dateField, isTimestamp, typeLabel, sortField) => {
             let q = query(collection(db, colName));
 
-            // Date Filter
+            // 1. Filter by Salesman
+            if (selectedSalesman !== 'all') {
+                q = query(q, where("salesmanId", "==", selectedSalesman)); // OR createdBySalesman for outlets
+            }
+
+            // 2. Filter by Date Range (Using range to allow indexing)
             if (isTimestamp) {
-                q = query(q, where(dateField, ">=", startTs), where(dateField, "<=", endTs));
+                // Fetch items between StartDate and Cursor
+                q = query(q, where(dateField, "<=", queryEndTs), where(dateField, ">=", startTs));
             } else {
+                // String date logic is harder with cursors, so we fallback to range
+                // Ideally string dates should be converted to Timestamps in DB design
                 q = query(q, where(dateField, ">=", startStr), where(dateField, "<=", endStr));
             }
 
-            // Salesman Filter
-            if (selectedSalesman !== 'all') {
-                q = query(q, where("salesmanId", "==", selectedSalesman));
-            }
+            // 3. Sort Descending (Newest first)
+            q = query(q, orderBy(dateField, "desc"));
 
-            // SAFETY LIMIT: Read max 50 docs per collection to save costs
-            q = query(q, limit(50)); 
+            // 4. Limit (We fetch 10 from EACH collection, then sort & slice in JS)
+            q = query(q, limit(PAGE_SIZE));
 
-            // Add to execution list
             promises.push(
                 getDocs(q).then(snap => 
                     snap.docs.map(d => ({
                         ...d.data(), 
                         _type: typeLabel, 
+                        _id: d.id, // Prevent duplicates
                         _sortTime: isTimestamp ? d.data()[sortField] : Timestamp.fromDate(new Date(d.data()[dateField] + "T08:00:00")) 
                     }))
                 )
             );
         };
 
-        // --- CONDITIONAL FETCHING (Saves Reads) ---
-        
-        // 1. Attendance
+        // --- BUILD QUERIES ---
+
         if (selectedType === 'all' || selectedType === 'Attendance') {
             addQuery("attendance", "date", false, "Attendance", "checkInTime");
         }
-
-        // 2. Visits
         if (selectedType === 'all' || selectedType === 'Visit') {
             addQuery("visits", "checkInTime", true, "Visit", "checkInTime");
         }
-
-        // 3. Orders
         if (selectedType === 'all' || selectedType === 'Order') {
             addQuery("orders", "orderDate", true, "Order", "orderDate");
         }
-
-        // 4. Payments
         if (selectedType === 'all' || selectedType === 'Payment') {
             addQuery("payments", "date", true, "Payment", "date");
         }
-
-        // 5. Targets
         if (selectedType === 'all' || selectedType === 'Target') {
             addQuery("daily_targets", "date", false, "Target", "date");
         }
+        // NEW: OUTLETS (Created Shops)
+        if (selectedType === 'all' || selectedType === 'Outlet') {
+            // Note: In Add Shop, we used 'createdBySalesman' and 'createdAt'
+            let q = query(collection(db, "outlets"));
+            if (selectedSalesman !== 'all') q = query(q, where("createdBySalesman", "==", selectedSalesman));
+            q = query(q, where("createdAt", "<=", queryEndTs), where("createdAt", ">=", startTs));
+            q = query(q, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+            
+            promises.push(getDocs(q).then(snap => snap.docs.map(d => ({
+                ...d.data(), _type: 'Outlet', _id: d.id, _sortTime: d.data().createdAt
+            }))));
+        }
 
-        // EXECUTE ONLY SELECTED QUERIES
+        // --- PROCESS RESULTS ---
         const results = await Promise.all(promises);
+        let newItems = results.flat();
 
-        // Merge & Flatten
-        allFetchedTransactions = results.flat();
+        // 1. Filter out items we already have (Client side dedup)
+        const existingIds = new Set(allFetchedTransactions.map(i => i._id));
+        newItems = newItems.filter(i => !existingIds.has(i._id));
 
-        // Sort by Date Descending
-        allFetchedTransactions.sort((a, b) => {
+        // 2. Sort Unified List
+        newItems.sort((a, b) => {
             const timeA = a._sortTime ? a._sortTime.seconds : 0;
             const timeB = b._sortTime ? b._sortTime.seconds : 0;
             return timeB - timeA;
         });
 
-        renderTransactions(allFetchedTransactions);
+        // 3. Slice to Page Size (Because we fetched 10 from *each*, we might have 60 items)
+        const slicedItems = newItems.slice(0, PAGE_SIZE);
+
+        // 4. Update Global List
+        allFetchedTransactions = [...allFetchedTransactions, ...slicedItems];
+
+        // 5. Update Cursor for next load
+        if (slicedItems.length > 0) {
+            const lastItem = slicedItems[slicedItems.length - 1];
+            // We decrease cursor slightly to avoid fetching same doc
+            if (lastItem._sortTime) {
+                // Create a timestamp 1 millisecond older
+                paginationCursorTime = new Timestamp(lastItem._sortTime.seconds, lastItem._sortTime.nanoseconds - 1);
+            }
+            loadMoreBtn.classList.remove('hidden');
+        } else {
+            if(isLoadMore) alert("No more records found.");
+            loadMoreBtn.classList.add('hidden');
+        }
+
+        renderTransactions(); // Render everything
 
     } catch (e) {
         console.error("Trans Load Error:", e);
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
+        if(!isLoadMore) tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
+        if(e.message.includes("index")) alert("Missing Index. Check Console.");
+    } finally {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerText = "⬇ Load More Records";
     }
 }
 
-// 3. Render Function (Updates UI)
-function renderTransactions(data) {
+// 3. Render Function
+function renderTransactions() {
     const tbody = document.getElementById('trans-table-body');
     tbody.innerHTML = "";
 
-    if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">No activity found in this period.</td></tr>';
+    if (allFetchedTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">No activity found.</td></tr>';
         return;
     }
 
-    data.forEach(item => {
-        // Determine Formatting based on Type
+    allFetchedTransactions.forEach(item => {
         let typeBadge = "";
         let details = "";
         let value = "";
@@ -1573,7 +1624,10 @@ function renderTransactions(data) {
 
         const dateObj = item._sortTime ? item._sortTime.toDate() : new Date();
         const dateStr = dateObj.toLocaleDateString() + " " + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        const salesmanName = salesmanMap[item.salesmanId] || "Unknown";
+        
+        // Handle "createdBySalesman" for outlets vs "salesmanId" for others
+        const sId = item.salesmanId || item.createdBySalesman;
+        const salesmanName = salesmanMap[sId] || "Unknown";
 
         switch(item._type) {
             case 'Attendance':
@@ -1589,7 +1643,6 @@ function renderTransactions(data) {
             case 'Order':
                 typeBadge = `<span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Order</span>`;
                 details = `<strong>${item.outletName}</strong><br><span class="text-xs text-slate-400">${item.items ? item.items.length + ' Items' : ''}</span>`;
-                // Handle different order structures
                 const amt = item.financials ? item.financials.totalAmount : (item.totalAmount || 0);
                 value = `<span class="text-purple-700 font-bold">₹${amt.toFixed(2)}</span>`;
                 break;
@@ -1604,6 +1657,11 @@ function renderTransactions(data) {
                 details = `<span class="text-slate-500">Target Assigned</span>`;
                 value = `🎯 ${item.targetBoxes} Boxes`;
                 break;
+            case 'Outlet': /* NEW */
+                typeBadge = `<span class="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">New Shop</span>`;
+                details = `<strong>${item.shopName}</strong><br><span class="text-xs text-slate-400">${item.address || 'No Address'}</span>`;
+                value = `<span class="text-xs text-slate-500">Created</span>`;
+                break;
         }
 
         const row = `
@@ -1617,26 +1675,6 @@ function renderTransactions(data) {
         `;
         tbody.innerHTML += row;
     });
-}
-
-// 4. Client-Side Filter (Instant)
-// 4. Client-Side Filter (Outlet Search Only)
-function filterTransactionsClientSide() {
-    // We NO LONGER filter by Type here, because the "Apply Filters" button handles that logic 
-    // to save database reads. We only handle the Outlet Name search here.
-    
-    const outletSearch = document.getElementById('transOutletSearch').value.toLowerCase();
-
-    const filtered = allFetchedTransactions.filter(item => {
-        // Outlet Name Search
-        if(outletSearch) {
-            const outletName = (item.outletName || "").toLowerCase();
-            if(!outletName.includes(outletSearch)) return false;
-        }
-        return true;
-    });
-
-    renderTransactions(filtered);
 }
 
 // EXPOSE TO HTML
