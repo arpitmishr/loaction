@@ -10,7 +10,7 @@ import {
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
     doc, getDoc, collection, getDocs, query, where, Timestamp, 
-    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, getDocs, query, where, collection 
+    addDoc, updateDoc, serverTimestamp, runTransaction, orderBy, setDoc, writeBatch, query, where, collection 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
