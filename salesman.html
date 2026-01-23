@@ -102,27 +102,49 @@
 </div>
 
             <!-- 1. ROUTE VIEW (HOME) -->
+
+            
 <!-- Today's Target Card -->
-<div id="target-card" class="hidden bg-white rounded-2xl p-5 shadow-sm border border-blue-100 mb-4 bg-gradient-to-br from-blue-50 to-white">
-    <div class="flex justify-between items-center mb-2">
-        <h3 class="font-bold text-blue-800 text-sm flex items-center gap-1">
-            <span class="material-icons-round text-lg">stars</span>
-            Today's Target
+<div id="target-card" class="hidden bg-white rounded-2xl p-5 shadow-card border border-blue-100 mb-6 relative overflow-hidden">
+    <!-- Background Decor for 100% state -->
+    <div id="target-confetti" class="hidden absolute top-0 right-0 p-2 opacity-20 text-4xl">🎉</div>
+
+    <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <span class="p-1.5 bg-blue-50 text-blue-600 rounded-lg material-icons-round text-base">track_changes</span>
+            Daily Goal
         </h3>
-        <span id="target-incentive" class="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">₹0/box incentive</span>
+        <span id="target-incentive-rate" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></span>
     </div>
     
-    <div class="flex items-end justify-between mb-2">
+    <div class="flex items-end justify-between mb-3">
         <div>
-            <span id="current-progress" class="text-2xl font-black text-slate-800">0</span>
-            <span class="text-slate-400 font-bold">/ <span id="total-target">0</span> boxes</span>
+            <span id="current-progress" class="text-3xl font-black text-slate-800">0</span>
+            <span class="text-slate-400 font-bold text-lg">/ <span id="total-target">0</span></span>
+            <p class="text-[10px] text-slate-400 font-medium uppercase">Boxes Sold Today</p>
         </div>
-        <span id="percent-label" class="text-sm font-bold text-blue-600">0%</span>
+        <div class="text-right">
+            <span id="percent-label" class="text-lg font-black text-blue-600">0%</span>
+        </div>
     </div>
 
     <!-- Progress Bar -->
-    <div class="w-full bg-blue-100 h-2 rounded-full overflow-hidden">
-        <div id="target-progress-bar" class="bg-blue-600 h-full transition-all duration-500" style="width: 0%"></div>
+    <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-4 shadow-inner">
+        <div id="target-progress-bar" class="bg-blue-600 h-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+    </div>
+
+    <!-- Dynamic Message Area -->
+    <div id="target-message" class="text-xs font-bold p-3 rounded-xl text-center transition-all duration-300">
+        <!-- Message injected here -->
+    </div>
+
+    <!-- Incentive Earned Area (Appears after 100%) -->
+    <div id="incentive-stats" class="hidden mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+        <span class="text-xs font-bold text-slate-500 uppercase">Extra Box Bonus</span>
+        <div class="text-right">
+            <p id="extra-boxes-label" class="text-[10px] text-emerald-500 font-bold">+0 extra boxes</p>
+            <p id="total-earned-incentive" class="text-xl font-black text-emerald-600">₹0.00</p>
+        </div>
     </div>
 </div>
 
