@@ -1,13 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salesman App</title>
-
-
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -39,36 +36,6 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .bottom-nav-item.active { color: #2563eb; }
         .bottom-nav-item.active span { color: #2563eb; }
-
-
-/* Ensure the Map View container occupies the full space between Header and Nav */
-#full-map-view {
-    position: fixed !important;
-    top: 64px;    /* Header height */
-    bottom: 80px; /* Navigation height */
-    left: 0;
-    right: 0;
-    background: white;
-    display: none; /* Controlled by switchView */
-    flex-direction: column;
-    z-index: 20;
-}
-
-#full-map-view:not(.hidden) {
-    display: flex !important;
-}
-
-#all-shops-map {
-    flex-grow: 1;
-    width: 100%;
-    background: #f1f5f9;
-}
-
-/* Fix for Leaflet marker popups */
-.leaflet-popup-content-wrapper {
-    border-radius: 12px;
-    padding: 5px;
-}
     </style>
 </head>
 <body class="pb-20"> <!-- Padding bottom for nav bar -->
@@ -97,61 +64,7 @@
         <!-- CONTENT AREA -->
         <main class="p-4 space-y-4">
 
-            <div id="full-map-view" class="view-section hidden fixed inset-0 bg-white z-30 pt-[60px] pb-[80px]">
-    <div id="all-shops-map" class="w-full h-full"></div>
-</div>
-
             <!-- 1. ROUTE VIEW (HOME) -->
-
-            
-<!-- Today's Target Card -->
-<div id="target-card" class="hidden bg-white rounded-2xl p-5 shadow-card border border-blue-100 mb-6 relative overflow-hidden">
-    <!-- Background Decor for 100% state -->
-    <div id="target-confetti" class="hidden absolute top-0 right-0 p-2 opacity-20 text-4xl">🎉</div>
-
-    <div class="flex justify-between items-center mb-3">
-        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
-            <span class="p-1.5 bg-blue-50 text-blue-600 rounded-lg material-icons-round text-base">track_changes</span>
-            Daily Goal
-        </h3>
-        <span id="target-incentive-rate" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest"></span>
-    </div>
-    
-    <div class="flex items-end justify-between mb-3">
-        <div>
-            <span id="current-progress" class="text-3xl font-black text-slate-800">0</span>
-            <span class="text-slate-400 font-bold text-lg">/ <span id="total-target">0</span></span>
-            <p class="text-[10px] text-slate-400 font-medium uppercase">Boxes Sold Today</p>
-        </div>
-        <div class="text-right">
-            <span id="percent-label" class="text-lg font-black text-blue-600">0%</span>
-        </div>
-    </div>
-
-    <!-- Progress Bar -->
-    <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-4 shadow-inner">
-        <div id="target-progress-bar" class="bg-blue-600 h-full transition-all duration-1000 ease-out" style="width: 0%"></div>
-    </div>
-
-    <!-- Dynamic Message Area -->
-    <div id="target-message" class="text-xs font-bold p-3 rounded-xl text-center transition-all duration-300">
-        <!-- Message injected here -->
-    </div>
-
-    <!-- Incentive Earned Area (Appears after 100%) -->
-    <div id="incentive-stats" class="hidden mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
-        <span class="text-xs font-bold text-slate-500 uppercase">Extra Box Bonus</span>
-        <div class="text-right">
-            <p id="extra-boxes-label" class="text-[10px] text-emerald-500 font-bold">+0 extra boxes</p>
-            <p id="total-earned-incentive" class="text-xl font-black text-emerald-600">₹0.00</p>
-        </div>
-    </div>
-</div>
-
-
-    
-  
-            
             <div id="route-view" class="view-section block">
                 
                 <!-- Attendance Card -->
@@ -331,35 +244,20 @@
                 </div>
             </div>
 
-
-
-
         </main>
-<!-- Inside #content, after </main> -->
-<div id="full-map-view" class="view-section hidden">
-    <div id="all-shops-map"></div>
-</div>
 
-
-        
         <!-- BOTTOM NAVIGATION BAR -->
         <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 z-40 max-w-md mx-auto">
-    <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
-        <span class="material-icons-round text-2xl">map</span>
-        <span class="text-[10px] font-bold">List</span>
-    </button>
-    
-    <!-- NEW MAP BUTTON -->
-    <button onclick="switchView('full-map')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-full-map">
-        <span class="material-icons-round text-2xl">explore</span>
-        <span class="text-[10px] font-bold">Map</span>
-    </button>
+            <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
+                <span class="material-icons-round text-2xl">map</span>
+                <span class="text-[10px] font-bold">Route</span>
+            </button>
+            <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
+                <span class="material-icons-round text-2xl">inventory_2</span>
+                <span class="text-[10px] font-bold">Catalog</span>
+            </button>
+        </nav>
 
-    <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
-        <span class="material-icons-round text-2xl">inventory_2</span>
-        <span class="text-[10px] font-bold">Catalog</span>
-    </button>
-</nav>
         <!-- MODALS -->
         
         <!-- Leave Modal -->
@@ -423,41 +321,26 @@
     <!-- HELPER SCRIPT FOR UI -->
     <script>
         // Tab Switcher
-window.switchView = function(viewName) {
-    console.log("Switching to:", viewName);
-    
-    // 1. Hide all sections
-    document.querySelectorAll('.view-section').forEach(el => {
-        el.classList.add('hidden');
-    });
-
-    // 2. Show the targeted section
-    const target = document.getElementById(viewName + '-view');
-    if (target) {
-        target.classList.remove('hidden');
-    }
-
-    // 3. Initialize Map if Map Tab selected
-    if (viewName === 'full-map') {
-        // Small delay to ensure Tailwind 'hidden' class is fully removed before Leaflet calculates size
-        setTimeout(() => {
-            if (window.initFullRouteMap) {
-                window.initFullRouteMap();
+        window.switchView = function(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected
+            if(viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
+            if(viewName === 'catalog') {
+                document.getElementById('catalog-view').classList.remove('hidden');
+                if(window.loadProductCatalog) window.loadProductCatalog();
             }
-        }, 300);
-    }
 
-    // 4. Update Bottom Navigation UI
-    document.querySelectorAll('.bottom-nav-item').forEach(el => {
-        el.classList.remove('active', 'text-blue-600');
-        el.classList.add('text-gray-400');
-    });
-    const btn = document.getElementById('nav-' + viewName);
-    if(btn) {
-        btn.classList.add('active', 'text-blue-600');
-        btn.classList.remove('text-gray-400');
-    }
-};
+            // Update Bottom Nav
+            document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
+            const activeBtn = document.getElementById('nav-' + viewName);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'text-blue-600');
+                activeBtn.classList.remove('text-gray-400');
+            }
+        };
+
         // Payment Method Toggle Helper
         window.setPayMethod = function(method) {
             document.getElementById('payMethod').value = method;
@@ -470,26 +353,5 @@ window.switchView = function(viewName) {
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/salesman.js"></script>
-
-
-
-
-    <!-- Place this right above the </body> tag -->
-    <div id="full-map-view" class="view-section hidden fixed inset-0 bg-white z-[60]">
-        <!-- Header for Map Tab -->
-        <div class="h-16 bg-white border-b flex items-center px-4 shadow-sm">
-            <h1 class="text-xl font-bold text-slate-800">Route Map</h1>
-        </div>
-        
-        <!-- The Actual Map Container -->
-        <div id="all-shops-map" style="height: calc(100vh - 136px); width: 100vw;"></div>
-    </div>
-
-    <!-- MAIN LOGIC FILE -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="js/salesman.js"></script>
-
-
-    
 </body>
 </html>
