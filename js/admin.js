@@ -53,6 +53,7 @@ onAuthStateChanged(auth, async (user) => {
         loadOutlets(); 
         loadSalesmenList(); // This function is now defined below
         // ... inside the successful admin check ...
+        populateTargetSalesmanDropdown(); 
 loadRoutes();
 populateSalesmanDropdown();
 populateAllOutletsDropdown();
