@@ -561,6 +561,70 @@
                 </div>
             </div>
 
+
+
+
+
+<!-- =======================
+     TAB 6: ATTENDANCE SHEET
+======================== -->
+<div id="tab-attendance-sheet" class="tab-content hidden">
+    
+    <!-- Controls Header -->
+    <div class="bg-surface p-5 rounded-2xl shadow-card border border-slate-100 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">Attendance Sheet</h2>
+            <p class="text-sm text-slate-500">Monthly overview & retention management.</p>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <!-- Month Picker -->
+            <input type="month" id="sheetMonthPicker" class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary">
+            
+            <!-- Load Button -->
+            <button onclick="loadAttendanceSheet()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-primaryDark transition">
+                Load Sheet
+            </button>
+        </div>
+
+        <!-- Retention Action -->
+        <button onclick="runRetentionCleanup()" class="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Clean Old Data (>3 Months)
+        </button>
+    </div>
+
+    <!-- The Matrix Table -->
+    <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                    <tr id="sheet-header-row">
+                        <!-- JS will populate: Name | 1 | 2 | ... | 31 -->
+                        <th class="p-4 border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-10 min-w-[150px]">Salesman</th>
+                        <th class="p-4 border-b text-center w-full">Select Month to View Data</th>
+                    </tr>
+                </thead>
+                <tbody id="sheet-body" class="divide-y divide-slate-100 text-slate-600">
+                    <!-- JS will populate rows -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Legend -->
+    <div class="mt-4 flex gap-4 text-xs font-medium text-slate-500 justify-end">
+        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500"></span> Present</div>
+        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Half Day</div>
+        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-500"></span> Leave</div>
+        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-slate-200"></span> Absent</div>
+    </div>
+</div>
+
+
+
+
+            
         </main>
 
         <!-- BOTTOM NAVIGATION (Fixed Bottom) -->
@@ -608,6 +672,19 @@
                         </div>
                         <span class="text-[10px] font-medium text-slate-400 transition-colors">Stock</span>
                     </button>
+
+
+<!-- Attendance Sheet Tab -->
+<button onclick="switchTab('tab-attendance-sheet')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
+    <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+    </div>
+    <span class="text-[10px] font-medium text-slate-400 transition-colors">Sheet</span>
+</button>
+
+                    
 
                     <!-- Staff Tab -->
                     <button onclick="switchTab('tab-staff')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
