@@ -1,7 +1,7 @@
 // 1. IMPORTS
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
-    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment 
+    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment, serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -1092,3 +1092,103 @@ async function loadDailyTarget() {
         }
     }
 }
+
+
+
+
+
+
+// ==========================================
+//      ADD NEW SHOP LOGIC
+// ==========================================
+
+function openAddShopModal() {
+    document.getElementById('addShopModal').classList.remove('hidden');
+    document.getElementById('newShopForm').reset();
+    document.getElementById('newShopGeoMsg').innerText = "Coordinates required";
+    document.getElementById('newShopGeoMsg').className = "text-[10px] text-indigo-400";
+}
+
+function captureNewShopLocation() {
+    const msg = document.getElementById('newShopGeoMsg');
+    
+    if(!navigator.geolocation) return alert("GPS not supported");
+
+    msg.innerText = "Locating...";
+    
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            
+            document.getElementById('newShopLat').value = lat;
+            document.getElementById('newShopLng').value = lng;
+            
+            msg.innerText = `✅ ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            msg.className = "text-[10px] text-green-600 font-bold";
+        },
+        (err) => {
+            console.error(err);
+            msg.innerText = "GPS Failed. Try again.";
+            msg.className = "text-[10px] text-red-500 font-bold";
+        },
+        { enableHighAccuracy: true }
+    );
+}
+
+async function submitNewShop() {
+    const name = document.getElementById('newShopName').value;
+    const owner = document.getElementById('newOwnerName').value;
+    const phone = document.getElementById('newShopPhone').value;
+    const type = document.getElementById('newShopType').value;
+    const lat = document.getElementById('newShopLat').value;
+    const lng = document.getElementById('newShopLng').value;
+    
+    const btn = document.getElementById('btnSaveShop');
+
+    if(!lat || !lng) {
+        alert("⚠️ GPS Location is required. Please click 'Capture GPS'.");
+        return;
+    }
+
+    try {
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        // 1. Add to 'outlets' collection
+        // We set currentBalance to 0 and credit details to default (Cash)
+        const docRef = await addDoc(collection(db, "outlets"), {
+            shopName: name,
+            ownerName: owner,
+            contactPerson: owner, // Default to owner
+            contactPhone: phone,
+            outletType: type,
+            storeType: 'Cash', // Default
+            currentBalance: 0,
+            geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
+            createdBySalesman: auth.currentUser.uid,
+            createdAt: serverTimestamp(),
+            status: 'active'
+        });
+
+        // 2. Optional: Add to 'route_outlets' so it appears immediately?
+        // Ideally, Admin assigns routes. 
+        // BUT, to let the salesman visit it NOW, let's create a temporary link or just Alert.
+        
+        alert("✅ Shop Added Successfully!\n\nThe shop is now in the database. Contact Admin to assign it to your permanent route.");
+        
+        document.getElementById('addShopModal').classList.add('hidden');
+
+    } catch (e) {
+        console.error("Add Shop Error:", e);
+        alert("Error saving shop: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Save Shop";
+    }
+}
+
+// EXPOSE FUNCTIONS
+window.openAddShopModal = openAddShopModal;
+window.captureNewShopLocation = captureNewShopLocation;
+window.submitNewShop = submitNewShop;
