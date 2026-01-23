@@ -450,59 +450,102 @@
 
 
 
-<!-- Add Shop Modal -->
+<!-- Add Shop Modal (Updated) -->
 <div id="addShopModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold text-slate-800">Add New Outlet</h3>
+    <div class="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-slate-800 border-b border-slate-100 pb-2">Add New Outlet</h3>
         
         <form id="newShopForm" class="space-y-3" onsubmit="event.preventDefault(); submitNewShop();">
             
-            <!-- Shop Name -->
-            <div>
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Name</label>
-                <input type="text" id="newShopName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500">
-            </div>
-
-            <!-- Owner & Phone -->
+            <!-- 1. Basic Info -->
             <div class="grid grid-cols-2 gap-3">
+                <div class="col-span-2">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Name</label>
+                    <input type="text" id="newShopName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:border-indigo-500">
+                </div>
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase">Owner Name</label>
-                    <input type="text" id="newOwnerName" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                    <input type="text" id="newOwnerName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
                 </div>
                 <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Phone</label>
-                    <input type="tel" id="newShopPhone" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Owner Phone</label>
+                    <input type="tel" id="newShopPhone" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
                 </div>
             </div>
 
-            <!-- Type -->
+            <!-- 2. Authorized Person (New) -->
+            <div class="grid grid-cols-2 gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Auth. Person</label>
+                    <input type="text" id="newAuthName" placeholder="Manager Name" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Auth. Number</label>
+                    <input type="tel" id="newAuthPhone" placeholder="Mobile" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
+                </div>
+            </div>
+
+            <!-- 3. Address & GST (New) -->
             <div>
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-                <select id="newShopType" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
-                    <option value="Shop">Grocery / Kirana</option>
-                    <option value="Restaurant">Restaurant / Hotel</option>
-                    <option value="Cafe">Cafe / Bakery</option>
-                    <option value="Other">Other</option>
-                </select>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">Full Address</label>
+                <textarea id="newShopAddress" rows="2" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500"></textarea>
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">GST Number (Optional)</label>
+                <input type="text" id="newShopGST" placeholder="e.g. 27ABCDE1234F1Z5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500 uppercase">
             </div>
 
-            <!-- GPS Capture -->
-            <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center justify-between">
+            <!-- 4. Payment Terms (Dynamic) -->
+            <div class="border-t border-slate-100 pt-2">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Category</label>
+                        <select id="newShopType" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            <option value="Shop">Grocery / Kirana</option>
+                            <option value="Restaurant">Restaurant / Hotel</option>
+                            <option value="Cafe">Cafe / Bakery</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Payment Type</label>
+                        <select id="newStoreType" onchange="toggleCreditFields()" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            <option value="Cash">Cash Only</option>
+                            <option value="Credit">Credit Allowed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Hidden Credit Fields -->
+                <div id="creditFields" class="hidden grid grid-cols-2 gap-3 mt-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                    <div>
+                        <label class="text-[10px] font-bold text-red-400 uppercase">Credit Days</label>
+                        <input type="number" id="newCreditDays" placeholder="e.g. 30" class="w-full p-2 bg-white border border-red-200 rounded-lg text-xs">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-red-400 uppercase">Credit Limit (₹)</label>
+                        <input type="number" id="newCreditLimit" placeholder="Max Amount" class="w-full p-2 bg-white border border-red-200 rounded-lg text-xs">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. GPS Capture -->
+            <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center justify-between mt-2">
                 <div>
-                    <p class="text-xs font-bold text-indigo-700">Location</p>
-                    <p id="newShopGeoMsg" class="text-[10px] text-indigo-400">Coordinates required</p>
+                    <p class="text-xs font-bold text-indigo-700">GPS Location <span class="text-red-500">*</span></p>
+                    <p id="newShopGeoMsg" class="text-[10px] text-indigo-400">Required to save</p>
                     <input type="hidden" id="newShopLat">
                     <input type="hidden" id="newShopLng">
                 </div>
                 <button type="button" onclick="captureNewShopLocation()" class="bg-white text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold shadow-sm border border-indigo-100">
-                    Capture GPS
+                    Capture
                 </button>
             </div>
 
             <!-- Buttons -->
-            <div class="grid grid-cols-2 gap-3 pt-2">
-                <button type="button" onclick="document.getElementById('addShopModal').classList.add('hidden')" class="py-3 text-slate-500 font-bold bg-slate-100 rounded-xl">Cancel</button>
-                <button type="submit" id="btnSaveShop" class="py-3 text-white font-bold bg-indigo-600 rounded-xl shadow-indigo-200">Save Shop</button>
+            <div class="grid grid-cols-2 gap-3 pt-3">
+                <button type="button" onclick="document.getElementById('addShopModal').classList.add('hidden')" class="py-3 text-slate-500 font-bold bg-slate-100 rounded-xl text-xs">Cancel</button>
+                <button type="submit" id="btnSaveShop" class="py-3 text-white font-bold bg-indigo-600 rounded-xl shadow-indigo-200 text-xs">Save Shop</button>
             </div>
         </form>
     </div>
