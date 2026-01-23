@@ -1016,74 +1016,93 @@ window.initFullRouteMap = async function() {
 
 
 async function loadDailyTarget(uid) {
-    console.log("Loading Daily Target for:", uid);
     const today = getTodayDateString();
     const card = document.getElementById('target-card');
+    const msgBox = document.getElementById('target-message');
+    const incentiveSection = document.getElementById('incentive-stats');
+    const confetti = document.getElementById('target-confetti');
     
     if (!card) return;
 
     try {
-        // 1. Fetch the Target for Today
-        const targetQ = query(
-            collection(db, "daily_targets"), 
+        // 1. Fetch Target Data
+        const targetQ = query(collection(db, "daily_targets"), 
             where("salesmanId", "==", uid), 
             where("date", "==", today)
         );
         const targetSnap = await getDocs(targetQ);
 
         if (targetSnap.empty) {
-            console.log("No target found for today:", today);
             card.classList.add('hidden');
             return;
         }
 
-        // Show the card if data exists
-        const targetData = targetSnap.docs[0].data();
-        card.classList.remove('hidden');
-        
-        const targetBoxes = targetData.targetBoxes || 0;
-        document.getElementById('total-target').innerText = targetBoxes;
-        document.getElementById('target-incentive').innerText = `₹${targetData.incentivePerBox}/box incentive`;
+        const t = targetSnap.docs[0].data();
+        const targetBoxes = Number(t.targetBoxes);
+        const rate = Number(t.incentivePerBox);
 
-        // 2. Calculate Achievement (Sum of boxes sold today)
-        // We look at orders placed by this salesman today
-        const ordersQ = query(
-            collection(db, "orders"), 
-            where("salesmanId", "==", uid)
-        );
+        card.classList.remove('hidden');
+        document.getElementById('total-target').innerText = targetBoxes;
+        document.getElementById('target-incentive-rate').innerText = `₹${rate}/box bonus`;
+
+        // 2. Calculate Achieved (Today's boxes)
+        const ordersQ = query(collection(db, "orders"), where("salesmanId", "==", uid));
         const ordersSnap = await getDocs(ordersQ);
         
         let totalSold = 0;
         ordersSnap.forEach(docSnap => {
             const order = docSnap.data();
-            // Convert Firestore Timestamp to YYYY-MM-DD
-            if (order.orderDate) {
-                const orderDate = order.orderDate.toDate().toISOString().split('T')[0];
-                if (orderDate === today) {
-                    // Sum the 'qty' of all items in this order
-                    order.items.forEach(item => {
-                        totalSold += (Number(item.qty) || 0);
-                    });
-                }
+            if (order.orderDate && order.orderDate.toDate().toISOString().split('T')[0] === today) {
+                order.items.forEach(item => totalSold += (Number(item.qty) || 0));
             }
         });
 
-        console.log("Total Sold Today:", totalSold);
-
-        // 3. Update the UI Progress
-        const progressEl = document.getElementById('current-progress');
-        const percentEl = document.getElementById('percent-label');
-        const barEl = document.getElementById('target-progress-bar');
-
-        progressEl.innerText = totalSold;
+        // 3. UI Updates & Logic
+        const progress = Math.min(Math.round((totalSold / targetBoxes) * 100), 100);
+        document.getElementById('current-progress').innerText = totalSold;
+        document.getElementById('percent-label').innerText = progress + "%";
         
-        // Calculate percentage (max 100)
-        const percent = targetBoxes > 0 ? Math.min(Math.round((totalSold / targetBoxes) * 100), 100) : 0;
-        
-        percentEl.innerText = percent + "%";
-        barEl.style.width = percent + "%";
+        const progressBar = document.getElementById('target-progress-bar');
+        progressBar.style.width = progress + "%";
+
+        // Reset Styles
+        msgBox.className = "text-xs font-bold p-3 rounded-xl text-center";
+        incentiveSection.classList.add('hidden');
+        confetti.classList.add('hidden');
+        progressBar.classList.remove('bg-emerald-500', 'bg-amber-500');
+        progressBar.classList.add('bg-blue-600');
+
+        // Logic Rules
+        if (totalSold >= targetBoxes) {
+            // STATE: 100% or more
+            const extraBoxes = totalSold - targetBoxes;
+            const earned = extraBoxes * rate;
+
+            progressBar.classList.replace('bg-blue-600', 'bg-emerald-500');
+            msgBox.classList.add('bg-emerald-50', 'text-emerald-700');
+            msgBox.innerHTML = `🎉 Target achieved! Incentive unlocked at ₹${rate} per box.`;
+            confetti.classList.remove('hidden');
+
+            // Show Incentive Stats
+            if (extraBoxes > 0) {
+                incentiveSection.classList.remove('hidden');
+                document.getElementById('extra-boxes-label').innerText = `+${extraBoxes} extra boxes`;
+                document.getElementById('total-earned-incentive').innerText = `₹${earned.toFixed(2)}`;
+            }
+
+        } else if (progress >= 80) {
+            // STATE: 80% to 99%
+            progressBar.classList.replace('bg-blue-600', 'bg-amber-500');
+            msgBox.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-100');
+            msgBox.innerHTML = `✨ Almost there! Complete the target to unlock incentive.`;
+        } else {
+            // STATE: Below 80%
+            msgBox.classList.add('bg-slate-50', 'text-slate-500');
+            const remaining = targetBoxes - totalSold;
+            msgBox.innerHTML = `Sell ${remaining} more boxes to reach your goal.`;
+        }
 
     } catch (error) {
-        console.error("Target Progress Calculation Error:", error);
+        console.error("Target logic error:", error);
     }
 }
