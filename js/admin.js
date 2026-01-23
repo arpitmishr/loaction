@@ -143,134 +143,195 @@ async function loadDashboardStats() {
 }
 
 // ==========================================
-//      ATTENDANCE & LEAVE LOGIC
+//        ATTENDANCE REGISTER (FINAL)
 // ==========================================
 
-// 1. Load Today's Data (Called by Init)
-async function loadTodayAttendance() {
-    // Set the Date Picker Input to Today's Date
-    const today = new Date();
-    const todayStr = today.getFullYear() + "-" + 
-                     String(today.getMonth() + 1).padStart(2, '0') + "-" + 
-                     String(today.getDate()).padStart(2, '0');
-    
-    const dateInput = document.getElementById('attendanceDateFilter');
-    if (dateInput) {
-        dateInput.value = todayStr;
-    }
+// ------------------------------------------
+// 1. STATUS STYLE MAPPING
+// ------------------------------------------
+const statusStyles = {
+    full_day:   { label: 'Full Day',   color: 'bg-emerald-100 text-emerald-700' },
+    half_day:   { label: 'Half Day',   color: 'bg-orange-100 text-orange-700' },
+    sick_leave: { label: 'Sick Leave', color: 'bg-purple-100 text-purple-700' },
+    leave:      { label: 'Leave',      color: 'bg-red-100 text-red-700' },
+    absent:     { label: 'Not Logged', color: 'bg-slate-100 text-slate-500' }
+};
 
-    // Call the main filter function
-    if (window.loadAttendanceByDate) {
-        await window.loadAttendanceByDate();
-    }
+
+// ------------------------------------------
+// 2. LOAD TODAY (INIT HELPER)
+// ------------------------------------------
+async function loadTodayAttendance() {
+    const today = new Date();
+    const todayStr =
+        today.getFullYear() + "-" +
+        String(today.getMonth() + 1).padStart(2, '0') + "-" +
+        String(today.getDate()).padStart(2, '0');
+
+    const input = document.getElementById('attendanceDateFilter');
+    if (input) input.value = todayStr;
+
+    await loadAttendanceByDate();
 }
 
-// 2. Filter by Date (Called by Button & LoadToday)
-window.loadAttendanceByDate = async function() {
+
+// ------------------------------------------
+// 3. MAIN REGISTER LOADER
+// ------------------------------------------
+window.loadAttendanceByDate = async function () {
     const list = document.getElementById('attendance-list');
-    const dateInput = document.getElementById('attendanceDateFilter').value;
-    
-    if(!dateInput) return;
-    
-    list.innerHTML = "<tr><td colspan='3'>Loading data...</td></tr>";
+    const date = document.getElementById('attendanceDateFilter').value;
+    if (!date) return;
+
+    list.innerHTML = `
+        <tr>
+            <td colspan="3" class="p-6 text-center text-slate-500">
+                Syncing attendance records...
+            </td>
+        </tr>
+    `;
 
     try {
-        // A. Fetch CHECK-INS
-        const attendQuery = query(collection(db, "attendance"), where("date", "==", dateInput));
-        const attendSnap = await getDocs(attendQuery);
+        // A. FETCH ALL SALESMEN
+        const usersSnap = await getDocs(
+            query(collection(db, "users"), where("role", "==", "salesman"))
+        );
 
-        // B. Fetch APPROVED LEAVES
-        const leaveQuery = query(collection(db, "leaves"), where("date", "==", dateInput), where("status", "==", "approved"));
-        const leaveSnap = await getDocs(leaveQuery);
+        const salesmen = usersSnap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+        }));
 
-        list.innerHTML = "";
-        
-        if (attendSnap.empty && leaveSnap.empty) {
-            list.innerHTML = "<tr><td colspan='3' style='text-align:center'>No records found for this date.</td></tr>";
-            return;
-        }
+        // B. FETCH ATTENDANCE FOR DATE
+        const attendSnap = await getDocs(
+            query(collection(db, "attendance"), where("date", "==", date))
+        );
 
-        // Render Check-ins
+        const attendanceMap = {};
         attendSnap.forEach(doc => {
-            const data = doc.data();
-            const time = data.checkInTime ? data.checkInTime.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A';
-            const mapLink = data.location 
-                ? `<a href="https://www.google.com/maps/search/?api=1&query=${data.location.latitude},${data.location.longitude}" target="_blank">View Map 📍</a>` 
-                : "No Loc";
-
-            list.innerHTML += `
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:10px;">${data.salesmanEmail}</td>
-                    <td><span style="color:green; font-weight:bold;">Present</span></td>
-                    <td>Checked In: ${time} | ${mapLink}</td>
-                </tr>
-            `;
+            attendanceMap[doc.data().salesmanId] = {
+                docId: doc.id,
+                ...doc.data()
+            };
         });
 
-        // Render Leaves
-        leaveSnap.forEach(doc => {
-            const data = doc.data();
-            const color = data.type === 'Half Day' ? '#fd7e14' : '#dc3545';
-            
-            list.innerHTML += `
-                <tr style="border-bottom:1px solid #eee;">
-                    <td style="padding:10px;">${data.salesmanEmail}</td>
-                    <td><span style="color:${color}; font-weight:bold;">${data.type}</span></td>
-                    <td>Remark: ${data.reason}</td>
-                </tr>
+        list.innerHTML = "";
+
+        // C. RENDER REGISTER
+        salesmen.forEach(staff => {
+            const record = attendanceMap[staff.id];
+            const status = record?.status || 'absent';
+
+            const checkInTime = record?.checkInTime
+                ? record.checkInTime.toDate().toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                  })
+                : '--:--';
+
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50 transition";
+
+            tr.innerHTML = `
+                <td class="p-4">
+                    <div class="font-semibold text-slate-700">
+                        ${staff.fullName || staff.email}
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono">
+                        ${staff.id.slice(0, 8)}
+                    </div>
+                </td>
+
+                <td class="p-4 text-xs text-slate-500">
+                    In: ${checkInTime}
+                </td>
+
+                <td class="p-4">
+                    <select
+                        class="text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm ${statusStyles[status].color}"
+                        onchange="updateAttendanceStatus(
+                            '${staff.id}',
+                            '${date}',
+                            this.value,
+                            '${record ? record.docId : ''}'
+                        )"
+                    >
+                        <option value="absent" ${status === 'absent' ? 'selected' : ''}>
+                            Absent / No Log
+                        </option>
+                        <option value="full_day" ${status === 'full_day' ? 'selected' : ''}>
+                            Full Day
+                        </option>
+                        <option value="half_day" ${status === 'half_day' ? 'selected' : ''}>
+                            Half Day
+                        </option>
+                        <option value="sick_leave" ${status === 'sick_leave' ? 'selected' : ''}>
+                            Sick Leave
+                        </option>
+                        <option value="leave" ${status === 'leave' ? 'selected' : ''}>
+                            On Leave
+                        </option>
+                    </select>
+                </td>
             `;
+
+            list.appendChild(tr);
         });
 
     } catch (error) {
-        console.error("Attendance Filter Error:", error);
+        console.error("Attendance Load Error:", error);
+        list.innerHTML = `
+            <tr>
+                <td colspan="3" class="p-4 text-red-600 text-center">
+                    Failed to load attendance register
+                </td>
+            </tr>
+        `;
     }
 };
 
-// 3. Load Pending Leaves (For Approval Box)
-async function loadPendingLeaves() {
-    const container = document.getElementById('leave-approval-section');
-    const list = document.getElementById('leave-approval-list');
-    if(!container) return;
 
+// ------------------------------------------
+// 4. UPDATE / MANUAL OVERRIDE
+// ------------------------------------------
+window.updateAttendanceStatus = async function (
+    staffId,
+    date,
+    newStatus,
+    existingDocId
+) {
     try {
-        const q = query(collection(db, "leaves"), where("status", "==", "pending"), orderBy("date", "asc"));
-        const snap = await getDocs(q);
+        if (existingDocId) {
+            // Update existing attendance record
+            await updateDoc(doc(db, "attendance", existingDocId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser.uid
+            });
 
-        if (snap.empty) {
-            container.style.display = 'none';
-            return;
+        } else if (newStatus !== 'absent') {
+            // Create manual attendance record
+            await addDoc(collection(db, "attendance"), {
+                salesmanId: staffId,
+                date: date,
+                status: newStatus,
+                checkInTime: null,
+                isManual: true,
+                createdAt: serverTimestamp(),
+                updatedBy: auth.currentUser.uid
+            });
         }
 
-        container.style.display = 'block';
-        list.innerHTML = "";
+        // Refresh UI
+        loadAttendanceByDate();
 
-        snap.forEach(docSnap => {
-            const data = docSnap.data();
-            const row = `
-                <tr>
-                    <td>${data.salesmanEmail}</td>
-                    <td><strong>${data.date}</strong><br>${data.type}</td>
-                    <td>${data.reason}</td>
-                    <td>
-                        <button onclick="processLeave('${docSnap.id}', 'approved')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px; cursor:pointer;">✔</button>
-                        <button onclick="processLeave('${docSnap.id}', 'rejected')" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✖</button>
-                    </td>
-                </tr>
-            `;
-            list.innerHTML += row;
-        });
-    } catch (e) { console.error("Leave Load Error:", e); }
-}
-
-window.processLeave = async function(leaveId, status) {
-    if(!confirm(`Mark request as ${status}?`)) return;
-    try {
-        await updateDoc(doc(db, "leaves", leaveId), { status: status });
-        alert("Updated!");
-        loadPendingLeaves(); // Refresh list
-        loadAttendanceByDate(); // Refresh attendance table
-    } catch (e) { alert("Error: " + e.message); }
+    } catch (error) {
+        alert("Attendance update failed: " + error.message);
+    }
 };
+
+
+
 // --- 4. SALESMAN LIST (WAS MISSING) ---
 
 async function loadSalesmenList() {
