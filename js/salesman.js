@@ -19,7 +19,6 @@ let visitStartTime = null;
 let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
-let fullMapInstance = null;
 
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
@@ -50,7 +49,6 @@ onAuthStateChanged(auth, async (user) => {
         // C. Load Initial Data
         checkTodayAttendance(user);
         loadAssignedRoute(user.uid);
-        loadDailyTarget(user.uid); 
 
         // D. Attach Global Listener for Daily Attendance
         const checkInBtn = document.getElementById('checkInBtn');
@@ -108,7 +106,7 @@ async function loadShops(routeId) {
         list.innerHTML = "";
         
         if(snap.empty) { 
-            list.innerHTML = "<li style='padding:15px; text-align:center;'>No shops in this route.</li>"; 
+            list.innerHTML = "<li style='padding:15px;'>No shops in this route.</li>"; 
             return; 
         }
 
@@ -120,58 +118,48 @@ async function loadShops(routeId) {
             const outletDocRef = doc(db, "outlets", routeOutletData.outletId);
             const outletDoc = await getDoc(outletDocRef);
             
-            if(!outletDoc.exists()) continue; 
+            if(!outletDoc.exists()) continue; // Skip if outlet was deleted
             
             const outletData = outletDoc.data();
             const shopLat = outletData.geo ? outletData.geo.lat : 0;
             const shopLng = outletData.geo ? outletData.geo.lng : 0;
 
             const li = document.createElement('li');
-            // Clean modern styling for the list item
-            li.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between gap-3";
+            li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
             
+            // --- UPDATED HTML STRUCTURE FOR TWO BUTTONS ---
             li.innerHTML = `
-                <div class="flex-grow">
-                    <h4 class="font-bold text-slate-800 text-base">${routeOutletData.outletName}</h4>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Stop ${routeOutletData.sequence}</p>
+                <div>
+                    <strong style="font-size:1.1rem;">${routeOutletData.outletName}</strong><br>
+                    <small>Seq: ${routeOutletData.sequence}</small>
                 </div>
-                <div class="flex gap-2">
-                    <!-- NEW: Direct Payment Button (Green) -->
-                    <button class="btn-collect-direct bg-emerald-50 text-emerald-600 p-2 rounded-xl border border-emerald-100 active:scale-95 transition-transform" title="Collect Payment">
-                        <span class="material-icons-round text-lg">payments</span>
+                <div style="display:flex; gap:10px;">
+                    <!-- Phone Order Button -->
+                    <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">
+                        📞
                     </button>
                     
-                    <!-- Phone Order Button (Yellow) -->
-                    <button class="btn-phone-order bg-amber-50 text-amber-600 p-2 rounded-xl border border-amber-100 active:scale-95 transition-transform" title="Phone Order">
-                        <span class="material-icons-round text-lg">phone_callback</span>
-                    </button>
-                    
-                    <!-- Visit/Map Button (Blue) -->
-                    <button class="btn-open-map bg-blue-50 text-blue-600 p-2 rounded-xl border border-blue-100 active:scale-95 transition-transform">
-                        <span class="material-icons-round text-lg">directions</span>
+                    <!-- Map/Visit Button -->
+                    <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
+                        Open 🗺️
                     </button>
                 </div>
             `;
             
-            // 1. ATTACH PAYMENT LISTENER
-            li.querySelector('.btn-collect-direct').onclick = () => {
-                const payEl = document.getElementById('pay-outlet-name');
-                payEl.dataset.id = routeOutletData.outletId;
-                payEl.innerText = routeOutletData.outletName;
-                window.openPaymentModal();
-            };
-
-            // 2. ATTACH PHONE ORDER LISTENER
+            // --- 1. ATTACH PHONE ORDER LISTENER ---
             li.querySelector('.btn-phone-order').onclick = () => {
+                // Ensure openOrderForm is defined (from the previous step)
                 if (window.openOrderForm) {
                     window.openOrderForm(routeOutletData.outletId, routeOutletData.outletName);
+                } else {
+                    alert("Order system not loaded yet.");
                 }
             };
 
-            // 3. ATTACH MAP LISTENER
+            // --- 2. ATTACH MAP LISTENER ---
             li.querySelector('.btn-open-map').onclick = () => {
                 if(shopLat === 0 && shopLng === 0) {
-                    alert("This outlet has no GPS coordinates set.");
+                    alert("This outlet has no GPS coordinates set by Admin.");
                 } else {
                     openVisitPanel(routeOutletData.outletId, routeOutletData.outletName, shopLat, shopLng);
                 }
@@ -182,7 +170,9 @@ async function loadShops(routeId) {
 
     } catch (error) {
         console.error("Load Shops Error:", error);
-        list.innerHTML = `<li class="p-4 text-red-500 text-center font-bold">Error loading shops. Check console.</li>`;
+        if (error.message.includes("index")) {
+            list.innerHTML = `<li style="color:red; font-weight:bold;">⚠️ Database Index Missing (Check Console)</li>`;
+        }
     }
 }
 
@@ -369,10 +359,7 @@ async function performEndVisit() {
 
 function getTodayDateString() {
     const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
 }
 
 async function checkTodayAttendance(user) {
@@ -410,13 +397,12 @@ function handleDailyAttendance(user) {
     navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
             await addDoc(collection(db, "attendance"), {
-    salesmanId: user.uid,
-    salesmanEmail: user.email,
-    date: getTodayDateString(),
-    checkInTime: Timestamp.now(),
-    location: new GeoPoint(pos.coords.latitude, pos.coords.longitude),
-    status: 'full_day' // DEFAULT TYPE ON CHECK-IN
-});
+                salesmanId: user.uid,
+                salesmanEmail: user.email,
+                date: getTodayDateString(),
+                checkInTime: Timestamp.now(),
+                location: new GeoPoint(pos.coords.latitude, pos.coords.longitude)
+            });
             alert("Daily Attendance Marked!");
             checkTodayAttendance(user);
         } catch (e) { 
@@ -467,30 +453,22 @@ function deg2rad(deg) {
 
 window.switchView = function(viewName) {
     // Hide all
-    document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-    
+    document.getElementById('route-view').style.display = 'none';
+    document.getElementById('visit-view').style.display = 'none';
+    document.getElementById('catalog-view').style.display = 'none';
+
     // Show selected
-    const target = document.getElementById(viewName + '-view');
-    if (target) target.classList.remove('hidden');
-
-    // Trigger map load
-    if (viewName === 'full-map') {
-        setTimeout(() => {
-            window.initFullRouteMap();
-        }, 100);
-    }
-
-    // Update Bottom Nav
-    document.querySelectorAll('.bottom-nav-item').forEach(el => {
-        el.classList.remove('active', 'text-blue-600');
-        el.classList.add('text-gray-400');
-    });
-    const btn = document.getElementById('nav-' + viewName);
-    if (btn) {
-        btn.classList.add('active', 'text-blue-600');
-        btn.classList.remove('text-gray-400');
+    if(viewName === 'route') document.getElementById('route-view').style.display = 'block';
+    if(viewName === 'visit') document.getElementById('visit-view').style.display = 'block';
+    if(viewName === 'catalog') {
+        document.getElementById('catalog-view').style.display = 'block';
+        loadProductCatalog(); // Load data when tab is clicked
     }
 };
+
+
+
+
 
 
 // ==========================================
@@ -803,57 +781,34 @@ window.submitPayment = async function() {
     const amount = parseFloat(document.getElementById('payAmount').value);
     const method = document.getElementById('payMethod').value;
     const modal = document.getElementById('paymentModal');
-    const btn = document.querySelector('#paymentModal button[onclick="submitPayment()"]');
 
     if(!amount || amount <= 0) return alert("Enter valid amount");
 
-    // UI State
-    btn.disabled = true;
-    btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Capturing GPS...`;
+    // 1. Close Modal immediately
+    modal.style.display = 'none';
 
-    // FORCE GPS CAPTURE
-    if (!navigator.geolocation) {
-        alert("GPS not supported.");
-        btn.disabled = false;
-        btn.innerText = "Collect";
-        return;
+    try {
+        // 2. Add 'Pending' Payment
+        await addDoc(collection(db, "payments"), {
+            salesmanId: auth.currentUser.uid,
+            outletId: outletId,
+            outletName: outletName,
+            amount: amount,
+            method: method,
+            date: Timestamp.now(),
+            status: "pending" // Critical: Admin must approve
+        });
+
+        alert("Payment Recorded! Waiting for Admin Approval.");
+
+    } catch (error) {
+        console.error("Payment Error:", error);
+        alert("Failed to record payment: " + error.message);
+        modal.style.display = 'flex'; // Reopen on error
     }
-
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
-            await addDoc(collection(db, "payments"), {
-                salesmanId: auth.currentUser.uid,
-                outletId: outletId,
-                outletName: outletName,
-                amount: amount,
-                method: method,
-                date: Timestamp.now(),
-                status: "pending",
-                
-                // NEW MANDATORY GPS FIELDS
-                collectedWithoutVisit: currentVisitId ? false : true,
-                gpsLat: pos.coords.latitude,
-                gpsLng: pos.coords.longitude,
-                gpsAccuracy: pos.coords.accuracy
-            });
-
-            alert("Payment recorded! GPS coordinates saved.");
-            modal.classList.add('hidden'); // Close modal
-            document.getElementById('payAmount').value = "";
-
-        } catch (error) {
-            console.error("Payment Submission Error:", error);
-            alert("Error: " + error.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "Collect";
-        }
-    }, (err) => {
-        alert("GPS Error: You must allow location access to collect payment.");
-        btn.disabled = false;
-        btn.innerText = "Collect";
-    }, { enableHighAccuracy: true, timeout: 8000 });
 };
+
+
 
 
 
@@ -903,207 +858,3 @@ window.submitLeaveRequest = async function() {
         btn.innerText = "Submit";
     }
 };
-
-
-
-
-
-
-
-
-    // Make sure fullMapInstance is declared at the top of your file
-
-
-window.initFullRouteMap = async function() {
-    console.log("Initializing Map View...");
-    const container = document.getElementById('all-shops-map');
-    if (!container) return;
-
-    // 1. Cleanup old instance to prevent "Map already initialized" error
-    if (fullMapInstance) {
-        fullMapInstance.remove();
-        fullMapInstance = null;
-    }
-
-    // 2. Setup Leaflet Map
-    fullMapInstance = L.map('all-shops-map', {
-        zoomControl: false // Cleaner for mobile
-    }).setView([20.5937, 78.9629], 5);
-
-    // 3. Use Browser-Friendly Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '©OpenStreetMap',
-        maxZoom: 18
-    }).addTo(fullMapInstance);
-
-    // 4. Force tile refresh after container is visible
-    setTimeout(() => {
-        fullMapInstance.invalidateSize();
-    }, 400);
-
-    try {
-        // 5. FETCH DATA STEP A: Find the route assigned to this salesman
-        const routeQuery = query(
-            collection(db, "routes"), 
-            where("assignedSalesmanId", "==", auth.currentUser.uid)
-        );
-        const routeSnap = await getDocs(routeQuery);
-
-        if (routeSnap.empty) {
-            console.warn("No route assigned to this user.");
-            return;
-        }
-
-        const routeId = routeSnap.docs[0].id;
-
-        // 6. FETCH DATA STEP B: Find all outlet stops for this route
-        const stopsQuery = query(
-            collection(db, "route_outlets"), 
-            where("routeId", "==", routeId), 
-            orderBy("sequence", "asc")
-        );
-        const stopsSnap = await getDocs(stopsQuery);
-
-        const markers = [];
-
-        // 7. FETCH DATA STEP C: Get details for each outlet and Plot
-        for (const docSnap of stopsSnap.docs) {
-            const routeStop = docSnap.data();
-            const outletRef = doc(db, "outlets", routeStop.outletId);
-            const outletDoc = await getDoc(outletRef);
-
-            if (outletDoc.exists()) {
-                const outletData = outletDoc.data();
-                
-                if (outletData.geo && outletData.geo.lat && outletData.geo.lng) {
-                    const lat = outletData.geo.lat;
-                    const lng = outletData.geo.lng;
-
-                    // Create Marker
-                    const marker = L.marker([lat, lng]).addTo(fullMapInstance);
-                    
-                    // Create Popup
-                    marker.bindPopup(`
-                        <div class="p-1">
-                            <h4 class="font-bold text-blue-600">${outletData.shopName}</h4>
-                            <p class="text-xs text-gray-500">Stop Sequence: ${routeStop.sequence}</p>
-                            <p class="text-xs text-gray-500">Type: ${outletData.outletType}</p>
-                            <button onclick="window.openVisitPanel('${outletDoc.id}', '${outletData.shopName}', ${lat}, ${lng})" 
-                                    class="mt-2 w-full bg-blue-600 text-white text-[10px] py-1 rounded">
-                                Visit Now
-                            </button>
-                        </div>
-                    `);
-
-                    markers.push([lat, lng]);
-                }
-            }
-        }
-
-        // 8. Auto-Zoom to fit all markers
-        if (markers.length > 0) {
-            const bounds = L.latLngBounds(markers);
-            fullMapInstance.fitBounds(bounds, { padding: [50, 50] });
-        }
-
-    } catch (error) {
-        console.error("Map Logic Error:", error);
-    }
-};
-
-
-
-
-
-
-async function loadDailyTarget(uid) {
-    const today = getTodayDateString();
-    const card = document.getElementById('target-card');
-    const msgBox = document.getElementById('target-message');
-    const incentiveSection = document.getElementById('incentive-stats');
-    const confetti = document.getElementById('target-confetti');
-    
-    if (!card) return;
-
-    try {
-        // 1. Fetch Target Data
-        const targetQ = query(collection(db, "daily_targets"), 
-            where("salesmanId", "==", uid), 
-            where("date", "==", today)
-        );
-        const targetSnap = await getDocs(targetQ);
-
-        if (targetSnap.empty) {
-            card.classList.add('hidden');
-            return;
-        }
-
-        const t = targetSnap.docs[0].data();
-        const targetBoxes = Number(t.targetBoxes);
-        const rate = Number(t.incentivePerBox);
-
-        card.classList.remove('hidden');
-        document.getElementById('total-target').innerText = targetBoxes;
-        document.getElementById('target-incentive-rate').innerText = `₹${rate}/box bonus`;
-
-        // 2. Calculate Achieved (Today's boxes)
-        const ordersQ = query(collection(db, "orders"), where("salesmanId", "==", uid));
-        const ordersSnap = await getDocs(ordersQ);
-        
-        let totalSold = 0;
-        ordersSnap.forEach(docSnap => {
-            const order = docSnap.data();
-            if (order.orderDate && order.orderDate.toDate().toISOString().split('T')[0] === today) {
-                order.items.forEach(item => totalSold += (Number(item.qty) || 0));
-            }
-        });
-
-        // 3. UI Updates & Logic
-        const progress = Math.min(Math.round((totalSold / targetBoxes) * 100), 100);
-        document.getElementById('current-progress').innerText = totalSold;
-        document.getElementById('percent-label').innerText = progress + "%";
-        
-        const progressBar = document.getElementById('target-progress-bar');
-        progressBar.style.width = progress + "%";
-
-        // Reset Styles
-        msgBox.className = "text-xs font-bold p-3 rounded-xl text-center";
-        incentiveSection.classList.add('hidden');
-        confetti.classList.add('hidden');
-        progressBar.classList.remove('bg-emerald-500', 'bg-amber-500');
-        progressBar.classList.add('bg-blue-600');
-
-        // Logic Rules
-        if (totalSold >= targetBoxes) {
-            // STATE: 100% or more
-            const extraBoxes = totalSold - targetBoxes;
-            const earned = extraBoxes * rate;
-
-            progressBar.classList.replace('bg-blue-600', 'bg-emerald-500');
-            msgBox.classList.add('bg-emerald-50', 'text-emerald-700');
-            msgBox.innerHTML = `🎉 Target achieved! Incentive unlocked at ₹${rate} per box.`;
-            confetti.classList.remove('hidden');
-
-            // Show Incentive Stats
-            if (extraBoxes > 0) {
-                incentiveSection.classList.remove('hidden');
-                document.getElementById('extra-boxes-label').innerText = `+${extraBoxes} extra boxes`;
-                document.getElementById('total-earned-incentive').innerText = `₹${earned.toFixed(2)}`;
-            }
-
-        } else if (progress >= 80) {
-            // STATE: 80% to 99%
-            progressBar.classList.replace('bg-blue-600', 'bg-amber-500');
-            msgBox.classList.add('bg-amber-50', 'text-amber-700', 'border', 'border-amber-100');
-            msgBox.innerHTML = `✨ Almost there! Complete the target to unlock incentive.`;
-        } else {
-            // STATE: Below 80%
-            msgBox.classList.add('bg-slate-50', 'text-slate-500');
-            const remaining = targetBoxes - totalSold;
-            msgBox.innerHTML = `Sell ${remaining} more boxes to reach your goal.`;
-        }
-
-    } catch (error) {
-        console.error("Target logic error:", error);
-    }
-}
