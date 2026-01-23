@@ -54,7 +54,7 @@ onAuthStateChanged(auth, async (user) => {
         loadSalesmenList(); // This function is now defined below
         // ... inside the successful admin check ...
         populateTargetSalesmanDropdown();
-        
+        setupTransactionTab();
 loadRoutes();
 populateSalesmanDropdown();
 populateAllOutletsDropdown();
@@ -1401,3 +1401,211 @@ async function runRetentionCleanup() {
 // EXPOSE FUNCTIONS TO HTML
 window.loadAttendanceSheet = loadAttendanceSheet;
 window.runRetentionCleanup = runRetentionCleanup;
+
+
+
+
+
+
+
+// ==========================================
+//      TRANSACTION / ACTIVITY LOGIC
+// ==========================================
+
+let allFetchedTransactions = []; // Store data here for client-side filtering
+let salesmanMap = {}; // Cache names: { uid: "John Doe" }
+
+// 1. Setup: Populate Salesman Dropdown & Default Dates
+async function setupTransactionTab() {
+    const select = document.getElementById('transSalesman');
+    const startInput = document.getElementById('transStart');
+    const endInput = document.getElementById('transEnd');
+
+    if(!select) return;
+
+    // Set Default Dates (Current Month)
+    const date = new Date();
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    
+    // Format YYYY-MM-DD using local time hack
+    const formatDate = (d) => {
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    };
+
+    if(startInput) startInput.value = formatDate(firstDay);
+    if(endInput) endInput.value = formatDate(lastDay);
+
+    // Populate Salesman Dropdown & Build Map
+    select.innerHTML = '<option value="all">All Staff</option>';
+    try {
+        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        const snap = await getDocs(q);
+        
+        snap.forEach(doc => {
+            const d = doc.data();
+            const name = d.fullName || d.email;
+            salesmanMap[doc.id] = name; // Cache for table display
+            
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = name;
+            select.appendChild(opt);
+        });
+    } catch (e) { console.error("Trans Setup Error:", e); }
+}
+
+// 2. Main Fetch Function (Hits Database)
+async function loadTransactions() {
+    const tbody = document.getElementById('trans-table-body');
+    const startStr = document.getElementById('transStart').value;
+    const endStr = document.getElementById('transEnd').value;
+    const selectedSalesman = document.getElementById('transSalesman').value;
+
+    if(!startStr || !endStr) return alert("Select Date Range");
+
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Loading 5 data sources...</td></tr>';
+
+    try {
+        // Prepare Date Objects for Timestamp Queries
+        const startTs = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
+        const endTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
+
+        // Build Queries (Arrays to store promises)
+        const queries = [];
+
+        // A. ATTENDANCE (String Date)
+        let qAtt = query(collection(db, "attendance"), where("date", ">=", startStr), where("date", "<=", endStr));
+        if(selectedSalesman !== 'all') qAtt = query(qAtt, where("salesmanId", "==", selectedSalesman));
+        queries.push(getDocs(qAtt).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Attendance', _sortTime: d.data().checkInTime}))));
+
+        // B. VISITS (Timestamp)
+        let qVis = query(collection(db, "visits"), where("checkInTime", ">=", startTs), where("checkInTime", "<=", endTs));
+        if(selectedSalesman !== 'all') qVis = query(qVis, where("salesmanId", "==", selectedSalesman));
+        queries.push(getDocs(qVis).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Visit', _sortTime: d.data().checkInTime}))));
+
+        // C. ORDERS (Timestamp)
+        let qOrd = query(collection(db, "orders"), where("orderDate", ">=", startTs), where("orderDate", "<=", endTs));
+        if(selectedSalesman !== 'all') qOrd = query(qOrd, where("salesmanId", "==", selectedSalesman));
+        queries.push(getDocs(qOrd).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Order', _sortTime: d.data().orderDate}))));
+
+        // D. PAYMENTS (Timestamp)
+        let qPay = query(collection(db, "payments"), where("date", ">=", startTs), where("date", "<=", endTs));
+        if(selectedSalesman !== 'all') qPay = query(qPay, where("salesmanId", "==", selectedSalesman));
+        queries.push(getDocs(qPay).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Payment', _sortTime: d.data().date}))));
+
+        // E. TARGETS (String Date)
+        // Targets doc ID is complex, so we query simply by date range
+        let qTgt = query(collection(db, "daily_targets"), where("date", ">=", startStr), where("date", "<=", endStr));
+        if(selectedSalesman !== 'all') qTgt = query(qTgt, where("salesmanId", "==", selectedSalesman));
+        queries.push(getDocs(qTgt).then(snap => snap.docs.map(d => ({...d.data(), _type: 'Target', _sortTime: Timestamp.fromDate(new Date(d.data().date + "T08:00:00"))}))));
+
+        // EXECUTE ALL QUERIES
+        const results = await Promise.all(queries);
+
+        // Merge & Flatten
+        allFetchedTransactions = results.flat();
+
+        // Sort by Date Descending (Newest First)
+        allFetchedTransactions.sort((a, b) => b._sortTime.seconds - a._sortTime.seconds);
+
+        // Render Initial View
+        renderTransactions(allFetchedTransactions);
+
+    } catch (e) {
+        console.error("Trans Load Error:", e);
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
+        if(e.message.includes("index")) alert("Missing Index. Check Console Link.");
+    }
+}
+
+// 3. Render Function (Updates UI)
+function renderTransactions(data) {
+    const tbody = document.getElementById('trans-table-body');
+    tbody.innerHTML = "";
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">No activity found in this period.</td></tr>';
+        return;
+    }
+
+    data.forEach(item => {
+        // Determine Formatting based on Type
+        let typeBadge = "";
+        let details = "";
+        let value = "";
+        let rowClass = "hover:bg-slate-50 transition";
+
+        const dateObj = item._sortTime ? item._sortTime.toDate() : new Date();
+        const dateStr = dateObj.toLocaleDateString() + " " + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const salesmanName = salesmanMap[item.salesmanId] || "Unknown";
+
+        switch(item._type) {
+            case 'Attendance':
+                typeBadge = `<span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Attendance</span>`;
+                details = `<span class="text-slate-400 italic">Marked Present</span>`;
+                value = `<span class="text-green-600 font-bold">✔</span>`;
+                break;
+            case 'Visit':
+                typeBadge = `<span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Visit</span>`;
+                details = `<strong>${item.outletName || 'Unknown Shop'}</strong>`;
+                value = item.durationMinutes ? `${item.durationMinutes} mins` : `Active`;
+                break;
+            case 'Order':
+                typeBadge = `<span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Order</span>`;
+                details = `<strong>${item.outletName}</strong><br><span class="text-xs text-slate-400">${item.items ? item.items.length + ' Items' : ''}</span>`;
+                // Handle different order structures
+                const amt = item.financials ? item.financials.totalAmount : (item.totalAmount || 0);
+                value = `<span class="text-purple-700 font-bold">₹${amt.toFixed(2)}</span>`;
+                break;
+            case 'Payment':
+                const statusColor = item.status === 'approved' ? 'text-green-600' : (item.status === 'rejected' ? 'text-red-600' : 'text-orange-500');
+                typeBadge = `<span class="bg-green-100 text-green-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Payment</span>`;
+                details = `<strong>${item.outletName}</strong><br><span class="text-xs capitalize ${statusColor}">${item.status}</span>`;
+                value = `<span class="font-bold">₹${item.amount}</span>`;
+                break;
+            case 'Target':
+                typeBadge = `<span class="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Target</span>`;
+                details = `<span class="text-slate-500">Target Assigned</span>`;
+                value = `🎯 ${item.targetBoxes} Boxes`;
+                break;
+        }
+
+        const row = `
+            <tr class="${rowClass} border-b border-slate-50">
+                <td class="p-4 text-xs font-medium text-slate-500">${dateStr}</td>
+                <td class="p-4 font-semibold text-slate-700">${salesmanName}</td>
+                <td class="p-4">${typeBadge}</td>
+                <td class="p-4">${details}</td>
+                <td class="p-4 text-right text-xs">${value}</td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+// 4. Client-Side Filter (Instant)
+function filterTransactionsClientSide() {
+    const typeFilter = document.getElementById('transType').value;
+    const outletSearch = document.getElementById('transOutletSearch').value.toLowerCase();
+
+    const filtered = allFetchedTransactions.filter(item => {
+        // Type Filter
+        if(typeFilter !== 'all' && item._type !== typeFilter) return false;
+        
+        // Outlet Name Search
+        if(outletSearch) {
+            const outletName = (item.outletName || "").toLowerCase();
+            if(!outletName.includes(outletSearch)) return false;
+        }
+
+        return true;
+    });
+
+    renderTransactions(filtered);
+}
+
+// EXPOSE TO HTML
+window.loadTransactions = loadTransactions;
+window.filterTransactionsClientSide = filterTransactionsClientSide;
