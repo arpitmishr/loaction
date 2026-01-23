@@ -1409,14 +1409,14 @@ window.runRetentionCleanup = runRetentionCleanup;
 
 
 // ==========================================
-//      TRANSACTION / ACTIVITY LOGIC (PAGINATED)
+//      TRANSACTION / ACTIVITY LOGIC (FINAL & FIXED)
 // ==========================================
 
 let allFetchedTransactions = []; 
 let salesmanMap = {}; 
 let paginationCursorTime = null; // Tracks the timestamp of the last loaded item
 
-// 1. Setup
+// 1. Setup: Populate Salesman Dropdown & Default Dates
 async function setupTransactionTab() {
     const select = document.getElementById('transSalesman');
     const startInput = document.getElementById('transStart');
@@ -1429,6 +1429,7 @@ async function setupTransactionTab() {
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
     const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     
+    // Format YYYY-MM-DD using local time hack
     const formatDate = (d) => {
         const offset = d.getTimezoneOffset() * 60000;
         return new Date(d.getTime() - offset).toISOString().split('T')[0];
@@ -1437,16 +1438,20 @@ async function setupTransactionTab() {
     if(startInput) startInput.value = formatDate(firstDay);
     if(endInput) endInput.value = formatDate(lastDay);
 
-    // Populate Salesman Dropdown
+    // Populate Salesman Dropdown & Build Map
     select.innerHTML = '<option value="all">All Staff</option>';
     try {
         const q = query(collection(db, "users"), where("role", "==", "salesman"));
         const snap = await getDocs(q);
+        
         snap.forEach(doc => {
-            salesmanMap[doc.id] = doc.data().fullName || doc.data().email;
+            const d = doc.data();
+            const name = d.fullName || d.email;
+            salesmanMap[doc.id] = name; // Cache for table display
+            
             const opt = document.createElement('option');
             opt.value = doc.id;
-            opt.textContent = salesmanMap[doc.id];
+            opt.textContent = name;
             select.appendChild(opt);
         });
     } catch (e) { console.error("Trans Setup Error:", e); }
@@ -1469,17 +1474,16 @@ async function loadTransactions(isLoadMore = false) {
         tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">Fetching data...</td></tr>';
         allFetchedTransactions = [];
         paginationCursorTime = null; // Reset cursor
-        loadMoreBtn.classList.add('hidden');
+        if(loadMoreBtn) loadMoreBtn.classList.add('hidden');
     } else {
-        loadMoreBtn.innerText = "Loading...";
-        loadMoreBtn.disabled = true;
+        if(loadMoreBtn) {
+            loadMoreBtn.innerText = "Loading...";
+            loadMoreBtn.disabled = true;
+        }
     }
 
     try {
         // Define Time Range
-        // If loading more, we fetch items OLDER (less than) the last loaded timestamp
-        // If fresh load, we fetch items OLDER (less than) the selected End Date
-        
         let queryEndTs;
         if (isLoadMore && paginationCursorTime) {
             queryEndTs = paginationCursorTime; 
@@ -1491,38 +1495,32 @@ async function loadTransactions(isLoadMore = false) {
 
         // Helper Query Builder
         const promises = [];
-        const PAGE_SIZE = 10; // Load 10 at a time
+        const PAGE_SIZE = 10; 
 
         const addQuery = (colName, dateField, isTimestamp, typeLabel, sortField) => {
             let q = query(collection(db, colName));
 
             // 1. Filter by Salesman
             if (selectedSalesman !== 'all') {
-                q = query(q, where("salesmanId", "==", selectedSalesman)); // OR createdBySalesman for outlets
+                q = query(q, where("salesmanId", "==", selectedSalesman));
             }
 
-            // 2. Filter by Date Range (Using range to allow indexing)
+            // 2. Filter by Date Range
             if (isTimestamp) {
-                // Fetch items between StartDate and Cursor
                 q = query(q, where(dateField, "<=", queryEndTs), where(dateField, ">=", startTs));
             } else {
-                // String date logic is harder with cursors, so we fallback to range
-                // Ideally string dates should be converted to Timestamps in DB design
                 q = query(q, where(dateField, ">=", startStr), where(dateField, "<=", endStr));
             }
 
-            // 3. Sort Descending (Newest first)
-            q = query(q, orderBy(dateField, "desc"));
-
-            // 4. Limit (We fetch 10 from EACH collection, then sort & slice in JS)
-            q = query(q, limit(PAGE_SIZE));
+            // 3. Sort & Limit
+            q = query(q, orderBy(dateField, "desc"), limit(PAGE_SIZE));
 
             promises.push(
                 getDocs(q).then(snap => 
                     snap.docs.map(d => ({
                         ...d.data(), 
                         _type: typeLabel, 
-                        _id: d.id, // Prevent duplicates
+                        _id: d.id, 
                         _sortTime: isTimestamp ? d.data()[sortField] : Timestamp.fromDate(new Date(d.data()[dateField] + "T08:00:00")) 
                     }))
                 )
@@ -1546,16 +1544,18 @@ async function loadTransactions(isLoadMore = false) {
         if (selectedType === 'all' || selectedType === 'Target') {
             addQuery("daily_targets", "date", false, "Target", "date");
         }
-        // NEW: OUTLETS (Created Shops)
+        // NEW: OUTLETS
         if (selectedType === 'all' || selectedType === 'Outlet') {
-            // Note: In Add Shop, we used 'createdBySalesman' and 'createdAt'
             let q = query(collection(db, "outlets"));
             if (selectedSalesman !== 'all') q = query(q, where("createdBySalesman", "==", selectedSalesman));
             q = query(q, where("createdAt", "<=", queryEndTs), where("createdAt", ">=", startTs));
             q = query(q, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
             
             promises.push(getDocs(q).then(snap => snap.docs.map(d => ({
-                ...d.data(), _type: 'Outlet', _id: d.id, _sortTime: d.data().createdAt
+                ...d.data(), 
+                _type: 'Outlet', 
+                _id: d.id, 
+                _sortTime: d.data().createdAt || Timestamp.now()
             }))));
         }
 
@@ -1563,7 +1563,7 @@ async function loadTransactions(isLoadMore = false) {
         const results = await Promise.all(promises);
         let newItems = results.flat();
 
-        // 1. Filter out items we already have (Client side dedup)
+        // 1. Dedup
         const existingIds = new Set(allFetchedTransactions.map(i => i._id));
         newItems = newItems.filter(i => !existingIds.has(i._id));
 
@@ -1574,49 +1574,69 @@ async function loadTransactions(isLoadMore = false) {
             return timeB - timeA;
         });
 
-        // 3. Slice to Page Size (Because we fetched 10 from *each*, we might have 60 items)
+        // 3. Slice to Page Size
         const slicedItems = newItems.slice(0, PAGE_SIZE);
 
         // 4. Update Global List
         allFetchedTransactions = [...allFetchedTransactions, ...slicedItems];
 
-        // 5. Update Cursor for next load
-        if (slicedItems.length > 0) {
+        // 5. Update Cursor
+        if (slicedItems.length > 0 && loadMoreBtn) {
             const lastItem = slicedItems[slicedItems.length - 1];
-            // We decrease cursor slightly to avoid fetching same doc
             if (lastItem._sortTime) {
-                // Create a timestamp 1 millisecond older
                 paginationCursorTime = new Timestamp(lastItem._sortTime.seconds, lastItem._sortTime.nanoseconds - 1);
             }
             loadMoreBtn.classList.remove('hidden');
-        } else {
+        } else if (loadMoreBtn) {
             if(isLoadMore) alert("No more records found.");
             loadMoreBtn.classList.add('hidden');
         }
 
-        renderTransactions(); // Render everything
+        renderTransactions(); 
 
     } catch (e) {
         console.error("Trans Load Error:", e);
         if(!isLoadMore) tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
         if(e.message.includes("index")) alert("Missing Index. Check Console.");
     } finally {
-        loadMoreBtn.disabled = false;
-        loadMoreBtn.innerText = "⬇ Load More Records";
+        if(loadMoreBtn) {
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.innerText = "⬇ Load More Records";
+        }
     }
 }
 
-// 3. Render Function
+// 3. Client-Side Filter (Outlet Search Only)
+function filterTransactionsClientSide() {
+    const outletSearch = document.getElementById('transOutletSearch').value.toLowerCase();
+
+    const filtered = allFetchedTransactions.filter(item => {
+        if(outletSearch) {
+            // Check outletName (Orders/Visits) OR shopName (New Outlets)
+            const name = (item.outletName || item.shopName || "").toLowerCase();
+            if(!name.includes(outletSearch)) return false;
+        }
+        return true;
+    });
+
+    renderTransactionsList(filtered);
+}
+
+// 4. Render Functions
 function renderTransactions() {
+    renderTransactionsList(allFetchedTransactions);
+}
+
+function renderTransactionsList(data) {
     const tbody = document.getElementById('trans-table-body');
     tbody.innerHTML = "";
 
-    if (allFetchedTransactions.length === 0) {
+    if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center">No activity found.</td></tr>';
         return;
     }
 
-    allFetchedTransactions.forEach(item => {
+    data.forEach(item => {
         let typeBadge = "";
         let details = "";
         let value = "";
@@ -1625,7 +1645,6 @@ function renderTransactions() {
         const dateObj = item._sortTime ? item._sortTime.toDate() : new Date();
         const dateStr = dateObj.toLocaleDateString() + " " + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         
-        // Handle "createdBySalesman" for outlets vs "salesmanId" for others
         const sId = item.salesmanId || item.createdBySalesman;
         const salesmanName = salesmanMap[sId] || "Unknown";
 
@@ -1657,7 +1676,7 @@ function renderTransactions() {
                 details = `<span class="text-slate-500">Target Assigned</span>`;
                 value = `🎯 ${item.targetBoxes} Boxes`;
                 break;
-            case 'Outlet': /* NEW */
+            case 'Outlet':
                 typeBadge = `<span class="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">New Shop</span>`;
                 details = `<strong>${item.shopName}</strong><br><span class="text-xs text-slate-400">${item.address || 'No Address'}</span>`;
                 value = `<span class="text-xs text-slate-500">Created</span>`;
@@ -1677,6 +1696,6 @@ function renderTransactions() {
     });
 }
 
-// EXPOSE TO HTML
+// 5. EXPOSE TO HTML (Fixes the "not defined" error)
 window.loadTransactions = loadTransactions;
 window.filterTransactionsClientSide = filterTransactionsClientSide;
