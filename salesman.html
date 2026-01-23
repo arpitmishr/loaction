@@ -244,6 +244,16 @@
                 </div>
             </div>
 
+
+
+            
+<!-- 5. MAP VIEW -->
+<div id="map-view" class="view-section hidden h-[calc(100vh-130px)] w-full mt-2">
+    <div id="routeMap" class="w-full h-full rounded-2xl shadow-inner border border-gray-200 z-0"></div>
+</div>
+
+
+            
         </main>
 
         <!-- BOTTOM NAVIGATION BAR -->
@@ -252,6 +262,15 @@
                 <span class="material-icons-round text-2xl">map</span>
                 <span class="text-[10px] font-bold">Route</span>
             </button>
+
+
+<button onclick="switchView('map')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-map">
+    <span class="material-icons-round text-2xl">public</span>
+    <span class="text-[10px] font-bold">Map</span>
+</button>
+
+
+            
             <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
                 <span class="material-icons-round text-2xl">inventory_2</span>
                 <span class="text-[10px] font-bold">Catalog</span>
