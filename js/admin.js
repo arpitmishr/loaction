@@ -54,6 +54,7 @@ onAuthStateChanged(auth, async (user) => {
         loadSalesmenList(); // This function is now defined below
         // ... inside the successful admin check ...
         populateTargetSalesmanDropdown(); 
+        
 loadRoutes();
 populateSalesmanDropdown();
 populateAllOutletsDropdown();
@@ -1161,3 +1162,85 @@ if(targetForm) {
 }
 
 // Ensure populateTargetSalesmanDropdown() is called in your admin init block
+
+
+
+
+
+
+
+
+
+
+// --- TARGET MANAGEMENT LOGIC ---
+
+// 1. Populate the target dropdown (Reuse existing user query or fetch new)
+async function populateTargetSalesmanDropdown() {
+    const select = document.getElementById('targetSalesmanId');
+    if(!select) return;
+    
+    // Clear existing options except first
+    select.innerHTML = '<option value="">Select Staff...</option>';
+
+    try {
+        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        const snap = await getDocs(q);
+        
+        snap.forEach(doc => {
+            const d = doc.data();
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = d.fullName || d.email;
+            select.appendChild(opt);
+        });
+        
+        // Set default date to today
+        document.getElementById('targetDate').valueAsDate = new Date();
+
+    } catch (e) { console.error("Target Dropdown Error:", e); }
+}
+
+// 2. Handle Form Submit
+const targetForm = document.getElementById('targetForm');
+if(targetForm) {
+    targetForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = targetForm.querySelector('button');
+        const originalText = btn.innerText;
+
+        try {
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            const salesmanId = document.getElementById('targetSalesmanId').value;
+            const date = document.getElementById('targetDate').value; // YYYY-MM-DD
+            
+            // Create a unique ID for the doc so we can overwrite if target exists for same day/user
+            const targetId = `${salesmanId}_${date}`; 
+
+            await setDoc(doc(db, "daily_targets", targetId), {
+                salesmanId: salesmanId,
+                date: date,
+                targetBoxes: Number(document.getElementById('targetBoxes').value),
+                incentivePerBox: Number(document.getElementById('incentivePerBox').value),
+                updatedAt: serverTimestamp()
+            });
+
+            alert("✅ Target Assigned Successfully!");
+            targetForm.reset();
+            document.getElementById('targetDate').valueAsDate = new Date(); // Reset date to today
+            populateTargetSalesmanDropdown(); // Refresh dropdown if needed
+
+        } catch (error) {
+            console.error(error);
+            alert("Error: " + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    });
+}
+
+// IMPORTANT: Add 'populateTargetSalesmanDropdown()' to your main onAuthStateChanged success block
+// alongside loadDashboardStats(), loadOutlets(), etc.
+// Add 'setDoc' to your imports from firebase-firestore.js at the top of the file.
