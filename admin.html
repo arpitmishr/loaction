@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -206,35 +207,34 @@
                 </div>
 
                 <!-- ATTENDANCE TABLE -->
-               <!-- ATTENDANCE TABLE -->
-<div class="bg-surface rounded-2xl shadow-card overflow-hidden border border-slate-100">
-    <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-        <div>
-            <h3 class="font-bold text-slate-800">Daily Register</h3>
-            <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Attendance & Overrides</p>
-        </div>
-        <div class="flex gap-2 w-full sm:w-auto">
-            <input type="date" id="attendanceDateFilter" class="bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 w-full sm:w-auto">
-            <button onclick="loadAttendanceByDate()" class="bg-primary text-white p-2 rounded-lg shadow hover:bg-primaryDark transition-colors">
-                <span class="material-icons-round text-sm">refresh</span>
-            </button>
-        </div>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs text-slate-400 uppercase tracking-wider font-semibold">
-                <tr>
-                    <th class="p-4">Salesman</th>
-                    <th class="p-4">Log / Time</th>
-                    <th class="p-4">Status Override</th>
-                </tr>
-            </thead>
-            <tbody id="attendance-list" class="divide-y divide-slate-100">
-                <!-- Rows injected by JS -->
-            </tbody>
-        </table>
-    </div>
-</div>
+                <div class="bg-surface rounded-2xl shadow-card overflow-hidden border border-slate-100">
+                    <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <h3 class="font-bold text-slate-800">Daily Register</h3>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="date" id="attendanceDateFilter" class="bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 w-full sm:w-auto">
+                            <button onclick="loadAttendanceByDate()" class="bg-primary text-white p-2 rounded-lg shadow hover:bg-primaryDark transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-xs text-slate-400 uppercase tracking-wider font-semibold">
+                                <tr>
+                                    <th class="p-4">Salesman</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4">Logs</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-list" class="divide-y divide-slate-100">
+                                <tr><td colspan="3" class="p-6 text-center text-slate-400 italic">Fetching records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             <!-- =======================
                  TAB 2: OUTLETS
@@ -488,28 +488,6 @@
                  TAB 5: STAFF
             ======================== -->
             <div id="tab-staff" class="tab-content hidden">
-                <!-- Inside <div id="tab-staff" ...> after the Sales Team list -->
-<div class="mt-10 bg-surface p-6 rounded-2xl border border-slate-100 shadow-card">
-    <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-        <span class="material-icons-round text-primary">target</span>
-        Set Daily Target
-    </h4>
-    <form id="targetForm" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <select id="targetSalesmanId" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                <option value="">Select Salesman</option>
-            </select>
-            <input type="date" id="targetDate" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <input type="number" id="targetBoxes" placeholder="Target Boxes" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-            <input type="number" id="incentivePerBox" placeholder="Incentive (₹/Box)" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-        </div>
-        <button type="submit" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition">
-            Set Target
-        </button>
-    </form>
-</div>
                 <div class="bg-surface rounded-2xl shadow-card border border-slate-100 p-8 min-h-[50vh] max-w-2xl mx-auto">
                     <h3 class="text-xl font-bold mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
                         <div class="bg-purple-100 text-purple-600 p-2 rounded-lg">
