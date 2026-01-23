@@ -1201,7 +1201,49 @@ async function submitNewShop() {
     }
 }
 
-// EXPOSE FUNCTIONS
-window.openAddShopModal = openAddShopModal;
+
+
+
+// ==========================================
+//      GPS CAPTURE LOGIC (Missing Part)
+// ==========================================
+
+function captureNewShopLocation() {
+    const msg = document.getElementById('newShopGeoMsg');
+    
+    if(!navigator.geolocation) return alert("GPS not supported");
+
+    msg.innerText = "Locating...";
+    msg.className = "text-[10px] text-orange-500 font-bold";
+    
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            
+            document.getElementById('newShopLat').value = lat;
+            document.getElementById('newShopLng').value = lng;
+            
+            msg.innerText = `✅ GPS Captured: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            msg.className = "text-[10px] text-green-600 font-bold";
+        },
+        (err) => {
+            console.error(err);
+            msg.innerText = "GPS Failed. Please Enable Location.";
+            msg.className = "text-[10px] text-red-500 font-bold";
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+// ==========================================
+//      EXPOSE FUNCTIONS TO HTML
+// ==========================================
+// This makes the functions clickable from the HTML buttons
+
+window.toggleCreditFields = toggleCreditFields;
 window.captureNewShopLocation = captureNewShopLocation;
 window.submitNewShop = submitNewShop;
+window.openAddShopModal = openAddShopModal;
+
+
