@@ -49,6 +49,7 @@ onAuthStateChanged(auth, async (user) => {
         // C. Load Initial Data
         checkTodayAttendance(user);
         loadAssignedRoute(user.uid);
+        loadDailyTarget();
 
         // D. Attach Global Listener for Daily Attendance
         const checkInBtn = document.getElementById('checkInBtn');
@@ -971,3 +972,116 @@ window.submitLeaveRequest = async function() {
         btn.innerText = "Submit";
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+// --- DAILY TARGET SYSTEM ---
+
+async function loadDailyTarget() {
+    const card = document.getElementById('target-card');
+    const uid = auth.currentUser.uid;
+    const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    try {
+        // 1. Fetch Target for Today
+        // We use the ID convention: salesmanId_date
+        const targetId = `${uid}_${todayStr}`;
+        const targetSnap = await getDoc(doc(db, "daily_targets", targetId));
+
+        if (!targetSnap.exists()) {
+            card.style.display = 'none'; // No target assigned
+            return;
+        }
+
+        const targetData = targetSnap.data();
+        const targetBoxes = targetData.targetBoxes;
+        const incentiveRate = targetData.incentivePerBox;
+
+        card.classList.remove('hidden'); // Show card
+
+        // 2. Calculate Actual Sales (Boxes) from Orders
+        // Define Time Range for Today
+        const startOfDay = new Date();
+        startOfDay.setHours(0,0,0,0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23,59,59,999);
+
+        // Query Orders
+        const q = query(
+            collection(db, "orders"), 
+            where("salesmanId", "==", uid),
+            where("orderDate", ">=", Timestamp.fromDate(startOfDay)),
+            where("orderDate", "<=", Timestamp.fromDate(endOfDay))
+        );
+
+        const orderSnaps = await getDocs(q);
+        
+        let totalBoxesSold = 0;
+        
+        orderSnaps.forEach(doc => {
+            const order = doc.data();
+            if(order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    // Assuming 'qty' is the number of boxes/units
+                    totalBoxesSold += (Number(item.qty) || 0);
+                });
+            }
+        });
+
+        // 3. UI Logic & Calculations
+        const progress = Math.min((totalBoxesSold / targetBoxes) * 100, 100);
+        const remaining = Math.max(0, targetBoxes - totalBoxesSold);
+        
+        // Incentive: Only for boxes ABOVE target
+        const extraBoxes = Math.max(0, totalBoxesSold - targetBoxes);
+        const incentiveEarned = extraBoxes * incentiveRate;
+
+        // Update DOM
+        document.getElementById('tgt-total').innerText = targetBoxes;
+        document.getElementById('tgt-max').innerText = targetBoxes;
+        document.getElementById('tgt-achieved').innerText = totalBoxesSold;
+        document.getElementById('tgt-left').innerText = remaining;
+        document.getElementById('tgt-bar').style.width = `${progress}%`;
+        document.getElementById('tgt-rate').innerText = incentiveRate;
+        document.getElementById('tgt-incentive-amt').innerText = `₹${incentiveEarned.toFixed(2)}`;
+
+        // Handle States
+        const msgRemaining = document.getElementById('msg-remaining');
+        const msgAlmost = document.getElementById('msg-almost');
+        const msgSuccess = document.getElementById('msg-success');
+        const bar = document.getElementById('tgt-bar');
+
+        // Reset
+        msgRemaining.classList.add('hidden');
+        msgAlmost.classList.add('hidden');
+        msgSuccess.classList.add('hidden');
+        bar.classList.remove('bg-amber-500', 'bg-green-500', 'bg-blue-600');
+
+        if (totalBoxesSold >= targetBoxes) {
+            // Target Met
+            msgSuccess.classList.remove('hidden');
+            bar.classList.add('bg-green-500'); // Green Bar
+        } else if (progress >= 80) {
+            // Almost There
+            msgAlmost.classList.remove('hidden');
+            bar.classList.add('bg-amber-500'); // Gold/Orange Bar
+        } else {
+            // Normal Progress
+            msgRemaining.classList.remove('hidden');
+            bar.classList.add('bg-blue-600'); // Blue Bar
+        }
+
+    } catch (error) {
+        console.error("Target Load Error:", error);
+        // Important: If index is missing, this will fail.
+        if(error.message.includes("index")) console.warn("Missing Index: orders (salesmanId, orderDate)");
+    }
+}
