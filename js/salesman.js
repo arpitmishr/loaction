@@ -63,7 +63,23 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+// --- SAFE LOGOUT (Cleanup GPS) ---
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    // 1. Stop Geo-fencing if active
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        console.log("GPS Watch Cleared");
+    }
+    
+    // 2. Stop Visit Timer if active
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+
+    // 3. Logout
+    logoutUser();
+});
 
 
 // --- 3. ROUTE & SHOP LIST LOGIC ---
