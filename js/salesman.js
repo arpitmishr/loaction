@@ -19,7 +19,7 @@ let visitStartTime = null;
 let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
-
+let currentVisitTarget = null; 
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
@@ -373,7 +373,10 @@ async function loadRouteOnMap() {
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
 window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
-    // 1. Switch Views
+    // 1. SAVE TARGET LOCATION (For End Visit Validation)
+    currentVisitTarget = { lat: shopLat, lng: shopLng };
+
+    // 2. Switch Views
     document.getElementById('route-view').style.display = 'none';
     document.getElementById('visit-view').style.display = 'block';
 
@@ -391,6 +394,20 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
     document.getElementById('in-shop-controls').style.display = 'none';
 
     // 3. Load Balance (Existing Logic)
+
+ // (Setup buttons, load balance, init map, etc.)
+    const geoBtn = document.getElementById('btn-geo-checkin');
+    geoBtn.style.display = 'block';
+    geoBtn.disabled = false;
+    geoBtn.innerText = "📍 Verify Location to Start";
+    geoBtn.onclick = () => verifyLocationForVisit(outletId, name, shopLat, shopLng);
+    geoBtn.style.background = "#2563eb";
+
+    document.getElementById('dist-display').innerText = "Tap Verify";
+    document.getElementById('in-shop-controls').style.display = 'none';
+
+
+    
     const balEl = document.getElementById('visit-outstanding-bal');
     balEl.innerText = "Loading...";
     try {
@@ -404,17 +421,18 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
     } catch (e) { console.error(e); }
 
     // 4. Initialize Map (Static View initially)
-    if (map) map.remove();
+   if (map) map.remove();
     map = L.map('map').setView([shopLat, shopLng], 18);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-    // Shop Marker
     shopMarker = L.marker([shopLat, shopLng]).addTo(map).bindPopup(`<b>${name}</b>`).openPopup();
     
-    // User Marker (Hidden initially or last known)
     userMarker = L.circleMarker([0,0], { radius: 8, color: 'blue', fillOpacity: 0.8 }).addTo(map);
     if(lastKnownLocation) userMarker.setLatLng([lastKnownLocation.lat, lastKnownLocation.lng]);
 };
+
+
+
 
 
 window.closeVisitPanel = function() {
@@ -511,41 +529,64 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
 
 
 async function performEndVisit() {
-    if(!confirm("End visit for this shop?")) return;
+    if(!confirm("Are you sure you want to end this visit?")) return;
     
     const btn = document.getElementById('btn-end-visit');
-    btn.innerText = "Ending...";
+    const originalText = btn.innerText;
+    btn.innerText = "Verifying Location...";
     btn.disabled = true;
 
     try {
-        // 1. Get GPS for Checkout
+        // 1. Get Current GPS
         const loc = await fetchCurrentGPS();
         
-        // 2. Calculate Duration
-        const endTime = new Date();
-        const duration = Math.round((endTime - visitStartTime) / 1000 / 60);
+        // 2. VALIDATION: Check if inside 50m Fence
+        if (currentVisitTarget) {
+            const dist = getDistanceFromLatLonInM(loc.lat, loc.lng, currentVisitTarget.lat, currentVisitTarget.lng);
+            
+            // Allow a small buffer (e.g. GPS inaccuracy), but strictly enforce logic
+            if (dist > GEO_FENCE_RADIUS) {
+                // ALERT AND BLOCK
+                alert(`🚫 OUT OF ZONE!\n\nYou are ${Math.round(dist)} meters away from the shop.\n\nPlease move back within ${GEO_FENCE_RADIUS} meters to close the visit.`);
+                
+                // Reset button and STOP
+                btn.innerText = originalText;
+                btn.disabled = false;
+                return; 
+            }
+        }
 
-        // 3. Update Doc
+        // 3. If validation passes, calculate duration
+        const endTime = new Date();
+        const duration = Math.round((endTime - visitStartTime) / 1000 / 60); // Minutes
+
+        // 4. Update Firestore
         await updateDoc(doc(db, "visits", currentVisitId), {
             checkOutTime: Timestamp.now(),
-            checkOutLocation: new GeoPoint(loc.lat, loc.lng), // New Field
+            checkOutLocation: new GeoPoint(loc.lat, loc.lng),
             status: "completed",
             durationMinutes: duration
         });
 
         stopTimer();
-        alert(`Visit Ended. Duration: ${duration} mins.`);
+        alert(`✅ Visit Closed Successfully.\nDuration: ${duration} mins.`);
         closeVisitPanel();
 
     } catch (error) {
         console.error("End Visit Error:", error);
-        alert("Error ending visit (GPS or Network). Try again.");
+        
+        // Detailed Error Messages
+        let msg = "Error ending visit.";
+        if (error.code === 1) msg = "GPS Permission Denied. Enable Location.";
+        else if (error.code === 2 || error.code === 3) msg = "GPS Signal Weak/Timeout. Move to open area.";
+        else if (error.message.includes("network")) msg = "Network Error. Check Internet.";
+        
+        alert(`⚠️ ${msg}\n\nTechnical details: ${error.message}`);
     } finally {
         btn.innerText = "End Visit";
         btn.disabled = false;
     }
 }
-
 
 
 
