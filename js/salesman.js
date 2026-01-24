@@ -13,7 +13,7 @@ const loader = document.getElementById('loader');
 let map = null;
 let userMarker = null;
 let shopMarker = null;
-let watchId = null;
+let lastKnownLocation = null; 
 let currentVisitId = null;
 let visitStartTime = null;
 let timerInterval = null;
@@ -24,6 +24,73 @@ let orderCart = [];
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
 console.log("Salesman Script Loaded");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- HELPER: ON-DEMAND GPS FETCH ---
+async function fetchCurrentGPS() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("GPS not supported"));
+            return;
+        }
+        
+        console.log("🛰️ Requesting GPS...");
+        
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                // Update Cache
+                lastKnownLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    timestamp: Date.now()
+                };
+                console.log("✅ GPS Cached:", lastKnownLocation);
+                resolve(lastKnownLocation);
+            },
+            (err) => {
+                console.error("GPS Error:", err);
+                // Fallback to cache if recent (< 5 mins)
+                if (lastKnownLocation && (Date.now() - lastKnownLocation.timestamp < 300000)) {
+                    console.warn("⚠️ Using cached GPS due to error");
+                    resolve(lastKnownLocation);
+                } else {
+                    reject(err);
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Force fresh
+        );
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -65,19 +132,10 @@ onAuthStateChanged(auth, async (user) => {
 });
 // --- SAFE LOGOUT (Cleanup GPS) ---
 document.getElementById('logoutBtn').addEventListener('click', () => {
-    // 1. Stop Geo-fencing if active
-    if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        console.log("GPS Watch Cleared");
-    }
-    
-    // 2. Stop Visit Timer if active
+    // Stop Visit Timer if active
     if (timerInterval) {
         clearInterval(timerInterval);
     }
-
-    // 3. Logout
     logoutUser();
 });
 
@@ -315,67 +373,47 @@ async function loadRouteOnMap() {
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
 window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
-
-    // ── Switch Views ─────────────────────────────
+    // 1. Switch Views
     document.getElementById('route-view').style.display = 'none';
     document.getElementById('visit-view').style.display = 'block';
 
     document.getElementById('visit-shop-name').innerText = name;
-    document.getElementById('dist-display').innerText = "Locating...";
-
-    // ── Reset Controls ───────────────────────────
+    
+    // 2. Setup "Check-In" Button (Reset State)
     const geoBtn = document.getElementById('btn-geo-checkin');
     geoBtn.style.display = 'block';
-    geoBtn.disabled = true;
-    geoBtn.innerText = "Waiting for GPS...";
+    geoBtn.disabled = false;
+    geoBtn.innerText = "📍 Verify Location to Start";
+    geoBtn.onclick = () => verifyLocationForVisit(outletId, name, shopLat, shopLng); // New Handler
+    geoBtn.style.background = "#2563eb"; // Blue
+
+    document.getElementById('dist-display').innerText = "Tap Verify";
     document.getElementById('in-shop-controls').style.display = 'none';
 
-    // ── NEW: Fetch Outstanding Balance ───────────
+    // 3. Load Balance (Existing Logic)
     const balEl = document.getElementById('visit-outstanding-bal');
     balEl.innerText = "Loading...";
-
     try {
         const docSnap = await getDoc(doc(db, "outlets", outletId));
         if (docSnap.exists()) {
-            const bal = docSnap.data().currentBalance || 0;
-            balEl.innerText = "₹" + bal.toFixed(2);
-
-            // Save outlet info for payment modal
+            balEl.innerText = "₹" + (docSnap.data().currentBalance || 0).toFixed(2);
             const payEl = document.getElementById('pay-outlet-name');
             payEl.dataset.id = outletId;
             payEl.innerText = name;
-        } else {
-            balEl.innerText = "₹0.00";
         }
-    } catch (e) {
-        console.error("Balance fetch failed:", e);
-        balEl.innerText = "Error";
-    }
+    } catch (e) { console.error(e); }
 
-    // ── Initialize Map ───────────────────────────
-    if (map) map.remove(); // Destroy previous instance
-
+    // 4. Initialize Map (Static View initially)
+    if (map) map.remove();
     map = L.map('map').setView([shopLat, shopLng], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    // ── Shop Marker ──────────────────────────────
-    shopMarker = L.marker([shopLat, shopLng])
-        .addTo(map)
-        .bindPopup(`<b>${name}</b><br>Target Location`)
-        .openPopup();
-
-    // ── User Marker ──────────────────────────────
-    userMarker = L.circleMarker([0, 0], {
-        radius: 8,
-        color: 'blue',
-        fillOpacity: 0.8
-    }).addTo(map);
-
-    // ── Start Geo-Fencing ─────────────────────────
-    startGeoFencing(shopLat, shopLng, outletId, name);
+    // Shop Marker
+    shopMarker = L.marker([shopLat, shopLng]).addTo(map).bindPopup(`<b>${name}</b>`).openPopup();
+    
+    // User Marker (Hidden initially or last known)
+    userMarker = L.circleMarker([0,0], { radius: 8, color: 'blue', fillOpacity: 0.8 }).addTo(map);
+    if(lastKnownLocation) userMarker.setLatLng([lastKnownLocation.lat, lastKnownLocation.lng]);
 };
 
 
@@ -433,31 +471,28 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
     const controls = document.getElementById('in-shop-controls');
     
     try {
-        btn.innerText = "Signing in...";
+        btn.innerText = "Saving...";
+        btn.disabled = true;
         
-        // DENORMALIZATION: Get Route Name from Cache or UI Fallback
-        const routeName = appCache.route ? appCache.route.name : 
-                          (document.getElementById('route-name')?.innerText || "Unknown Route");
+        const routeName = appCache.route ? appCache.route.name : (document.getElementById('route-name')?.innerText || "Unknown");
 
-        // Save Visit with Names
+        // Save Visit
         const docRef = await addDoc(collection(db, "visits"), {
             salesmanId: auth.currentUser.uid,
-            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name
+            salesmanName: appCache.user?.fullName || auth.currentUser.email,
             outletId: outletId,
-            outletName: outletName, // Store Name
-            routeName: routeName,   // Store Name
+            outletName: outletName,
+            routeName: routeName,
             checkInTime: Timestamp.now(),
-            location: new GeoPoint(lat, lng),
+            location: new GeoPoint(lat, lng), // Use passed coords
             status: "in-progress"
         });
 
         currentVisitId = docRef.id;
         visitStartTime = new Date();
 
-        // Update UI
         btn.style.display = 'none';
         controls.style.display = 'block';
-        
         startTimer();
 
         // Bind Actions
@@ -467,7 +502,8 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
     } catch (error) {
         console.error("Visit Start Error:", error);
         alert("Check-in failed: " + error.message);
-        btn.innerText = "Retry Check-in";
+        btn.disabled = false;
+        btn.innerText = "Retry Confirm";
     }
 }
 
@@ -475,14 +511,24 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
 
 
 async function performEndVisit() {
-    if(!confirm("Are you done with this shop?")) return;
+    if(!confirm("End visit for this shop?")) return;
     
-    try {
-        const endTime = new Date();
-        const duration = Math.round((endTime - visitStartTime) / 1000 / 60); // Minutes
+    const btn = document.getElementById('btn-end-visit');
+    btn.innerText = "Ending...";
+    btn.disabled = true;
 
+    try {
+        // 1. Get GPS for Checkout
+        const loc = await fetchCurrentGPS();
+        
+        // 2. Calculate Duration
+        const endTime = new Date();
+        const duration = Math.round((endTime - visitStartTime) / 1000 / 60);
+
+        // 3. Update Doc
         await updateDoc(doc(db, "visits", currentVisitId), {
             checkOutTime: Timestamp.now(),
+            checkOutLocation: new GeoPoint(loc.lat, loc.lng), // New Field
             status: "completed",
             durationMinutes: duration
         });
@@ -493,9 +539,15 @@ async function performEndVisit() {
 
     } catch (error) {
         console.error("End Visit Error:", error);
-        alert("Error ending visit.");
+        alert("Error ending visit (GPS or Network). Try again.");
+    } finally {
+        btn.innerText = "End Visit";
+        btn.disabled = false;
     }
 }
+
+
+
 
 
 // --- 6. DAILY ATTENDANCE (Dashboard Top) ---
@@ -531,30 +583,34 @@ async function checkTodayAttendance(user) {
     }
 }
 
-function handleDailyAttendance(user) {
+async function handleDailyAttendance(user) {
     const btn = document.getElementById('checkInBtn');
-    if (!navigator.geolocation) return alert("No GPS available");
     
-    btn.innerText = "Locating...";
-    
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
-            // DENORMALIZATION: Add salesmanName
-            await addDoc(collection(db, "attendance"), {
-                salesmanId: user.uid,
-                salesmanName: appCache.user?.fullName || user.email, // Store Name
-                salesmanEmail: user.email,
-                date: getTodayDateString(),
-                checkInTime: Timestamp.now(),
-                location: new GeoPoint(pos.coords.latitude, pos.coords.longitude)
-            });
-            alert("Daily Attendance Marked!");
-            checkTodayAttendance(user);
-        } catch (e) { 
-            alert("Error: " + e.message); 
-            btn.innerText = "Check In Now"; 
-        }
-    });
+    try {
+        btn.disabled = true;
+        btn.innerText = "Locating...";
+
+        // 1. Get GPS On-Demand
+        const loc = await fetchCurrentGPS();
+        
+        // 2. Submit to Firestore
+        await addDoc(collection(db, "attendance"), {
+            salesmanId: user.uid,
+            salesmanName: appCache.user?.fullName || user.email, 
+            salesmanEmail: user.email,
+            date: getTodayDateString(),
+            checkInTime: Timestamp.now(),
+            location: new GeoPoint(loc.lat, loc.lng)
+        });
+
+        alert("Daily Attendance Marked!");
+        checkTodayAttendance(user); // Refresh UI
+
+    } catch (e) {
+        alert("Error: " + e.message);
+        btn.disabled = false;
+        btn.innerText = "Check In Now";
+    }
 }
 
 
@@ -941,33 +997,46 @@ window.openPaymentModal = function() {
 
 window.submitPayment = async function() {
     const outletId = document.getElementById('pay-outlet-name').dataset.id;
-    const outletName = document.getElementById('pay-outlet-name').innerText; // Pulled from UI
+    const outletName = document.getElementById('pay-outlet-name').innerText;
     const amount = parseFloat(document.getElementById('payAmount').value);
     const method = document.getElementById('payMethod').value;
     const modal = document.getElementById('paymentModal');
 
     if(!amount || amount <= 0) return alert("Enter valid amount");
 
-    modal.style.display = 'none';
+    // Temporarily disable UI but keep modal open until GPS is fetched
+    const submitBtn = modal.querySelector('button[onclick="submitPayment()"]');
+    const origText = submitBtn.innerText;
+    submitBtn.innerText = "Locating...";
+    submitBtn.disabled = true;
 
     try {
+        // 1. Active GPS Fetch
+        const loc = await fetchCurrentGPS();
+
+        // 2. Submit Data
         await addDoc(collection(db, "payments"), {
             salesmanId: auth.currentUser.uid,
-            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name (Optional but good)
+            salesmanName: appCache.user?.fullName || auth.currentUser.email,
             outletId: outletId,
-            outletName: outletName, // Store Name
+            outletName: outletName,
             amount: amount,
             method: method,
             date: Timestamp.now(),
+            gpsLat: loc.lat, // Store Coords
+            gpsLng: loc.lng,
             status: "pending"
         });
 
-        alert("Payment Recorded! Waiting for Admin Approval.");
+        alert("Payment Recorded successfully!");
+        modal.style.display = 'none';
 
     } catch (error) {
         console.error("Payment Error:", error);
-        alert("Failed to record payment: " + error.message);
-        modal.style.display = 'flex';
+        alert("Failed: " + error.message);
+    } finally {
+        submitBtn.innerText = origText;
+        submitBtn.disabled = false;
     }
 };
 
@@ -1296,3 +1365,44 @@ window.submitNewShop = submitNewShop;
 window.openAddShopModal = openAddShopModal;
 
 
+async function verifyLocationForVisit(outletId, outletName, targetLat, targetLng) {
+    const btn = document.getElementById('btn-geo-checkin');
+    const distDisplay = document.getElementById('dist-display');
+
+    try {
+        btn.innerText = "Locating...";
+        btn.disabled = true;
+
+        // 1. Active GPS Request
+        const loc = await fetchCurrentGPS();
+
+        // 2. Update Map
+        userMarker.setLatLng([loc.lat, loc.lng]);
+        map.setView([loc.lat, loc.lng], 18);
+
+        // 3. Calculate Distance
+        const distMeters = getDistanceFromLatLonInM(loc.lat, loc.lng, targetLat, targetLng);
+        const distInt = Math.round(distMeters);
+        distDisplay.innerText = `${distInt}m`;
+
+        // 4. Check Fence
+        if (distMeters <= GEO_FENCE_RADIUS) {
+            btn.style.background = "#28a745"; // Green
+            btn.innerText = `✅ Confirm Check-In (${distInt}m)`;
+            btn.disabled = false;
+            // Next click performs the actual DB write
+            btn.onclick = () => performVisitCheckIn(outletId, outletName, loc.lat, loc.lng);
+        } else {
+            btn.style.background = "#dc3545"; // Red
+            btn.innerText = `❌ Too Far (${distInt}m) - Retry`;
+            btn.disabled = false;
+            // Click to retry
+            btn.onclick = () => verifyLocationForVisit(outletId, outletName, targetLat, targetLng);
+        }
+
+    } catch (e) {
+        alert("GPS Error: " + e.message);
+        btn.innerText = "Retry Location";
+        btn.disabled = false;
+    }
+}
