@@ -1531,14 +1531,75 @@ window.openQuickCollection = function(outletId, outletName) {
     const label = document.getElementById('pay-outlet-name');
     const input = document.getElementById('payAmount');
     
-    // Set Data
+    // 1. Set Outlet Data
     label.innerText = outletName;
-    label.dataset.id = outletId; // Important: Stores ID for submit
+    label.dataset.id = outletId; // Store ID for the fetch function
     
-    // Reset Inputs
+    // 2. RESET Balance View (Crucial for optimization)
+    // We wipe previous data so we don't show wrong balances from other shops
+    document.getElementById('pay-balance-display').innerText = "---";
+    document.getElementById('pay-balance-display').className = "text-sm font-bold text-slate-700";
+    
+    const viewBtn = document.getElementById('btn-view-bal');
+    viewBtn.style.display = "inline-block"; // Show the button
+    viewBtn.innerText = "VIEW";
+    viewBtn.disabled = false;
+
+    // 3. Reset Inputs
     input.value = "";
     document.getElementById('payMethod').value = "Cash";
     
-    // Show Modal
+    // 4. Show Modal
     modal.style.display = 'flex';
 }
+
+
+
+
+// --- NEW FUNCTION: ON-DEMAND BALANCE FETCH ---
+window.fetchOutletBalance = async function() {
+    const label = document.getElementById('pay-outlet-name');
+    const outletId = label.dataset.id;
+    const display = document.getElementById('pay-balance-display');
+    const btn = document.getElementById('btn-view-bal');
+
+    if(!outletId) return;
+
+    // UI: Show loading state
+    btn.disabled = true;
+    btn.innerText = "...";
+    display.innerText = "Loading...";
+
+    try {
+        console.log("💰 Fetching Balance from Firestore (1 Read Cost)");
+        
+        // DIRECT FIRESTORE READ
+        // We do this here specifically to get the absolute latest money data
+        const docRef = doc(db, "outlets", outletId);
+        const docSnap = await getDoc(docRef);
+
+        if(docSnap.exists()) {
+            const bal = docSnap.data().currentBalance || 0;
+            
+            // Format Currency
+            display.innerText = "₹" + bal.toFixed(2);
+            
+            // Color Logic: Red if they owe money, Green if 0 or positive
+            if(bal > 0) {
+                display.className = "text-sm font-bold text-red-600";
+            } else {
+                display.className = "text-sm font-bold text-green-600";
+            }
+            
+            // Hide button after successful fetch to prevent re-clicks
+            btn.style.display = "none";
+        } else {
+            display.innerText = "Error";
+        }
+    } catch (e) {
+        console.error("Balance Fetch Error:", e);
+        display.innerText = "Failed";
+        btn.innerText = "Retry";
+        btn.disabled = false;
+    }
+};
