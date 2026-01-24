@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
-
+import { getCachedUserProfile } from "./auth.js"; // <--- Add this import at the top
 // --- GLOBAL VARIABLES ---
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
@@ -25,7 +25,8 @@ const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
 console.log("Salesman Script Loaded");
 
-// --- 2. MAIN EXECUTION (AUTH GUARD) ---
+
+
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
         window.location.href = 'index.html';
@@ -33,25 +34,26 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     try {
-        // A. Verify Role
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        // A. USE CACHED PROFILE
+        const userData = await getCachedUserProfile(user.uid);
         
-        if (!userDoc.exists() || userDoc.data().role !== 'salesman') {
+        // B. Check Salesman Role
+        if (!userData || userData.role !== 'salesman') {
             alert("Access Denied: Salesman role required.");
             logoutUser();
             return;
         }
 
-        // B. Initialize UI
+        // C. Initialize UI
         if (loader) loader.style.display = 'none';
         if (content) content.style.display = 'block';
 
-        // C. Load Initial Data
+        // D. Load Data
         checkTodayAttendance(user);
         loadAssignedRoute(user.uid);
         loadDailyTarget();
 
-        // D. Attach Global Listener for Daily Attendance
+        // E. Attach Global Listener
         const checkInBtn = document.getElementById('checkInBtn');
         if(checkInBtn) {
             checkInBtn.addEventListener('click', () => handleDailyAttendance(user));
@@ -59,10 +61,8 @@ onAuthStateChanged(auth, async (user) => {
 
     } catch (error) {
         console.error("Init Error:", error);
-        alert("System Error: " + error.message);
     }
 });
-
 // --- SAFE LOGOUT (Cleanup GPS) ---
 document.getElementById('logoutBtn').addEventListener('click', () => {
     // 1. Stop Geo-fencing if active
