@@ -184,14 +184,32 @@ async function loadAssignedRoute(uid) {
 async function loadShops(routeId) {
     const list = document.getElementById('shops-list');
     
-    // 1. Check Cache for Outlets List (Heavy Operation)
+    // 1. Fetch Today's Visits (To mark them green)
+    // We do this every time to keep the "Visited" status fresh
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const todayTs = Timestamp.fromDate(today);
+    
+    let visitedSet = new Set();
+    
+    try {
+        const visitQ = query(
+            collection(db, "visits"), 
+            where("salesmanId", "==", auth.currentUser.uid),
+            where("checkInTime", ">=", todayTs)
+        );
+        const visitSnap = await getDocs(visitQ);
+        visitSnap.forEach(doc => visitedSet.add(doc.data().outletId));
+    } catch(e) { console.error("Error fetching daily visits:", e); }
+
+    // 2. Check Cache for Outlets List (Heavy Data)
     if (appCache.routeOutlets) {
         console.log("⚡ Loaded Shops from Cache");
-        renderShopsList(appCache.routeOutlets);
+        renderShopsList(appCache.routeOutlets, visitedSet); // Pass visitedSet
         return;
     }
 
-    // 2. Network Fetch
+    // 3. Network Fetch (If not cached)
     console.log("🌐 Fetching Outlets from Firestore...");
     const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
     
@@ -203,62 +221,66 @@ async function loadShops(routeId) {
             return; 
         }
 
-        // 3. Process & Merge Data (Parallel Fetching)
+        // Process & Merge Data
         const outletPromises = snap.docs.map(async (docSnap) => {
             const linkData = docSnap.data();
-            
-            // Fetch actual Outlet details (for GPS/Name)
             const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
             if (!outletDoc.exists()) return null;
-
             const outletData = outletDoc.data();
             
             return {
                 id: linkData.outletId,
-                name: linkData.outletName, // or outletData.shopName
+                name: linkData.outletName,
                 sequence: linkData.sequence,
                 lat: outletData.geo ? outletData.geo.lat : 0,
                 lng: outletData.geo ? outletData.geo.lng : 0,
-                // Store extra data needed for orders
                 fullData: outletData 
             };
         });
 
-        // Wait for all fetches
         const results = await Promise.all(outletPromises);
         const validShops = results.filter(s => s !== null);
 
-        // 4. Save to Cache
+        // Save to Cache
         appCache.routeOutlets = validShops;
 
-        // 5. Render
-        renderShopsList(validShops);
+        // Render
+        renderShopsList(validShops, visitedSet); // Pass visitedSet
 
     } catch (error) {
         console.error("Load Shops Error:", error);
-        if (error.message.includes("index")) {
-            list.innerHTML = `<li style="color:red; font-weight:bold;">⚠️ Database Index Missing (Check Console)</li>`;
-        }
     }
 }
 
 // Helper to Render UI (Reused by Cache and Network)
-function renderShopsList(shops) {
+// Helper to Render UI
+function renderShopsList(shops, visitedSet = new Set()) {
     const list = document.getElementById('shops-list');
     list.innerHTML = "";
 
     shops.forEach(shop => {
+        const isVisited = visitedSet.has(shop.id);
         const li = document.createElement('li');
-        li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
+        
+        // Dynamic Styling
+        const bgStyle = isVisited ? "background:#f0fdf4; border:1px solid #86efac;" : "background:white; border:1px solid #ddd;";
+        const checkMark = isVisited ? `<span style="color:green; font-weight:bold; font-size:12px;">✅ Visited</span>` : "";
+
+        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s;`;
         
         li.innerHTML = `
             <div>
-                <strong style="font-size:1.1rem;">${shop.name}</strong><br>
-                <small>Seq: ${shop.sequence}</small>
+                <strong style="font-size:1.1rem; color:${isVisited ? '#15803d' : '#333'}">${shop.name}</strong><br>
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <small style="color:#666">Seq: ${shop.sequence}</small>
+                    ${checkMark}
+                </div>
             </div>
             <div style="display:flex; gap:10px;">
                 <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">📞</button>
-                <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Open 🗺️</button>
+                <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
+                    ${isVisited ? 'Re-Visit 🔄' : 'Open 🗺️'}
+                </button>
             </div>
         `;
         
@@ -272,6 +294,7 @@ function renderShopsList(shops) {
         list.appendChild(li);
     });
 }
+
 
 
 
@@ -562,6 +585,8 @@ async function performEndVisit() {
         const duration = Math.round((endTime - visitStartTime) / 1000 / 60); // Minutes
 
         // 4. Update Firestore
+        // ... inside try block ...
+
         await updateDoc(doc(db, "visits", currentVisitId), {
             checkOutTime: Timestamp.now(),
             checkOutLocation: new GeoPoint(loc.lat, loc.lng),
@@ -572,6 +597,13 @@ async function performEndVisit() {
         stopTimer();
         alert(`✅ Visit Closed Successfully.\nDuration: ${duration} mins.`);
         closeVisitPanel();
+
+        // NEW: REFRESH THE SHOP LIST TO SHOW GREEN COLOR
+        if (appCache.route) {
+            loadShops(appCache.route.id);
+        }
+
+      
 
     } catch (error) {
         console.error("End Visit Error:", error);
