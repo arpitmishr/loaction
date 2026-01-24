@@ -272,7 +272,18 @@ window.processLeave = async function(leaveId, status) {
         loadAttendanceByDate(); // Refresh attendance table
     } catch (e) { alert("Error: " + e.message); }
 };
-// --- 4. SALESMAN LIST (WAS MISSING) ---
+
+
+
+
+
+
+
+
+
+
+
+// --- 4. SALESMAN LIST ---
 
 async function loadSalesmenList() {
     const list = document.getElementById('salesmen-list');
@@ -307,6 +318,20 @@ async function loadSalesmenList() {
             `;
             list.appendChild(li);
         });
+
+    } catch (error) {
+        console.error("Error loading salesmen:", error);
+        list.innerHTML = "<li>Error loading list.</li>";
+    }
+}
+
+
+
+
+
+
+
+
 
 // --- 5. OUTLET MANAGEMENT ---
 
