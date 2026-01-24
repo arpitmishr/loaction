@@ -289,15 +289,24 @@ async function loadSalesmenList() {
         snap.forEach(doc => {
             const d = doc.data();
             const li = document.createElement('li');
-            li.textContent = `👤 ${d.fullName || d.email} ${d.phone ? ' - ' + d.phone : ''}`;
-            li.style.padding = "5px 0";
+            li.className = "flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-white border border-slate-100 shadow-sm transition-all";
+            
+            li.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-100 text-indigo-600 p-2 rounded-full">
+                        <span class="material-icons-round text-sm">person</span>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-slate-700">${d.fullName || d.email}</p>
+                        <p class="text-xs text-slate-400">${d.phone || 'No Phone'}</p>
+                    </div>
+                </div>
+                <button onclick="openSalarySettings('${doc.id}', '${d.fullName || d.email}')" class="text-slate-400 hover:text-emerald-600 p-2 rounded-lg hover:bg-emerald-50 transition">
+                    <span class="material-icons-round text-lg">payments</span>
+                </button>
+            `;
             list.appendChild(li);
         });
-    } catch (e) {
-        console.error("Salesmen List Error:", e);
-        list.innerHTML = "<li>Error loading list.</li>";
-    }
-}
 
 // --- 5. OUTLET MANAGEMENT ---
 
@@ -1699,3 +1708,221 @@ function renderTransactionsList(data) {
 // 5. EXPOSE TO HTML (Fixes the "not defined" error)
 window.loadTransactions = loadTransactions;
 window.filterTransactionsClientSide = filterTransactionsClientSide;
+
+
+
+
+
+
+
+
+// ==========================================
+//      PAYROLL / SALARY GENERATION LOGIC
+// ==========================================
+
+// 1. Open Configuration Modal
+window.openSalarySettings = async function(uid, name) {
+    document.getElementById('salarySettingsModal').classList.remove('hidden');
+    document.getElementById('salaryModalUser').innerText = name;
+    document.getElementById('salaryEditUid').value = uid;
+    document.getElementById('baseSalaryInput').value = ""; // Reset
+
+    // Fetch existing setting
+    try {
+        const docSnap = await getDoc(doc(db, "users", uid));
+        if(docSnap.exists() && docSnap.data().baseSalaryPerDay) {
+            document.getElementById('baseSalaryInput').value = docSnap.data().baseSalaryPerDay;
+        }
+    } catch(e) { console.error(e); }
+};
+
+// 2. Save Configuration
+window.saveSalarySettings = async function() {
+    const uid = document.getElementById('salaryEditUid').value;
+    const amount = Number(document.getElementById('baseSalaryInput').value);
+    
+    if(!uid || amount < 0) return alert("Invalid Input");
+
+    try {
+        await updateDoc(doc(db, "users", uid), { baseSalaryPerDay: amount });
+        alert("Settings Saved!");
+        document.getElementById('salarySettingsModal').classList.add('hidden');
+    } catch(e) { alert("Error: " + e.message); }
+};
+
+// 3. GENERATE REPORT (The Complex Part)
+window.generateSalaryReport = async function() {
+    const picker = document.getElementById('salaryMonthPicker');
+    const tbody = document.getElementById('salary-table-body');
+    
+    if(!picker.value) return alert("Select a month first.");
+
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center">Calculating Incentives & Deductions...</td></tr>';
+
+    const [year, month] = picker.value.split('-');
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startStr = `${year}-${month}-01`;
+    const endStr = `${year}-${month}-${daysInMonth}`;
+
+    // Timestamps for Order Query
+    const startTs = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
+    const endTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
+
+    try {
+        // A. Fetch All Salesmen
+        const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "salesman")));
+        
+        // B. Fetch All Required Data for the Month
+        // 1. Attendance
+        const attSnap = await getDocs(query(collection(db, "attendance"), where("date", ">=", startStr), where("date", "<=", endStr)));
+        // 2. Leaves (Approved only)
+        const leaveSnap = await getDocs(query(collection(db, "leaves"), where("status", "==", "approved"), where("date", ">=", startStr), where("date", "<=", endStr)));
+        // 3. Targets
+        const targetSnap = await getDocs(query(collection(db, "daily_targets"), where("date", ">=", startStr), where("date", "<=", endStr)));
+        // 4. Orders (To calculate incentive achievement)
+        const orderSnap = await getDocs(query(collection(db, "orders"), where("orderDate", ">=", startTs), where("orderDate", "<=", endTs)));
+
+        // --- C. PROCESS DATA IN MEMORY ---
+        const report = [];
+
+        usersSnap.forEach(uDoc => {
+            const user = uDoc.data();
+            const uid = uDoc.id;
+            const baseRate = user.baseSalaryPerDay || 0;
+
+            let stats = {
+                uid: uid,
+                name: user.fullName || user.email,
+                baseRate: baseRate,
+                presentDays: 0,
+                halfDays: 0,
+                sickLeaves: 0,
+                otherLeaves: 0, // Unpaid
+                incentiveTotal: 0
+            };
+
+            // 1. Calculate Attendance
+            attSnap.docs.forEach(d => { if(d.data().salesmanId === uid) stats.presentDays++; });
+
+            // 2. Calculate Leaves & Deductions
+            leaveSnap.docs.forEach(d => {
+                const data = d.data();
+                if(data.salesmanId === uid || data.userId === uid) {
+                    if(data.type === 'Half Day') stats.halfDays++;
+                    else if(data.type === 'Sick Leave') stats.sickLeaves++;
+                    else stats.otherLeaves++;
+                }
+            });
+
+            // 3. Calculate Incentives (Target vs Actual)
+            // Group orders by Date
+            const dailySales = {}; 
+            orderSnap.docs.forEach(o => {
+                const od = o.data();
+                if(od.salesmanId === uid) {
+                    const dateKey = od.orderDate.toDate().toISOString().split('T')[0]; // Local time might vary, simplest approx
+                    // Better: use the date string if you saved it, else convert timestamp
+                    if(!dailySales[dateKey]) dailySales[dateKey] = 0;
+                    
+                    if(od.items) {
+                        od.items.forEach(i => dailySales[dateKey] += (Number(i.qty) || 0));
+                    }
+                }
+            });
+
+            // Check against targets
+            targetSnap.docs.forEach(t => {
+                const td = t.data();
+                if(td.salesmanId === uid) {
+                    const actualBoxes = dailySales[td.date] || 0;
+                    if(actualBoxes > td.targetBoxes) {
+                        const extra = actualBoxes - td.targetBoxes;
+                        stats.incentiveTotal += (extra * (td.incentivePerBox || 0));
+                    }
+                }
+            });
+
+            report.push(stats);
+        });
+
+        // --- D. RENDER TABLE ---
+        tbody.innerHTML = "";
+        
+        report.forEach((r, index) => {
+            // Default Pay Calculation
+            // Present = 100%, HalfDay = 50%, Sick = Optional (Default 0 here, toggle adds it), Other = 0%
+            const payFromAttendance = (r.presentDays * r.baseRate);
+            const payFromHalfDays = (r.halfDays * (r.baseRate / 2));
+            
+            // Initial Total (Without Sick Pay)
+            const initialBasePay = payFromAttendance + payFromHalfDays;
+            
+            const rowId = `sal-row-${index}`;
+            
+            const row = `
+                <tr class="hover:bg-slate-50 border-b border-slate-100">
+                    <td class="p-4">
+                        <div class="font-bold text-slate-700">${r.name}</div>
+                        <div class="text-[10px] text-slate-400">Rate: ₹${r.baseRate}/day</div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="text-xs">
+                            <span class="text-green-600 font-bold">${r.presentDays} P</span> | 
+                            <span class="text-amber-600 font-bold">${r.halfDays} HD</span> | 
+                            <span class="text-red-500 font-bold">${r.otherLeaves} L</span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="flex flex-col items-center gap-1">
+                            <span class="text-xs font-bold text-slate-600">${r.sickLeaves} Days</span>
+                            ${r.sickLeaves > 0 ? `
+                                <label class="flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" onchange="updateRowTotal('${rowId}', ${r.baseRate}, ${r.sickLeaves})" class="w-3 h-3 rounded text-emerald-600 focus:ring-emerald-500">
+                                    <span class="text-[9px] text-slate-500 uppercase font-bold">Pay?</span>
+                                </label>
+                            ` : '-'}
+                        </div>
+                    </td>
+                    <td class="p-4 text-right font-medium text-slate-600">
+                        ₹<span id="${rowId}-base" data-initial="${initialBasePay}">${initialBasePay.toFixed(2)}</span>
+                    </td>
+                    <td class="p-4 text-right font-medium text-purple-600">
+                        + ₹<span id="${rowId}-inc">${r.incentiveTotal.toFixed(2)}</span>
+                    </td>
+                    <td class="p-4 text-right font-bold text-lg text-slate-800 bg-slate-50/50">
+                        ₹<span id="${rowId}-total">${(initialBasePay + r.incentiveTotal).toFixed(2)}</span>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        if(report.length === 0) tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center">No staff found.</td></tr>';
+
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-500">Error: ${e.message}</td></tr>`;
+    }
+};
+
+// 4. Update Logic when "Pay Sick Leave" is toggled
+window.updateRowTotal = function(rowId, rate, sickDays) {
+    const checkbox = event.target;
+    const baseEl = document.getElementById(`${rowId}-base`);
+    const incEl = document.getElementById(`${rowId}-inc`);
+    const totalEl = document.getElementById(`${rowId}-total`);
+
+    const initialBase = parseFloat(baseEl.dataset.initial);
+    const incentive = parseFloat(incEl.innerText);
+    
+    // Calculate Sick Pay Amount
+    const sickPayAmount = checkbox.checked ? (rate * sickDays) : 0;
+    
+    // New Totals
+    const newBase = initialBase + sickPayAmount;
+    const newTotal = newBase + incentive;
+
+    // Update UI
+    baseEl.innerText = newBase.toFixed(2);
+    totalEl.innerText = newTotal.toFixed(2);
+};
