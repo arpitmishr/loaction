@@ -244,13 +244,19 @@
                     <div class="p-5 flex-grow bg-[#f8fafc]">
                         <!-- Map -->
                         <div class="relative w-full h-64 bg-slate-200 rounded-3xl overflow-hidden shadow-md border border-slate-200 mb-6 group">
-                            <div id="map" class="w-full h-full z-0"></div>
-                            <!-- Distance Badge -->
-                            <div class="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm text-slate-700 z-[1000] border border-slate-100 flex items-center gap-1">
-                                <span class="material-icons-round text-sm text-indigo-500">near_me</span>
-                                <span id="dist-display">--</span>
-                            </div>
-                        </div>
+    <div id="map" class="w-full h-full z-0"></div>
+    
+    <!-- Distance Badge (Existing) -->
+    <div class="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm text-slate-700 z-[400] border border-slate-100 flex items-center gap-1">
+        <span class="material-icons-round text-sm text-indigo-500">near_me</span>
+        <span id="dist-display">--</span>
+    </div>
+
+    <!-- NEW NAVIGATION BUTTON (Floating on Map) -->
+    <button id="btn-visit-navigate" class="absolute bottom-3 right-3 bg-blue-600 text-white p-3 rounded-full shadow-lg z-[400] flex items-center justify-center active:scale-95 transition-transform hover:bg-blue-700">
+        <span class="material-icons-round text-xl">directions</span>
+    </button>
+</div>
 
                         <!-- Pre-Checkin Action -->
                         <button id="btn-geo-checkin" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold shadow-xl shadow-slate-300 mb-6 flex items-center justify-center gap-3 disabled:bg-slate-300 disabled:shadow-none disabled:cursor-not-allowed transition-all transform active:scale-95 border border-slate-800">
