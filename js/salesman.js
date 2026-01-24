@@ -435,11 +435,17 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
     try {
         btn.innerText = "Signing in...";
         
-        // Save Visit to Firestore
+        // DENORMALIZATION: Get Route Name from Cache or UI Fallback
+        const routeName = appCache.route ? appCache.route.name : 
+                          (document.getElementById('route-name')?.innerText || "Unknown Route");
+
+        // Save Visit with Names
         const docRef = await addDoc(collection(db, "visits"), {
             salesmanId: auth.currentUser.uid,
+            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name
             outletId: outletId,
-            outletName: outletName,
+            outletName: outletName, // Store Name
+            routeName: routeName,   // Store Name
             checkInTime: Timestamp.now(),
             location: new GeoPoint(lat, lng),
             status: "in-progress"
@@ -454,18 +460,19 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
         
         startTimer();
 
-        // Bind Button Actions
-        document.getElementById('btn-take-order').onclick = () => {
-    // Pass outlet ID and Name from the current visit context
-    openOrderForm(outletId, outletName);
-};
+        // Bind Actions
+        document.getElementById('btn-take-order').onclick = () => openOrderForm(outletId, outletName);
         document.getElementById('btn-end-visit').onclick = () => performEndVisit();
 
     } catch (error) {
         console.error("Visit Start Error:", error);
         alert("Check-in failed: " + error.message);
+        btn.innerText = "Retry Check-in";
     }
 }
+
+
+
 
 async function performEndVisit() {
     if(!confirm("Are you done with this shop?")) return;
@@ -532,8 +539,10 @@ function handleDailyAttendance(user) {
     
     navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
+            // DENORMALIZATION: Add salesmanName
             await addDoc(collection(db, "attendance"), {
                 salesmanId: user.uid,
+                salesmanName: appCache.user?.fullName || user.email, // Store Name
                 salesmanEmail: user.email,
                 date: getTodayDateString(),
                 checkInTime: Timestamp.now(),
@@ -547,6 +556,10 @@ function handleDailyAttendance(user) {
         }
     });
 }
+
+
+
+
 
 // --- 7. MATH UTILS ---
 
@@ -868,11 +881,12 @@ window.submitOrder = async function() {
         const tax = applyTax ? (subtotal * 0.05) : 0;
         const total = subtotal + tax;
 
-        // 2. Prepare Order Data
+        // 2. Prepare Order Data (DENORMALIZED)
         const orderData = {
             salesmanId: auth.currentUser.uid,
+            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name
             outletId: currentOrderOutlet.id,
-            outletName: currentOrderOutlet.name,
+            outletName: currentOrderOutlet.name, // Store Name
             visitId: isPhone ? null : currentVisitId,
             orderDate: Timestamp.now(),
             orderType: isPhone ? "Phone Call" : "Physical Visit",
@@ -927,26 +941,25 @@ window.openPaymentModal = function() {
 
 window.submitPayment = async function() {
     const outletId = document.getElementById('pay-outlet-name').dataset.id;
-    const outletName = document.getElementById('pay-outlet-name').innerText;
+    const outletName = document.getElementById('pay-outlet-name').innerText; // Pulled from UI
     const amount = parseFloat(document.getElementById('payAmount').value);
     const method = document.getElementById('payMethod').value;
     const modal = document.getElementById('paymentModal');
 
     if(!amount || amount <= 0) return alert("Enter valid amount");
 
-    // 1. Close Modal immediately
     modal.style.display = 'none';
 
     try {
-        // 2. Add 'Pending' Payment
         await addDoc(collection(db, "payments"), {
             salesmanId: auth.currentUser.uid,
+            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name (Optional but good)
             outletId: outletId,
-            outletName: outletName,
+            outletName: outletName, // Store Name
             amount: amount,
             method: method,
             date: Timestamp.now(),
-            status: "pending" // Critical: Admin must approve
+            status: "pending"
         });
 
         alert("Payment Recorded! Waiting for Admin Approval.");
@@ -954,7 +967,7 @@ window.submitPayment = async function() {
     } catch (error) {
         console.error("Payment Error:", error);
         alert("Failed to record payment: " + error.message);
-        modal.style.display = 'flex'; // Reopen on error
+        modal.style.display = 'flex';
     }
 };
 
