@@ -108,82 +108,67 @@
     </div>
 
     <script type="module">
-        import { loginUser } from './js/auth.js';
-        import { auth, db } from './js/firebase.js';
-        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-        import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { loginUser, getCachedUserProfile } from './js/auth.js'; // Import helper
+    import { auth } from './js/firebase.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 
-        const form = document.getElementById('loginForm');
-        const statusMsg = document.getElementById('statusMessage');
-        const statusContainer = document.getElementById('statusContainer');
-        const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('loginForm');
+    const statusMsg = document.getElementById('statusMessage');
+    const statusContainer = document.getElementById('statusContainer');
+    const submitBtn = document.getElementById('submitBtn');
 
-        // Helper to show/hide status
-        const showStatus = (msg) => {
-            statusMsg.innerText = msg;
-            statusContainer.classList.remove('hidden');
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
-        };
+    const showStatus = (msg) => {
+        statusMsg.innerText = msg;
+        statusContainer.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+    };
 
-        const hideStatus = () => {
-            statusContainer.classList.add('hidden');
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-        };
+    const hideStatus = () => {
+        statusContainer.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+    };
 
-        // 1. Check if user is already logged in (Auto-Redirect)
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                showStatus("Session found. Redirecting...");
-                // Re-fetch role to decide where to go
-                try {
-                    const snap = await getDoc(doc(db, "users", user.uid));
-                    if (snap.exists()) {
-                        const role = snap.data().role;
-                        if (role === 'admin') window.location.href = 'admin.html';
-                        else if (role === 'salesman') window.location.href = 'salesman.html';
-                        else {
-                            alert("No role assigned.");
-                            hideStatus();
-                        }
-                    } else {
-                        // User deleted from DB but has auth token
-                        console.warn("User has no profile doc");
-                        hideStatus();
-                    }
-                } catch (e) {
-                    console.error(e);
+    // 1. Check Login & Auto-Redirect using CACHE
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            showStatus("Session found. Redirecting...");
+            try {
+                // Use Cache Strategy
+                const userData = await getCachedUserProfile(user.uid);
+                
+                if (userData) {
+                    if (userData.role === 'admin') window.location.href = 'admin.html';
+                    else if (userData.role === 'salesman') window.location.href = 'salesman.html';
+                    else { alert("No role assigned."); hideStatus(); }
+                } else {
+                    console.warn("User has no profile doc");
                     hideStatus();
                 }
+            } catch (e) {
+                console.error(e);
+                hideStatus();
             }
-        });
+        }
+    });
 
-        // 2. Handle Login Form Submit
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            showStatus("Verifying credentials...");
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            try {
-                await loginUser(email, password);
-                // loginUser handles the redirect, but if it fails it might alert
-            } catch (error) {
-                console.error(error);
-            } finally {
-                // If we haven't redirected, re-enable button (loginUser usually redirects on success)
-                // We keep spinner if success to prevent double click while page loads
-                // If loginUser throws error inside auth.js, we might need to reset here
-                setTimeout(() => {
-                    // Logic inside auth.js handles alerts, but we want to reset UI if it failed
-                    // Check if page is unloading? Hard to detect perfectly. 
-                    // Assuming if still here after 3s, something might be wrong or it failed silently.
-                    // Ideally modify auth.js to return true/false.
-                }, 2000);
-            }
-        });
-    </script>
+    // 2. Handle Login Form
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        showStatus("Verifying credentials...");
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        try {
+            await loginUser(email, password);
+        } catch (error) {
+            console.error(error);
+            // Re-enable button after delay if no redirect happened
+            setTimeout(() => hideStatus(), 2000);
+        }
+    });
+</script>
 </body>
 </html>
