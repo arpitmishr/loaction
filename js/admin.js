@@ -521,61 +521,84 @@ window.cancelEdit = function() {
 };
 
 // --- LOAD OUTLETS (LIMITED) ---
+// --- LOAD OUTLETS (UPDATED WITH DELETE & BLOCK) ---
 async function loadOutlets() {
     const tableBody = document.getElementById('outlets-table-body');
     if (!tableBody) return;
     
     try {
-        // OPTIMIZATION: Limit to 20 newest
         const q = query(
             collection(db, "outlets"), 
             orderBy("createdAt", "desc"), 
-            limit(20)
+            limit(50) // Increased limit to see more
         );
         const snap = await getDocs(q);
 
         tableBody.innerHTML = "";
-        if (snap.empty) { tableBody.innerHTML = "<tr><td colspan='6'>No outlets found.</td></tr>"; return; }
+        if (snap.empty) { tableBody.innerHTML = "<tr><td colspan='6' class='p-4 text-center text-slate-400'>No outlets found.</td></tr>"; return; }
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
             const id = docSnap.id;
             const isBlocked = data.status === 'blocked';
             
+            // Status Badge
             const statusBadge = isBlocked 
-                ? `<span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;">Blocked</span>` 
-                : `<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;">Active</span>`;
+                ? `<span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">Blocked</span>` 
+                : `<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">Active</span>`;
 
+            // Block/Unblock Button
             const blockBtn = isBlocked
-                ? `<button style="background:#28a745; color:white; padding:4px 8px; margin-right:5px; border-radius:4px;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
-                : `<button style="background:#dc3545; color:white; padding:4px 8px; margin-right:5px; border-radius:4px;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
+                ? `<button onclick="toggleOutletStatus('${id}', 'active')" class="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors" title="Unblock Outlet">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   </button>`
+                : `<button onclick="toggleOutletStatus('${id}', 'blocked')" class="text-amber-500 hover:bg-amber-50 p-2 rounded-lg transition-colors" title="Block Outlet">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                   </button>`;
 
-            const editBtn = `<button style="background:#007bff; color:white; padding:4px 8px; border-radius:4px;" onclick="editOutlet('${id}')">Edit</button>`;
+            // Edit Button
+            const editBtn = `<button onclick="editOutlet('${id}')" class="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors" title="Edit Details">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                             </button>`;
+
+            // DELETE BUTTON (NEW)
+            const deleteBtn = `<button onclick="deleteOutlet('${id}', '${data.shopName}')" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Delete Permanently">
+                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                               </button>`;
 
             const creditInfo = data.storeType === 'Credit' 
-                ? `<small style="color:#d63384;">Limit: ${data.creditLimit}</small>` 
-                : `<small style="color:#28a745;">Cash</small>`;
+                ? `<span class="text-xs font-bold text-pink-500">Limit: ₹${data.creditLimit}</span>` 
+                : `<span class="text-xs font-bold text-emerald-600">Cash</span>`;
 
+            // Row HTML
             const row = `
-                <tr>
-                    <td><strong>${data.shopName}</strong><br><small style="color:#666;">${data.outletType}</small></td>
-                    <td>${data.contactPerson}<br><small><a href="tel:${data.contactPhone}">${data.contactPhone}</a></small></td>
-                    <td>${data.storeType}<br>${creditInfo}</td>
-                    <td><small>${data.gstNumber}</small></td>
-                    <td>${statusBadge}</td>
-                    <td>${editBtn} ${blockBtn}</td>
+                <tr class="hover:bg-slate-50 border-b border-slate-50 transition-colors ${isBlocked ? 'bg-red-50/30' : ''}">
+                    <td class="p-4">
+                        <div class="font-bold text-slate-800">${data.shopName}</div>
+                        <div class="text-xs text-slate-500">${data.outletType}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="text-sm text-slate-700">${data.contactPerson}</div>
+                        <a href="tel:${data.contactPhone}" class="text-xs text-blue-500 hover:underline">${data.contactPhone}</a>
+                    </td>
+                    <td class="p-4">
+                        <div class="text-sm font-medium text-slate-700">${data.storeType}</div>
+                        ${creditInfo}
+                    </td>
+                    <td class="p-4 text-center">${statusBadge}</td>
+                    <td class="p-4">
+                        <div class="flex items-center justify-end gap-1">
+                            ${blockBtn}
+                            ${editBtn}
+                            ${deleteBtn}
+                        </div>
+                    </td>
                 </tr>`;
             tableBody.innerHTML += row;
         });
         
-        // Add footer indicating limit
-        if (snap.size === 20) {
-            tableBody.innerHTML += `<tr><td colspan="6" class="text-center text-xs text-slate-400 p-2">Showing recent 20 outlets only.</td></tr>`;
-        }
-        
     } catch (error) {
         console.error("Load Outlets Error:", error);
-        if(error.message.includes("index")) tableBody.innerHTML = "<tr><td colspan='6' style='color:red'>Missing Index: outlets/createdAt desc</td></tr>";
     }
 }
 
@@ -589,12 +612,20 @@ async function loadOutlets() {
 
 
 
+// --- BLOCK/UNBLOCK LOGIC ---
 window.toggleOutletStatus = async function(id, newStatus) {
-    if(!confirm(`Change status to ${newStatus}?`)) return;
+    const action = newStatus === 'blocked' ? 'Block' : 'Activate';
+    if(!confirm(`Are you sure you want to ${action} this outlet?`)) return;
+
     try {
         await updateDoc(doc(db, "outlets", id), { status: newStatus });
+        
+        // If blocking, visual feedback is enough, reload table
         loadOutlets();
-    } catch (error) { alert("Failed to update status."); }
+    } catch (error) {
+        console.error("Status Update Error:", error);
+        alert("Failed to update status.");
+    }
 };
 
 
@@ -2064,5 +2095,41 @@ window.refreshDashboard = async function() {
             btn.disabled = false;
             btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>`;
         }
+    }
+};
+
+
+
+
+
+
+
+// --- DELETE OUTLET LOGIC ---
+window.deleteOutlet = async function(id, name) {
+    if(!confirm(`⚠️ WARNING: Are you sure you want to delete "${name}"?\n\nThis will:\n1. Delete the shop data.\n2. Remove it from all salesmen routes.\n\nThis cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        // 1. Delete the Outlet Document
+        await deleteDoc(doc(db, "outlets", id));
+
+        // 2. CLEANUP: Remove this outlet from 'route_outlets' collection
+        // We must query to find where this outlet is used
+        const q = query(collection(db, "route_outlets"), where("outletId", "==", id));
+        const snap = await getDocs(q);
+        
+        // Delete all link documents
+        const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
+        await Promise.all(deletePromises);
+
+        alert(`✅ "${name}" has been deleted.`);
+        
+        // Refresh Table
+        loadOutlets();
+
+    } catch (error) {
+        console.error("Delete Error:", error);
+        alert("Error deleting: " + error.message);
     }
 };
