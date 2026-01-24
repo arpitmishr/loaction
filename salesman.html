@@ -463,14 +463,33 @@
 
         <!-- Payment Modal -->
         <div id="paymentModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-5">
-            <div class="bg-white w-full max-w-sm rounded-3xl p-6 space-y-6 shadow-2xl">
-                <div class="text-center relative">
-                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                         <span class="material-icons-round text-green-600">payments</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-800">Collect Payment</h3>
-                    <p class="text-xs text-slate-500 mt-1">From: <span id="pay-outlet-name" class="font-bold text-slate-700"></span></p>
-                </div>
+            <div class="text-center relative">
+        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+             <span class="material-icons-round text-green-600">payments</span>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800">Collect Payment</h3>
+        
+        <!-- Updated Outlet Name Display -->
+        <p class="text-sm text-slate-500 mt-1 mb-2">
+            From: <span id="pay-outlet-name" class="font-bold text-slate-700" data-id=""></span>
+        </p>
+
+        <!-- NEW: ON-DEMAND BALANCE CHECK -->
+        <div class="flex items-center justify-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100 mx-auto w-max">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Balance:</span>
+            <span id="pay-balance-display" class="text-sm font-bold text-slate-700">---</span>
+            <button id="btn-view-bal" onclick="fetchOutletBalance()" class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-200 transition">
+                VIEW
+            </button>
+        </div>
+    </div>
+    
+    <!-- AMOUNT INPUT (Existing) -->
+    <div class="relative group">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">₹</span>
+        <input type="number" id="payAmount" placeholder="0.00" class="w-full pl-10 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-2xl font-bold text-slate-800 focus:ring-2 focus:ring-green-500 focus:bg-white transition-all outline-none">
+    </div>
+
                 
                 <div class="relative group">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">₹</span>
