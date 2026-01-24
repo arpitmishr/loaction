@@ -421,14 +421,34 @@ async function loadRouteOnMap() {
 // --- 4. VISIT PANEL & MAP LOGIC ---
 
 window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
-    // 1. SAVE TARGET LOCATION (For End Visit Validation)
+    // 1. Existing Logic...
     currentVisitTarget = { lat: shopLat, lng: shopLng };
-
-    // 2. Switch Views
     document.getElementById('route-view').style.display = 'none';
     document.getElementById('visit-view').style.display = 'block';
-
     document.getElementById('visit-shop-name').innerText = name;
+
+
+
+// 2. NEW: Attach Navigation Listener to the Floating Button
+    const navBtn = document.getElementById('btn-visit-navigate');
+    if(navBtn) {
+        // Remove old listeners to prevent stacking (cloning trick)
+        const newBtn = navBtn.cloneNode(true);
+        navBtn.parentNode.replaceChild(newBtn, navBtn);
+        
+        // Add new listener with current coordinates
+        newBtn.onclick = () => openGoogleMapsNavigation(shopLat, shopLng);
+    }
+
+    // 3. Existing Map Logic...
+    if (map) map.remove();
+    map = L.map('map').setView([shopLat, shopLng], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+    shopMarker = L.marker([shopLat, shopLng]).addTo(map).bindPopup(`<b>${name}</b>`).openPopup();
+
+
+    
     
     // 3. Setup "Check-In" Button (Declare geoBtn ONLY ONCE here)
     const geoBtn = document.getElementById('btn-geo-checkin');
