@@ -252,11 +252,19 @@ async function loadShops(routeId) {
     }
 }
 
-// Helper to Render UI (Reused by Cache and Network)
-// Helper to Render UI
+// --- REPLACE EXISTING renderShopsList FUNCTION ---
+
 function renderShopsList(shops, visitedSet = new Set()) {
     const list = document.getElementById('shops-list');
     list.innerHTML = "";
+
+    // Sort: Visited at bottom, then by sequence
+    shops.sort((a, b) => {
+        const aVisit = visitedSet.has(a.id) ? 1 : 0;
+        const bVisit = visitedSet.has(b.id) ? 1 : 0;
+        if (aVisit !== bVisit) return aVisit - bVisit;
+        return (a.sequence || 999) - (b.sequence || 999);
+    });
 
     shops.forEach(shop => {
         const isVisited = visitedSet.has(shop.id);
@@ -266,25 +274,34 @@ function renderShopsList(shops, visitedSet = new Set()) {
         const bgStyle = isVisited ? "background:#f0fdf4; border:1px solid #86efac;" : "background:white; border:1px solid #ddd;";
         const checkMark = isVisited ? `<span style="color:green; font-weight:bold; font-size:12px;">✅ Visited</span>` : "";
 
-        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s;`;
+        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);`;
         
         li.innerHTML = `
-            <div>
-                <strong style="font-size:1.1rem; color:${isVisited ? '#15803d' : '#333'}">${shop.name}</strong><br>
-                <div style="display:flex; gap:5px; align-items:center;">
-                    <small style="color:#666">Seq: ${shop.sequence}</small>
+            <div style="flex-grow:1;">
+                <strong style="font-size:1rem; color:${isVisited ? '#15803d' : '#1e293b'}">${shop.name}</strong><br>
+                <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
+                    <span style="font-size:0.7rem; background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px;">Seq: ${shop.sequence || 'New'}</span>
                     ${checkMark}
                 </div>
             </div>
-            <div style="display:flex; gap:10px;">
-                <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">📞</button>
-                <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
-                    ${isVisited ? 'Re-Visit 🔄' : 'Open 🗺️'}
+            <div style="display:flex; gap:8px;">
+                <!-- NEW COLLECTION BUTTON -->
+                <button class="btn-collect" style="background:#ecfccb; color:#4d7c0f; border:1px solid #d9f99d; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Collect Payment">
+                    <span class="material-icons-round" style="font-size:18px;">payments</span>
+                </button>
+
+                <button class="btn-phone-order" style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Phone Order">
+                    <span class="material-icons-round" style="font-size:18px;">call</span>
+                </button>
+
+                <button class="btn-open-map" style="background:${isVisited ? '#f1f5f9' : '#eff6ff'}; color:${isVisited ? '#64748b' : '#2563eb'}; border:1px solid ${isVisited ? '#e2e8f0' : '#bfdbfe'}; padding:0 12px; height:36px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:0.75rem;">
+                    ${isVisited ? 'View' : 'Visit'}
                 </button>
             </div>
         `;
         
         // Attach Listeners
+        li.querySelector('.btn-collect').onclick = () => openQuickCollection(shop.id, shop.name);
         li.querySelector('.btn-phone-order').onclick = () => window.openOrderForm(shop.id, shop.name);
         li.querySelector('.btn-open-map').onclick = () => {
             if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
@@ -294,7 +311,6 @@ function renderShopsList(shops, visitedSet = new Set()) {
         list.appendChild(li);
     });
 }
-
 
 
 
@@ -1319,6 +1335,8 @@ window.toggleCreditFields = function() {
     }
 };
 
+// --- REPLACE EXISTING submitNewShop FUNCTION ---
+
 async function submitNewShop() {
     const btn = document.getElementById('btnSaveShop');
     
@@ -1326,20 +1344,16 @@ async function submitNewShop() {
     const name = document.getElementById('newShopName').value.trim();
     const owner = document.getElementById('newOwnerName').value.trim();
     const phone = document.getElementById('newShopPhone').value.trim();
-    
-    // 2. Gather Extended Data
-    const authName = document.getElementById('newAuthName').value.trim() || owner; // Default to owner if empty
-    const authPhone = document.getElementById('newAuthPhone').value.trim() || phone;
     const address = document.getElementById('newShopAddress').value.trim();
     const gst = document.getElementById('newShopGST').value.trim() || "N/A";
     
-    // 3. Gather Types & Credit
+    // Types & Credit
     const catType = document.getElementById('newShopType').value;
     const storeType = document.getElementById('newStoreType').value;
     const creditDays = storeType === 'Credit' ? Number(document.getElementById('newCreditDays').value) : 0;
     const creditLimit = storeType === 'Credit' ? Number(document.getElementById('newCreditLimit').value) : 0;
 
-    // 4. Gather GPS
+    // GPS
     const lat = document.getElementById('newShopLat').value;
     const lng = document.getElementById('newShopLng').value;
 
@@ -1352,41 +1366,56 @@ async function submitNewShop() {
         btn.disabled = true;
         btn.innerText = "Saving...";
 
-        // 5. Construct Data Object (Matching Admin Schema)
+        // 2. Construct Data Object
         const shopData = {
             shopName: name,
             ownerName: owner,
             contactPhone: phone,
-            
-            // Extended Fields
-            contactPerson: authName, // Admin calls this 'contactPerson'
-            authPhone: authPhone,    // Extra field
             address: address,
             gstNumber: gst,
-            
-            outletType: catType,     // e.g. Restaurant, Shop
-            storeType: storeType,    // Cash vs Credit
+            outletType: catType,
+            storeType: storeType,
             creditDays: creditDays,
             creditLimit: creditLimit,
-            
-            currentBalance: 0,       // New shops start with 0 debt
-            
+            currentBalance: 0,
             geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
-            
             createdBySalesman: auth.currentUser.uid,
             createdAt: serverTimestamp(),
-            status: 'active'         // Default active
+            status: 'active'
         };
 
-        // 6. Save to Firestore
-        await addDoc(collection(db, "outlets"), shopData);
+        // 3. Save to Firestore (WRITE OPERATION)
+        const docRef = await addDoc(collection(db, "outlets"), shopData);
 
-        alert("✅ Shop Added Successfully!");
+        // --- OPTIMIZATION START: Update UI Locally (No Read) ---
+        
+        // Create a local representation matching the 'routeOutlets' structure
+        const newLocalShop = {
+            id: docRef.id,
+            name: name,
+            sequence: 0, // 0 indicates it's new/unassigned
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            fullData: shopData
+        };
+
+        // Initialize cache if empty
+        if (!appCache.routeOutlets) appCache.routeOutlets = [];
+        
+        // Push to local cache
+        appCache.routeOutlets.push(newLocalShop);
+
+        // Re-render the list immediately
+        renderShopsList(appCache.routeOutlets);
+        
+        // --- OPTIMIZATION END ---
+
+        alert("✅ Shop Added! It is now available in your list.");
         document.getElementById('addShopModal').classList.add('hidden');
 
     } catch (e) {
         console.error("Add Shop Error:", e);
-        alert("Error saving shop: " + e.message); // If this still says permission denied, check Part 1
+        alert("Error saving shop: " + e.message);
     } finally {
         btn.disabled = false;
         btn.innerText = "Save Shop";
@@ -1479,4 +1508,37 @@ async function verifyLocationForVisit(outletId, outletName, targetLat, targetLng
         btn.innerText = "Retry Location";
         btn.disabled = false;
     }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- ADD THIS NEW HELPER FUNCTION ---
+
+window.openQuickCollection = function(outletId, outletName) {
+    const modal = document.getElementById('paymentModal');
+    const label = document.getElementById('pay-outlet-name');
+    const input = document.getElementById('payAmount');
+    
+    // Set Data
+    label.innerText = outletName;
+    label.dataset.id = outletId; // Important: Stores ID for submit
+    
+    // Reset Inputs
+    input.value = "";
+    document.getElementById('payMethod').value = "Cash";
+    
+    // Show Modal
+    modal.style.display = 'flex';
 }
