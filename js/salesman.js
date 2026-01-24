@@ -382,56 +382,55 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
 
     document.getElementById('visit-shop-name').innerText = name;
     
-    // 2. Setup "Check-In" Button (Reset State)
+    // 3. Setup "Check-In" Button (Declare geoBtn ONLY ONCE here)
     const geoBtn = document.getElementById('btn-geo-checkin');
-    geoBtn.style.display = 'block';
-    geoBtn.disabled = false;
-    geoBtn.innerText = "📍 Verify Location to Start";
-    geoBtn.onclick = () => verifyLocationForVisit(outletId, name, shopLat, shopLng); // New Handler
-    geoBtn.style.background = "#2563eb"; // Blue
-
-    document.getElementById('dist-display').innerText = "Tap Verify";
-    document.getElementById('in-shop-controls').style.display = 'none';
-
-    // 3. Load Balance (Existing Logic)
-
- // (Setup buttons, load balance, init map, etc.)
-    const geoBtn = document.getElementById('btn-geo-checkin');
+    
+    // Reset Button State
     geoBtn.style.display = 'block';
     geoBtn.disabled = false;
     geoBtn.innerText = "📍 Verify Location to Start";
     geoBtn.onclick = () => verifyLocationForVisit(outletId, name, shopLat, shopLng);
-    geoBtn.style.background = "#2563eb";
+    geoBtn.style.background = "#2563eb"; // Blue
 
+    // Reset UI Texts
     document.getElementById('dist-display').innerText = "Tap Verify";
     document.getElementById('in-shop-controls').style.display = 'none';
 
-
-    
+    // 4. Load Balance
     const balEl = document.getElementById('visit-outstanding-bal');
     balEl.innerText = "Loading...";
     try {
         const docSnap = await getDoc(doc(db, "outlets", outletId));
         if (docSnap.exists()) {
             balEl.innerText = "₹" + (docSnap.data().currentBalance || 0).toFixed(2);
+            // Setup Payment Modal Data
             const payEl = document.getElementById('pay-outlet-name');
-            payEl.dataset.id = outletId;
-            payEl.innerText = name;
+            if(payEl) {
+                payEl.dataset.id = outletId;
+                payEl.innerText = name;
+            }
+        } else {
+            balEl.innerText = "₹0.00";
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Balance Load Error:", e);
+        balEl.innerText = "Error"; 
+    }
 
-    // 4. Initialize Map (Static View initially)
-   if (map) map.remove();
+    // 5. Initialize Map
+    if (map) map.remove();
     map = L.map('map').setView([shopLat, shopLng], 18);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
+    // Add Shop Marker
     shopMarker = L.marker([shopLat, shopLng]).addTo(map).bindPopup(`<b>${name}</b>`).openPopup();
     
+    // Add User Marker (Hidden initially or set to last known)
     userMarker = L.circleMarker([0,0], { radius: 8, color: 'blue', fillOpacity: 0.8 }).addTo(map);
-    if(lastKnownLocation) userMarker.setLatLng([lastKnownLocation.lat, lastKnownLocation.lng]);
+    if(lastKnownLocation) {
+        userMarker.setLatLng([lastKnownLocation.lat, lastKnownLocation.lng]);
+    }
 };
-
-
 
 
 
