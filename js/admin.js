@@ -14,29 +14,30 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
-
+import { getCachedUserProfile } from "./auth.js"; // <--- Add this import at the top
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
 
+
 // --- 2. MAIN EXECUTION ---
 onAuthStateChanged(auth, async (user) => {
-    // A. Not Logged In -> Redirect
     if (!user) {
         window.location.href = 'index.html';
         return;
     }
 
     try {
-        // B. Check Admin Role
-        const userDoc = await getDoc(doc(db, "users", user.uid));
+        // A. USE CACHED PROFILE (No more getDoc here)
+        const userData = await getCachedUserProfile(user.uid);
         
-        if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+        // B. Check Admin Role
+        if (!userData || userData.role !== 'admin') {
             alert("Access Denied: Admins Only.");
             await logoutUser();
             return;
         }
 
-        // C. SUCCESS: Hide Loader & Show Content
+        // C. SUCCESS: Update UI
         if (loader) loader.style.display = 'none';
         if (content) content.style.display = 'block';
         
@@ -44,33 +45,25 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById('user-email').innerText = user.email;
         }
 
-        // D. Setup Forms (Do this immediately so listeners attach)
+        // ... rest of your loading functions (setupOutletForm, loadDashboardStats, etc.) ...
         setupOutletForm();
-
-        // E. Load Data
         loadDashboardStats();
         loadTodayAttendance();
         loadOutlets(); 
-        loadSalesmenList(); // This function is now defined below
-        // ... inside the successful admin check ...
+        loadSalesmenList();
         populateTargetSalesmanDropdown();
         setupTransactionTab();
-loadRoutes();
-populateSalesmanDropdown();
-populateAllOutletsDropdown();
-        // ... inside the try block ...
-loadProducts();
-setupProductForm();
-        // ... inside onAuthStateChanged ...
-loadPendingPayments();
-        // Inside the admin success block:
-loadPendingLeaves();
-// Set default date picker to today
-document.getElementById('attendanceDateFilter').valueAsDate = new Date();
+        loadRoutes();
+        populateSalesmanDropdown();
+        populateAllOutletsDropdown();
+        loadProducts();
+        setupProductForm();
+        loadPendingPayments();
+        loadPendingLeaves();
+        document.getElementById('attendanceDateFilter').valueAsDate = new Date();
 
     } catch (error) {
         console.error("Dashboard Init Error:", error);
-        alert("Error: " + error.message);
     }
 });
 
