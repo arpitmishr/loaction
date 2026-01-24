@@ -435,7 +435,9 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
 
 
 window.closeVisitPanel = function() {
-    if(watchId) navigator.geolocation.clearWatch(watchId);
+    // FIX: Removed the line referring to 'watchId'
+    
+    // Switch Views
     document.getElementById('route-view').style.display = 'block';
     document.getElementById('visit-view').style.display = 'none';
 };
