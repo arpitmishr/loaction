@@ -6,7 +6,10 @@ import { auth, db } from "./firebase.js";
 
 // --- GLOBAL APP CACHE ---
 export const appCache = {
-    user: null // In-memory store
+    user: null,         // Existing
+    route: null,        // NEW: Stores the assigned route metadata
+    routeOutlets: null, // NEW: Stores the list of shop details (merged data)
+    dailyTarget: null   // NEW: Stores today's target data
 };
 
 // --- HELPER: GET USER (Cache First, Then Network) ---
