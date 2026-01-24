@@ -1,11 +1,19 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salesman App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SalesPro | Field Mobile</title>
     
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -13,542 +21,362 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#2563eb', // Blue-600
-                        success: '#16a34a', // Green-600
-                        danger: '#dc2626',  // Red-600
-                        warning: '#ca8a04', // Yellow-600
-                        dark: '#1e293b',    // Slate-800
-                    }
+                        primary: '#6366f1',    /* Indigo 500 */
+                        secondary: '#f43f5e',  /* Rose 500 */
+                        accent: '#10b981',     /* Emerald 500 */
+                        surface: '#ffffff',
+                        dark: '#0f172a',
+                    },
+                    borderRadius: { '4xl': '2rem' }
                 }
             }
         }
     </script>
-    
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Icons (Optional, using SVG directly is better but CDN for simplicity) -->
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        /* Hide scrollbar for clean app feel */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        .bottom-nav-item.active { color: #2563eb; }
-        .bottom-nav-item.active span { color: #2563eb; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f8fafc; }
+        
+        /* Glassmorphism */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Animations */
+        @keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .animate-skeleton { animation: skeleton-pulse 1.5s infinite; }
+        
+        .view-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .active-tab-indicator { transition: all 0.3s ease; transform-origin: center; }
+
+        /* Hide scrollbars */
+        ::-webkit-scrollbar { width: 0px; display: none; }
+
+        .fab-gradient {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+        }
+
+        .order-sheet { transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .order-sheet.active { transform: translateY(0); }
     </style>
 </head>
-<body class="pb-20"> <!-- Padding bottom for nav bar -->
+<body class="text-slate-900 overflow-x-hidden">
 
-    <!-- LOADER -->
-    <div id="loader" class="fixed inset-0 flex items-center justify-center bg-white z-50">
-        <div class="text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h2 class="text-lg font-semibold text-gray-600">Loading App...</h2>
+    <!-- 1. SKELETON LOADING SCREEN -->
+    <div id="skeleton-screen" class="fixed inset-0 z-[100] bg-white p-6 space-y-6">
+        <div class="flex justify-between items-center">
+            <div class="h-8 w-32 bg-slate-200 rounded-lg animate-skeleton"></div>
+            <div class="h-10 w-10 bg-slate-200 rounded-full animate-skeleton"></div>
+        </div>
+        <div class="h-44 w-full bg-slate-200 rounded-4xl animate-skeleton"></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="h-28 bg-slate-100 rounded-3xl animate-skeleton"></div>
+            <div class="h-28 bg-slate-100 rounded-3xl animate-skeleton"></div>
+        </div>
+        <div class="space-y-4">
+            <div class="h-20 w-full bg-slate-50 rounded-2xl animate-skeleton"></div>
+            <div class="h-20 w-full bg-slate-50 rounded-2xl animate-skeleton"></div>
         </div>
     </div>
 
-    <!-- MAIN APP CONTAINER -->
-    <div id="content" style="display:none;" class="max-w-md mx-auto min-h-screen bg-gray-50 relative shadow-2xl">
+    <!-- 2. MAIN APP CONTAINER -->
+    <div id="app-content" class="max-w-md mx-auto min-h-screen relative pb-32 hidden">
         
         <!-- HEADER -->
-        <header class="bg-white shadow-sm sticky top-0 z-40 px-4 py-3 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <span class="text-blue-600">⚡</span> Sales App
-            </h1>
-            <button id="logoutBtn" class="bg-red-50 text-red-600 px-3 py-1 rounded-full text-xs font-medium border border-red-100 hover:bg-red-100 transition">
-                Logout
+        <header class="px-6 py-5 flex justify-between items-center sticky top-0 bg-slate-50/80 backdrop-blur-md z-40">
+            <div>
+                <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">January 24, 2026</p>
+                <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">Alex Walker</h1>
+            </div>
+            <button onclick="logout()" class="w-10 h-10 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-rose-500 active:scale-90 transition">
+                <span class="material-icons-round">logout</span>
             </button>
         </header>
 
-        <!-- CONTENT AREA -->
-        <main class="p-4 space-y-4">
+        <main class="px-6">
 
-            <!-- 1. ROUTE VIEW (HOME) -->
-            <div id="route-view" class="view-section block">
-
-
-
-
-
-
-
-
-                <!-- Floating Add Shop Button -->
-<button onclick="openAddShopModal()" class="fixed bottom-24 right-5 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg shadow-indigo-200 flex items-center justify-center z-30 active:scale-90 transition-transform">
-    <span class="material-icons-round text-3xl">add_business</span>
-</button>
-
-
-
-                
-
-
-
-<!-- TARGET PROGRESS CARD (New) -->
-<div id="target-card" class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4 hidden">
-    <div class="flex justify-between items-end mb-2">
-        <div>
-            <h3 class="font-bold text-gray-800 text-lg">Today's Target</h3>
-            <p class="text-xs text-gray-500">Sell <span id="tgt-total" class="font-bold text-gray-800">0</span> boxes</p>
-        </div>
-        <div class="text-right">
-            <span id="tgt-achieved" class="text-2xl font-bold text-blue-600">0</span>
-            <span class="text-xs text-gray-400">/ <span id="tgt-max">0</span></span>
-        </div>
-    </div>
-
-    <!-- Progress Bar -->
-    <div class="w-full bg-gray-100 rounded-full h-3 mb-3 overflow-hidden">
-        <div id="tgt-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-1000 ease-out" style="width: 0%"></div>
-    </div>
-
-    <!-- Dynamic Messages -->
-    <div id="tgt-msg-container">
-        <!-- Default: Remaining -->
-        <p id="msg-remaining" class="text-xs text-gray-500">
-            <span id="tgt-left" class="font-bold text-gray-800">0</span> more boxes to unlock incentive.
-        </p>
-        
-        <!-- >= 80%: Motivation -->
-        <p id="msg-almost" class="hidden text-xs font-bold text-amber-600 flex items-center gap-1">
-            <span class="material-icons-round text-sm">local_fire_department</span>
-            Almost there! Push for the incentive!
-        </p>
-
-        <!-- 100% Achieved -->
-        <div id="msg-success" class="hidden bg-green-50 border border-green-100 rounded-lg p-2 mt-2">
-            <p class="text-xs font-bold text-green-700 flex items-center gap-1 mb-1">
-                <span class="material-icons-round text-sm">emoji_events</span>
-                Target Smashed! Incentive Unlocked.
-            </p>
-            <div class="flex justify-between items-center">
-                <span class="text-[10px] text-green-600 uppercase font-bold">Earned Incentive</span>
-                <span id="tgt-incentive-amt" class="text-lg font-bold text-green-700">₹0</span>
-            </div>
-            <p class="text-[10px] text-green-500 text-right mt-0.5">
-                (₹<span id="tgt-rate">0</span> per extra box)
-            </p>
-        </div>
-    </div>
-</div>
-
-
-
-
-
-
-                
-                
-                <!-- Attendance Card -->
-                <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-bold text-gray-700">Daily Attendance</h3>
-                        <span id="attendance-status" class="text-xs text-gray-400">Not checked in</span>
+            <!-- VIEW: ROUTE (HOME) -->
+            <div id="view-route" class="view-section space-y-6">
+                <!-- Target Widget -->
+                <div class="bg-indigo-600 rounded-4xl p-6 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <p class="text-indigo-100 text-xs font-semibold opacity-80">Today's Target</p>
+                                <h3 class="text-3xl font-black mt-1">72 / <span class="text-lg opacity-60 font-medium">100 Boxes</span></h3>
+                            </div>
+                            <div class="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                                <span class="material-icons-round">trending_up</span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-white/20 h-3 rounded-full overflow-hidden">
+                            <div id="target-bar" class="bg-white h-full rounded-full w-[72%] transition-all duration-1000"></div>
+                        </div>
+                        <div class="flex justify-between items-center mt-3">
+                            <p class="text-[10px] font-bold text-indigo-100 uppercase italic">Bonus: ₹500 at 100%</p>
+                            <span class="text-xs font-bold">72%</span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button id="checkInBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-sm font-semibold shadow-blue-100 flex flex-col items-center justify-center gap-1 transition active:scale-95">
-                            <span class="material-icons-round">place</span>
-                            Check In
-                        </button>
-                        <button onclick="document.getElementById('leaveModal').style.display='none'" class="py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Cancel</button>
-                    </div>
+                    <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
                 </div>
 
-                <!-- Route Info -->
-                <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-lg mb-4">
-                    <p class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-1">Assigned Route</p>
-                    <h2 id="route-name" class="text-2xl font-bold">Loading...</h2>
+                <!-- Action Grid -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-2 active:scale-95 transition">
+                        <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                            <span class="material-icons-round">how_to_reg</span>
+                        </div>
+                        <span class="text-xs font-bold text-slate-700">Check In</span>
+                    </button>
+                    <button onclick="toggleModal('leaveModal', true)" class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-2 active:scale-95 transition">
+                        <div class="w-10 h-10 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center">
+                            <span class="material-icons-round">event_busy</span>
+                        </div>
+                        <span class="text-xs font-bold text-slate-700">Leave</span>
+                    </button>
                 </div>
 
                 <!-- Shops List -->
-                <h3 class="font-bold text-gray-800 text-lg mb-2">Shops to Visit</h3>
-                <ul id="shops-list" class="space-y-3 pb-20">
-                    <li class="text-center text-gray-400 py-4">Loading shops...</li>
-                </ul>
-            </div>
-
-            <!-- 2. CATALOG VIEW -->
-            <div id="catalog-view" class="view-section hidden pb-20">
-                <div class="sticky top-[60px] z-30 bg-gray-50 pb-2">
-                    <div class="relative">
-                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                            <span class="material-icons-round text-sm">search</span>
-                        </span>
-                        <input type="text" id="searchProd" placeholder="Search products..." class="w-full pl-10 pr-4 py-3 rounded-xl border-none shadow-sm focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                <div class="space-y-4 pb-10">
+                    <div class="flex justify-between items-end">
+                        <h2 class="text-lg font-black text-slate-800 tracking-tight">Today's Route</h2>
+                        <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase">Western Zone</span>
                     </div>
-                </div>
-                
-                <div id="catalog-list" class="grid grid-cols-2 gap-3">
-                    <!-- Products injected here -->
-                </div>
-            </div>
-
-            <!-- 3. VISIT / MAP VIEW -->
-            <div id="visit-view" class="view-section hidden fixed inset-0 bg-white z-50 overflow-y-auto">
-                <div class="p-4">
-                    <button onclick="closeVisitPanel()" class="flex items-center text-gray-500 mb-4 hover:text-gray-800">
-                        <span class="material-icons-round mr-1">arrow_back</span> Back to Route
-                    </button>
-
-                    <h2 id="visit-shop-name" class="text-2xl font-bold text-gray-900 mb-4">Shop Name</h2>
-
-                    <!-- Map -->
-                    <div class="relative w-full h-64 bg-gray-100 rounded-2xl overflow-hidden shadow-inner mb-4">
-                        <div id="map" class="w-full h-full z-0"></div>
-                        <div class="absolute bottom-2 left-2 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-xs font-bold shadow text-gray-700 z-[1000]">
-                            Dist: <span id="dist-display">--</span>
-                        </div>
-                    </div>
-
-                    <!-- Pre-Checkin Action -->
-                    <button id="btn-geo-checkin" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg mb-4 flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
-                        <span class="material-icons-round">pin_drop</span>
-                        Check In (Enter Fence)
-                    </button>
-
-                    <!-- Active Visit Controls -->
-                    <div id="in-shop-controls" class="hidden space-y-3">
-                        <div class="bg-green-50 border border-green-100 p-4 rounded-xl text-center mb-4">
-                            <p class="text-green-700 font-bold flex items-center justify-center gap-1">
-                                <span class="material-icons-round">check_circle</span> Checked In
-                            </p>
-                            <p class="text-gray-500 text-sm mt-1">Time: <span id="visit-timer" class="font-mono">00:00</span></p>
-                        </div>
-
-                        <!-- Outstanding Balance Card -->
-                        <div class="bg-red-50 border border-red-100 p-4 rounded-xl flex justify-between items-center">
-                            <div>
-                                <p class="text-xs text-red-600 uppercase font-bold">Outstanding</p>
-                                <p id="visit-outstanding-bal" class="text-xl font-bold text-red-800">₹0.00</p>
+                    
+                    <div id="shops-list" class="space-y-3">
+                        <!-- Shop Item -->
+                        <div onclick="openVisit('Green Valley Mart', '1.2km')" class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm active:bg-slate-50 transition cursor-pointer flex justify-between items-center">
+                            <div class="flex gap-4 items-center">
+                                <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center">
+                                    <span class="material-icons-round">storefront</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-900 leading-tight">Green Valley Mart</h4>
+                                    <p class="text-[11px] text-slate-400 font-medium">Last visit: 3 days ago</p>
+                                </div>
                             </div>
-                            <button onclick="openPaymentModal()" class="bg-white text-red-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm border border-red-100 hover:bg-red-50">
-                                Collect
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3 mt-4">
-                            <button id="btn-take-order" class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-blue-200 hover:bg-blue-700">
-                                New Order
-                            </button>
-                            <button id="btn-end-visit" class="bg-white text-gray-700 border border-gray-300 py-3 rounded-xl font-bold hover:bg-gray-50">
-                                End Visit
-                            </button>
+                            <span class="material-icons-round text-slate-300">chevron_right</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. ORDER VIEW -->
-            <div id="order-view" class="view-section hidden fixed inset-0 bg-gray-50 z-50 flex flex-col">
-                <!-- Order Header -->
-                <div class="bg-white px-4 py-3 shadow-sm flex items-center justify-between">
-                    <button onclick="cancelOrder()" class="text-gray-500 hover:text-red-500">
-                        <span class="material-icons-round">close</span>
-                    </button>
-                    <h3 class="font-bold text-lg">New Order</h3>
-                    <div class="w-6"></div> <!-- Spacer -->
+            <!-- VIEW: CATALOG -->
+            <div id="view-catalog" class="view-section hidden space-y-6">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-4 flex items-center text-slate-400">
+                        <span class="material-icons-round text-sm">search</span>
+                    </span>
+                    <input type="text" placeholder="Search products..." class="w-full pl-12 pr-4 py-4 rounded-3xl border-none shadow-sm focus:ring-2 focus:ring-indigo-500 bg-white text-sm font-medium">
                 </div>
-
-                <div class="flex-grow overflow-y-auto p-4 space-y-4">
-                    <div class="text-center">
-                        <h4 id="order-outlet-name" class="text-xl font-bold text-blue-600">Outlet Name</h4>
-                    </div>
-
-                    <!-- Toggles -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="flex items-center justify-between p-3 bg-white rounded-xl border border-yellow-200 shadow-sm cursor-pointer">
-                            <span class="text-xs font-bold text-yellow-700">📞 Phone Order</span>
-                            <input type="checkbox" id="isPhoneOrder" class="w-5 h-5 text-yellow-500 rounded focus:ring-yellow-500">
-                        </label>
-                        <label class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer">
-                            <span class="text-xs font-bold text-gray-600">💵 Apply GST</span>
-                            <input type="checkbox" id="applyGst" class="w-5 h-5 text-blue-500 rounded focus:ring-blue-500">
-                        </label>
-                    </div>
-
-                    <!-- Product Select -->
-                    <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
-                        <select id="order-product-select" class="w-full p-3 bg-gray-50 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select Product...</option>
-                        </select>
-                        <div class="flex gap-2">
-                            <input type="number" id="order-qty" placeholder="Qty" min="1" class="w-24 p-3 bg-gray-50 border-none rounded-lg text-center font-bold">
-                            <button onclick="addToCart()" class="flex-grow bg-slate-800 text-white rounded-lg font-bold">Add Item</button>
-                        </div>
-                    </div>
-
-                    <!-- Cart -->
-                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-                        <table class="w-full text-sm text-left">
-                            <thead class="bg-gray-100 text-gray-500 uppercase text-xs">
-                                <tr>
-                                    <th class="p-3">Item</th>
-                                    <th class="p-3 text-center">Qty</th>
-                                    <th class="p-3 text-right">Total</th>
-                                    <th class="p-3 w-8"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="order-cart-body" class="divide-y divide-gray-100"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Order Footer (Totals) -->
-                <div class="bg-white border-t p-4 pb-8 space-y-3 shadow-lg">
-                    <div class="flex justify-between text-sm text-gray-500">
-                        <span>Subtotal</span>
-                        <span id="ord-subtotal">₹0.00</span>
-                    </div>
-                    <div id="tax-row" class="flex justify-between text-sm text-gray-500 hidden">
-                        <span>GST (5%)</span>
-                        <span id="ord-tax">₹0.00</span>
-                    </div>
-                    <div class="flex justify-between text-xl font-bold text-slate-800">
-                        <span>Total</span>
-                        <span id="ord-grand-total">₹0.00</span>
-                    </div>
-                    <button id="btn-submit-order" onclick="submitOrder()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg shadow-blue-200 hover:bg-blue-700 transition">
-                        Confirm Order
-                    </button>
+                <div class="grid grid-cols-2 gap-4" id="catalog-list">
+                    <!-- Products injected via JS -->
                 </div>
             </div>
 
+            <!-- VIEW: MAP -->
+            <div id="view-map" class="view-section hidden h-[60vh] w-full rounded-4xl overflow-hidden border border-white shadow-xl">
+                <div id="map" class="w-full h-full"></div>
+            </div>
 
-
-            
-<!-- 5. MAP VIEW -->
-<div id="map-view" class="view-section hidden h-[calc(100vh-130px)] w-full mt-2">
-    <div id="routeMap" class="w-full h-full rounded-2xl shadow-inner border border-gray-200 z-0"></div>
-</div>
-
-
-            
         </main>
 
-        <!-- BOTTOM NAVIGATION BAR -->
-        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3 z-40 max-w-md mx-auto">
-            <button onclick="switchView('route')" class="bottom-nav-item active flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-route">
-                <span class="material-icons-round text-2xl">map</span>
-                <span class="text-[10px] font-bold">Route</span>
+        <!-- FLOATING ACTION BUTTON -->
+        <button onclick="toggleModal('addShopModal', true)" class="fixed bottom-28 right-6 w-14 h-14 rounded-2xl fab-gradient text-white flex items-center justify-center z-50 transition transform active:scale-90 shadow-xl">
+            <span class="material-icons-round text-3xl">add_business</span>
+        </button>
+
+        <!-- BOTTOM NAVIGATION -->
+        <nav class="fixed bottom-6 left-6 right-6 h-20 glass-nav rounded-4xl shadow-2xl z-50 flex items-center px-2">
+            <button onclick="switchTab('route', this)" class="nav-item flex-1 flex flex-col items-center gap-1 text-indigo-600 relative">
+                <div class="active-indicator absolute -top-2 w-8 h-1 bg-indigo-600 rounded-full"></div>
+                <span class="material-icons-round">explore</span>
+                <span class="text-[9px] font-black uppercase">Route</span>
             </button>
-
-
-<button onclick="switchView('map')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-map">
-    <span class="material-icons-round text-2xl">public</span>
-    <span class="text-[10px] font-bold">Map</span>
-</button>
-
-
-            
-            <button onclick="switchView('catalog')" class="bottom-nav-item flex flex-col items-center gap-1 text-gray-400 w-full" id="nav-catalog">
-                <span class="material-icons-round text-2xl">inventory_2</span>
-                <span class="text-[10px] font-bold">Catalog</span>
+            <button onclick="switchTab('map', this)" class="nav-item flex-1 flex flex-col items-center gap-1 text-slate-400 relative">
+                <div class="active-indicator absolute -top-2 w-8 h-1 bg-indigo-600 rounded-full scale-x-0"></div>
+                <span class="material-icons-round">map</span>
+                <span class="text-[9px] font-black uppercase">Map</span>
+            </button>
+            <button onclick="switchTab('catalog', this)" class="nav-item flex-1 flex flex-col items-center gap-1 text-slate-400 relative">
+                <div class="active-indicator absolute -top-2 w-8 h-1 bg-indigo-600 rounded-full scale-x-0"></div>
+                <span class="material-icons-round">inventory_2</span>
+                <span class="text-[9px] font-black uppercase">Catalog</span>
             </button>
         </nav>
+    </div>
 
-        <!-- MODALS -->
-        
-        <!-- Leave Modal -->
-        <div id="leaveModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-            <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4">
-                <h3 class="text-lg font-bold">Request Leave</h3>
-                <div class="space-y-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-gray-500 uppercase">Date</label>
-                        <input type="date" id="leaveDate" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-gray-500 uppercase">Type</label>
-                        <select id="leaveType" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200">
-                            <option value="Full Day">Full Day</option>
-                            <option value="Half Day">Half Day</option>
-                            <option value="Sick Leave">Sick Leave</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-gray-500 uppercase">Reason</label>
-                        <textarea id="leaveReason" rows="2" class="w-full p-3 bg-gray-50 rounded-xl border border-gray-200" placeholder="Why?"></textarea>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="document.getElementById('leaveModal').classList.add('hidden')" class="py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Cancel</button>
-                    <button onclick="submitLeaveRequest()" class="py-3 text-white font-bold bg-blue-600 rounded-xl">Submit</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Payment Modal -->
-        <div id="paymentModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-            <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4">
-                <div class="text-center">
-                    <h3 class="text-lg font-bold">Collect Payment</h3>
-                    <p class="text-sm text-gray-500">From: <span id="pay-outlet-name" class="font-semibold text-gray-800"></span></p>
-                </div>
-                
-                <div class="relative">
-                    <span class="absolute left-4 top-3.5 text-gray-400 font-bold">₹</span>
-                    <input type="number" id="payAmount" placeholder="0.00" class="w-full pl-8 p-3 bg-gray-50 rounded-xl border border-gray-200 text-lg font-bold">
-                </div>
-
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="setPayMethod('Cash')" class="pay-method-btn bg-green-50 border border-green-200 text-green-700 py-2 rounded-lg text-sm font-bold active">Cash</button>
-                    <button onclick="setPayMethod('UPI')" class="pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">UPI</button>
-                    <button onclick="setPayMethod('Cheque')" class="pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold">Cheque</button>
-                </div>
-                <input type="hidden" id="payMethod" value="Cash">
-
-                <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="document.getElementById('paymentModal').style.display='none'" class="py-3 text-gray-500 font-bold bg-gray-100 rounded-xl">Cancel</button>
-                    <button onclick="submitPayment()" class="py-3 text-white font-bold bg-green-600 rounded-xl shadow-green-200">Collect</button>
-                </div>
-            </div>
-        </div>
-
-    </div> <!-- End Main Container -->
-
-    <!-- HELPER SCRIPT FOR UI -->
-    <script>
-        // Tab Switcher
-        window.switchView = function(viewName) {
-            // Hide all views
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+    <!-- 3. VISIT / ORDER FLOW (Slide-up Sheet) -->
+    <div id="visit-sheet" class="fixed inset-0 z-[60] hidden">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeVisit()"></div>
+        <div class="order-sheet absolute bottom-0 left-0 right-0 bg-slate-50 rounded-t-[3rem] max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto my-4"></div>
             
-            // Show selected
-            if(viewName === 'route') document.getElementById('route-view').classList.remove('hidden');
-            if(viewName === 'catalog') {
-                document.getElementById('catalog-view').classList.remove('hidden');
-                if(window.loadProductCatalog) window.loadProductCatalog();
-            }
+            <div class="px-8 pb-10 space-y-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 id="visit-title" class="text-2xl font-black text-slate-800">Shop Name</h2>
+                        <p id="visit-dist" class="text-xs font-bold text-indigo-600">-- away</p>
+                    </div>
+                    <button onclick="closeVisit()" class="w-10 h-10 bg-slate-200 rounded-2xl flex items-center justify-center">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
 
-            // Update Bottom Nav
-            document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active', 'text-blue-600'));
-            const activeBtn = document.getElementById('nav-' + viewName);
-            if(activeBtn) {
-                activeBtn.classList.add('active', 'text-blue-600');
-                activeBtn.classList.remove('text-gray-400');
-            }
-        };
+                <!-- Outstanding Card -->
+                <div class="bg-rose-50 border border-rose-100 p-5 rounded-3xl flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] font-black text-rose-400 uppercase">Outstanding Balance</p>
+                        <p class="text-2xl font-black text-rose-600">₹14,250</p>
+                    </div>
+                    <button class="bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-rose-200">Collect</button>
+                </div>
 
-        // Payment Method Toggle Helper
-        window.setPayMethod = function(method) {
-            document.getElementById('payMethod').value = method;
-            document.querySelectorAll('.pay-method-btn').forEach(btn => {
-                btn.className = "pay-method-btn bg-gray-50 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm font-bold w-full";
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="startOrderFlow()" class="bg-indigo-600 text-white p-6 rounded-3xl shadow-xl shadow-indigo-100 flex flex-col items-center gap-2">
+                        <span class="material-icons-round text-3xl">shopping_cart</span>
+                        <span class="text-sm font-bold">New Order</span>
+                    </button>
+                    <button class="bg-white border border-slate-200 p-6 rounded-3xl flex flex-col items-center gap-2">
+                        <span class="material-icons-round text-3xl text-slate-400">history</span>
+                        <span class="text-sm font-bold text-slate-600">History</span>
+                    </button>
+                </div>
+
+                <!-- Order Cart (Hidden until Start) -->
+                <div id="cart-section" class="hidden space-y-4 animate-in fade-in duration-500">
+                    <h3 class="font-black text-slate-800 border-b border-slate-200 pb-2">Order Cart</h3>
+                    <div id="cart-items" class="space-y-2">
+                        <!-- Cart Items here -->
+                    </div>
+                    <div class="bg-slate-800 p-5 rounded-3xl text-white flex justify-between items-center">
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">Total Amount</p>
+                            <p id="cart-total" class="text-xl font-black">₹0.00</p>
+                        </div>
+                        <button class="bg-indigo-500 px-6 py-3 rounded-2xl font-black text-sm active:scale-95 transition">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <!-- Leave Modal -->
+    <div id="leaveModal" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-xs rounded-4xl p-8 space-y-6">
+            <h3 class="text-xl font-black text-center">Request Leave</h3>
+            <div class="space-y-4">
+                <input type="date" class="w-full p-4 bg-slate-50 rounded-2xl border-none ring-1 ring-slate-100 focus:ring-2 focus:ring-indigo-500 text-sm font-bold">
+                <textarea placeholder="Reason..." class="w-full p-4 bg-slate-50 rounded-2xl border-none ring-1 ring-slate-100 focus:ring-2 focus:ring-indigo-500 text-sm font-bold" rows="3"></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="toggleModal('leaveModal', false)" class="flex-1 py-4 text-slate-400 font-bold">Cancel</button>
+                <button class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        // Data Simulation
+        const products = [
+            { id: 1, name: 'Premium Masala', price: 450, img: 'inventory_2' },
+            { id: 2, name: 'Saffron 10g', price: 1200, img: 'workspace_premium' },
+            { id: 3, name: 'Red Chilli Powder', price: 210, img: 'local_fire_department' },
+            { id: 4, name: 'Turmeric Gold', price: 180, img: 'stars' },
+        ];
+
+        // 1. Initial Load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('skeleton-screen').classList.add('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
+                renderCatalog();
+            }, 1500);
+        });
+
+        // 2. Navigation
+        function switchTab(view, el) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            
+            // UI Toggle
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.replace('text-indigo-600', 'text-slate-400');
+                item.querySelector('.active-indicator').classList.replace('scale-x-100', 'scale-x-0');
             });
-            event.target.className = "pay-method-btn bg-green-50 border border-green-200 text-green-700 py-2 rounded-lg text-sm font-bold w-full ring-2 ring-green-500";
+            el.classList.replace('text-slate-400', 'text-indigo-600');
+            el.querySelector('.active-indicator').classList.replace('scale-x-0', 'scale-x-100');
+
+            if(view === 'map') initMap();
+        }
+
+        // 3. Visit Flow
+        function openVisit(name, dist) {
+            const sheet = document.getElementById('visit-sheet');
+            sheet.classList.remove('hidden');
+            document.getElementById('visit-title').innerText = name;
+            document.getElementById('visit-dist').innerText = dist;
+            setTimeout(() => sheet.querySelector('.order-sheet').classList.add('active'), 10);
+        }
+
+        function closeVisit() {
+            const sheet = document.getElementById('visit-sheet');
+            sheet.querySelector('.order-sheet').classList.remove('active');
+            setTimeout(() => sheet.classList.add('hidden'), 400);
+            document.getElementById('cart-section').classList.add('hidden');
+        }
+
+        function startOrderFlow() {
+            document.getElementById('cart-section').classList.remove('hidden');
+            // Add a sample item to cart
+            const cartItems = document.getElementById('cart-items');
+            cartItems.innerHTML = `
+                <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
+                    <span class="font-bold text-sm">Premium Masala x 2</span>
+                    <span class="font-black text-indigo-600">₹900</span>
+                </div>
+            `;
+            document.getElementById('cart-total').innerText = '₹900.00';
+        }
+
+        // 4. Catalog Rendering
+        function renderCatalog() {
+            const list = document.getElementById('catalog-list');
+            list.innerHTML = products.map(p => `
+                <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3 active:scale-95 transition">
+                    <div class="h-24 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300">
+                        <span class="material-icons-round text-4xl">${p.img}</span>
+                    </div>
+                    <div>
+                        <h5 class="text-xs font-black text-slate-800 truncate">${p.name}</h5>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">₹${p.price}</p>
+                    </div>
+                    <button class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase">Add to Cart</button>
+                </div>
+            `).join('');
+        }
+
+        // 5. Map Integration
+        let map;
+        function initMap() {
+            if (map) return;
+            map = L.map('map', { zoomControl: false }).setView([19.0760, 72.8777], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+            L.marker([19.0760, 72.8777]).addTo(map).bindPopup('Current Location').openPopup();
+        }
+
+        // 6. Helpers
+        function toggleModal(id, show) {
+            document.getElementById(id).classList.toggle('hidden', !show);
+        }
+
+        function logout() {
+            if(confirm('Are you sure you want to exit?')) window.location.reload();
         }
     </script>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module" src="js/salesman.js"></script>
-
-
-
-
-
-<!-- Add Shop Modal (Updated) -->
-<div id="addShopModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold text-slate-800 border-b border-slate-100 pb-2">Add New Outlet</h3>
-        
-        <form id="newShopForm" class="space-y-3" onsubmit="event.preventDefault(); submitNewShop();">
-            
-            <!-- 1. Basic Info -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="col-span-2">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Name</label>
-                    <input type="text" id="newShopName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Owner Name</label>
-                    <input type="text" id="newOwnerName" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Owner Phone</label>
-                    <input type="tel" id="newShopPhone" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
-                </div>
-            </div>
-
-            <!-- 2. Authorized Person (New) -->
-            <div class="grid grid-cols-2 gap-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Auth. Person</label>
-                    <input type="text" id="newAuthName" placeholder="Manager Name" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Auth. Number</label>
-                    <input type="tel" id="newAuthPhone" placeholder="Mobile" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:border-indigo-500">
-                </div>
-            </div>
-
-            <!-- 3. Address & GST (New) -->
-            <div>
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Full Address</label>
-                <textarea id="newShopAddress" rows="2" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500"></textarea>
-            </div>
-            <div>
-                <label class="text-[10px] font-bold text-slate-400 uppercase">GST Number (Optional)</label>
-                <input type="text" id="newShopGST" placeholder="e.g. 27ABCDE1234F1Z5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:border-indigo-500 uppercase">
-            </div>
-
-            <!-- 4. Payment Terms (Dynamic) -->
-            <div class="border-t border-slate-100 pt-2">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Shop Category</label>
-                        <select id="newShopType" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                            <option value="Shop">Grocery / Kirana</option>
-                            <option value="Restaurant">Restaurant / Hotel</option>
-                            <option value="Cafe">Cafe / Bakery</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Payment Type</label>
-                        <select id="newStoreType" onchange="toggleCreditFields()" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                            <option value="Cash">Cash Only</option>
-                            <option value="Credit">Credit Allowed</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Hidden Credit Fields -->
-                <div id="creditFields" class="hidden grid grid-cols-2 gap-3 mt-3 bg-red-50 p-3 rounded-lg border border-red-100">
-                    <div>
-                        <label class="text-[10px] font-bold text-red-400 uppercase">Credit Days</label>
-                        <input type="number" id="newCreditDays" placeholder="e.g. 30" class="w-full p-2 bg-white border border-red-200 rounded-lg text-xs">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-red-400 uppercase">Credit Limit (₹)</label>
-                        <input type="number" id="newCreditLimit" placeholder="Max Amount" class="w-full p-2 bg-white border border-red-200 rounded-lg text-xs">
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. GPS Capture -->
-            <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center justify-between mt-2">
-                <div>
-                    <p class="text-xs font-bold text-indigo-700">GPS Location <span class="text-red-500">*</span></p>
-                    <p id="newShopGeoMsg" class="text-[10px] text-indigo-400">Required to save</p>
-                    <input type="hidden" id="newShopLat">
-                    <input type="hidden" id="newShopLng">
-                </div>
-                <button type="button" onclick="captureNewShopLocation()" class="bg-white text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold shadow-sm border border-indigo-100">
-                    Capture
-                </button>
-            </div>
-
-            <!-- Buttons -->
-            <div class="grid grid-cols-2 gap-3 pt-3">
-                <button type="button" onclick="document.getElementById('addShopModal').classList.add('hidden')" class="py-3 text-slate-500 font-bold bg-slate-100 rounded-xl text-xs">Cancel</button>
-                <button type="submit" id="btnSaveShop" class="py-3 text-white font-bold bg-indigo-600 rounded-xl shadow-indigo-200 text-xs">Save Shop</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-
-    
 </body>
 </html>
