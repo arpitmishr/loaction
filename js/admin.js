@@ -221,13 +221,20 @@ window.loadAttendanceByDate = async function() {
 };
 
 // 3. Load Pending Leaves (For Approval Box)
+// --- LOAD PENDING LEAVES (LIMITED) ---
 async function loadPendingLeaves() {
     const container = document.getElementById('leave-approval-section');
     const list = document.getElementById('leave-approval-list');
     if(!container) return;
 
     try {
-        const q = query(collection(db, "leaves"), where("status", "==", "pending"), orderBy("date", "asc"));
+        // OPTIMIZATION: Limit to 20
+        const q = query(
+            collection(db, "leaves"), 
+            where("status", "==", "pending"), 
+            orderBy("date", "asc"),
+            limit(20)
+        );
         const snap = await getDocs(q);
 
         if (snap.empty) {
@@ -240,14 +247,16 @@ async function loadPendingLeaves() {
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
+            const name = data.salesmanName || data.salesmanEmail;
+            
             const row = `
                 <tr>
-                    <td>${data.salesmanEmail}</td>
+                    <td>${name}</td>
                     <td><strong>${data.date}</strong><br>${data.type}</td>
                     <td>${data.reason}</td>
                     <td>
-                        <button onclick="processLeave('${docSnap.id}', 'approved')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; margin-right:5px; cursor:pointer;">✔</button>
-                        <button onclick="processLeave('${docSnap.id}', 'rejected')" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">✖</button>
+                        <button onclick="processLeave('${docSnap.id}', 'approved')" style="color:green; margin-right:5px;">✔</button>
+                        <button onclick="processLeave('${docSnap.id}', 'rejected')" style="color:red;">✖</button>
                     </td>
                 </tr>
             `;
@@ -255,6 +264,13 @@ async function loadPendingLeaves() {
         });
     } catch (e) { console.error("Leave Load Error:", e); }
 }
+
+
+
+
+
+
+
 
 window.processLeave = async function(leaveId, status) {
     if(!confirm(`Mark request as ${status}?`)) return;
@@ -276,15 +292,19 @@ window.processLeave = async function(leaveId, status) {
 
 
 
-// --- 4. SALESMAN LIST ---
-
+// --- LOAD SALESMEN (LIMITED) ---
 async function loadSalesmenList() {
     const list = document.getElementById('salesmen-list');
     if(!list) return;
     list.innerHTML = '<li>Loading...</li>';
 
     try {
-        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        // OPTIMIZATION: Limit to 20
+        const q = query(
+            collection(db, "users"), 
+            where("role", "==", "salesman"),
+            limit(20)
+        );
         const snap = await getDocs(q);
         
         list.innerHTML = "";
@@ -292,6 +312,7 @@ async function loadSalesmenList() {
 
         snap.forEach(doc => {
             const d = doc.data();
+            // Use Denormalized ID/Name if you want, but this is the 'users' collection so it's source data
             const li = document.createElement('li');
             li.className = "flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-white border border-slate-100 shadow-sm transition-all";
             
@@ -499,12 +520,18 @@ window.cancelEdit = function() {
     document.getElementById('creditLimit').disabled = true;
 };
 
+// --- LOAD OUTLETS (LIMITED) ---
 async function loadOutlets() {
     const tableBody = document.getElementById('outlets-table-body');
     if (!tableBody) return;
     
     try {
-        const q = query(collection(db, "outlets")); 
+        // OPTIMIZATION: Limit to 20 newest
+        const q = query(
+            collection(db, "outlets"), 
+            orderBy("createdAt", "desc"), 
+            limit(20)
+        );
         const snap = await getDocs(q);
 
         tableBody.innerHTML = "";
@@ -520,10 +547,10 @@ async function loadOutlets() {
                 : `<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;">Active</span>`;
 
             const blockBtn = isBlocked
-                ? `<button style="background:#28a745; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
-                : `<button style="background:#dc3545; color:white; border:none; padding:4px 8px; margin-right:5px; border-radius:4px; cursor:pointer;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
+                ? `<button style="background:#28a745; color:white; padding:4px 8px; margin-right:5px; border-radius:4px;" onclick="toggleOutletStatus('${id}', 'active')">Unblock</button>`
+                : `<button style="background:#dc3545; color:white; padding:4px 8px; margin-right:5px; border-radius:4px;" onclick="toggleOutletStatus('${id}', 'blocked')">Block</button>`;
 
-            const editBtn = `<button style="background:#007bff; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="editOutlet('${id}')">Edit</button>`;
+            const editBtn = `<button style="background:#007bff; color:white; padding:4px 8px; border-radius:4px;" onclick="editOutlet('${id}')">Edit</button>`;
 
             const creditInfo = data.storeType === 'Credit' 
                 ? `<small style="color:#d63384;">Limit: ${data.creditLimit}</small>` 
@@ -540,10 +567,27 @@ async function loadOutlets() {
                 </tr>`;
             tableBody.innerHTML += row;
         });
+        
+        // Add footer indicating limit
+        if (snap.size === 20) {
+            tableBody.innerHTML += `<tr><td colspan="6" class="text-center text-xs text-slate-400 p-2">Showing recent 20 outlets only.</td></tr>`;
+        }
+        
     } catch (error) {
         console.error("Load Outlets Error:", error);
+        if(error.message.includes("index")) tableBody.innerHTML = "<tr><td colspan='6' style='color:red'>Missing Index: outlets/createdAt desc</td></tr>";
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 window.toggleOutletStatus = async function(id, newStatus) {
     if(!confirm(`Change status to ${newStatus}?`)) return;
@@ -617,12 +661,18 @@ if (createRouteForm) {
 }
 
 // 3. Load Existing Routes
+// --- LOAD ROUTES (LIMITED) ---
 async function loadRoutes() {
     const list = document.getElementById('routes-list-group');
     if (!list) return;
 
     try {
-        const q = query(collection(db, "routes"), orderBy("createdAt", "desc"));
+        // OPTIMIZATION: Limit to 20
+        const q = query(
+            collection(db, "routes"), 
+            orderBy("createdAt", "desc"), 
+            limit(20)
+        );
         const snap = await getDocs(q);
         list.innerHTML = "";
 
@@ -647,6 +697,10 @@ async function loadRoutes() {
         });
     } catch (e) { console.error(e); }
 }
+
+
+
+
 
 // 4. Populate All Outlets (for adding to route)
 async function populateAllOutletsDropdown() {
@@ -828,12 +882,18 @@ function setupProductForm() {
     });
 }
 
+// --- LOAD PRODUCTS (LIMITED) ---
 async function loadProducts() {
     const tbody = document.getElementById('product-list-body');
     if (!tbody) return;
 
     try {
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        // OPTIMIZATION: Limit to 20
+        const q = query(
+            collection(db, "products"), 
+            orderBy("createdAt", "desc"), 
+            limit(20)
+        );
         const snap = await getDocs(q);
 
         tbody.innerHTML = "";
@@ -860,12 +920,17 @@ async function loadProducts() {
 
     } catch (error) {
         console.error("Load Products Error:", error);
-        if(error.message.includes("index")) {
-            // Fallback if index missing
-             tbody.innerHTML = "<tr><td colspan='5' style='color:red'>Missing Index (See Console)</td></tr>";
-        }
     }
 }
+
+
+
+
+
+
+
+
+
 
 // Global Delete Function
 window.deleteProduct = async function(id) {
@@ -886,20 +951,20 @@ function formatCurrency(amount) {
 //      PAYMENT APPROVAL & TRANSACTION LOGIC
 // ==========================================
 
-// 1. Function to Load the List (Must exist for the dashboard to show alerts)
+// --- LOAD PENDING PAYMENTS (LIMITED) ---
 async function loadPendingPayments() {
-    console.log("Checking for pending payments...");
     const container = document.getElementById('approval-section');
     const list = document.getElementById('approval-list');
 
     if(!container) return;
 
     try {
-        // Query: Status is 'pending', ordered by newest first
+        // OPTIMIZATION: Limit to 20
         const q = query(
             collection(db, "payments"), 
             where("status", "==", "pending"),
-            orderBy("date", "desc")
+            orderBy("date", "desc"),
+            limit(20) 
         );
         
         const snap = await getDocs(q);
@@ -915,39 +980,47 @@ async function loadPendingPayments() {
         snap.forEach(docSnap => {
             const data = docSnap.data();
             const isOffsite = data.collectedWithoutVisit ? 
-    `<span style="color:red; font-size:10px;">[OFF-SITE]</span>` : 
-    `<span style="color:blue; font-size:10px;">[ON-VISIT]</span>`;
+                `<span style="color:red; font-size:10px;">[OFF-SITE]</span>` : 
+                `<span style="color:blue; font-size:10px;">[ON-VISIT]</span>`;
+            
+            // Use Denormalized Names if available, fallback to IDs
+            const shopName = data.outletName || data.outletId;
+            const staffName = data.salesmanName || (data.salesmanId ? data.salesmanId.slice(0,5) : 'Unknown');
+            
+            const mapLink = `https://www.google.com/maps/search/?api=1&query=${data.gpsLat},${data.gpsLng}`;
 
-const mapLink = `https://www.google.com/maps/search/?api=1&query=${data.gpsLat},${data.gpsLng}`;
-
-const row = `
-    <tr>
-        <td>
-            <strong>${data.outletName}</strong> ${isOffsite}<br>
-            <small>By: ${data.salesmanId ? data.salesmanId.slice(0,5) : 'Unknown'}</small>
-        </td>
-        <td style="font-weight:bold; color:green;">₹${data.amount}</td>
-        <td>
-            ${data.method}<br>
-            <a href="${mapLink}" target="_blank" style="color:blue; text-decoration:underline; font-size:10px;">View GPS 📍</a>
-        </td>
-        <td>
-            <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" ...>✔</button>
-            <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" ...>✖</button>
-        </td>
-    </tr>
-`;
+            const row = `
+                <tr>
+                    <td>
+                        <strong>${shopName}</strong> ${isOffsite}<br>
+                        <small>By: ${staffName}</small>
+                    </td>
+                    <td style="font-weight:bold; color:green;">₹${data.amount}</td>
+                    <td>
+                        ${data.method}<br>
+                        <a href="${mapLink}" target="_blank" style="color:blue; text-decoration:underline; font-size:10px;">View GPS 📍</a>
+                    </td>
+                    <td>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'approve')" style="cursor:pointer; margin-right:5px;">✔</button>
+                        <button onclick="processPayment('${docSnap.id}', '${data.outletId}', ${data.amount}, 'reject')" style="cursor:pointer;">✖</button>
+                    </td>
+                </tr>
+            `;
             list.innerHTML += row;
         });
 
     } catch (error) {
         console.error("Approval Load Error:", error);
-        if(error.message.includes("index")) {
-            container.style.display = 'block';
-            list.innerHTML = `<tr><td colspan="4" style="color:red; font-weight:bold;">⚠️ Missing Index. Check Console.</td></tr>`;
-        }
     }
 }
+
+
+
+
+
+
+
+
 
 // 2. Global Function to Handle Click (Must match what is in HTML)
 window.processPayment = async function(paymentId, outletId, amount, action) {
