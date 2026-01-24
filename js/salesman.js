@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
-import { getCachedUserProfile } from "./auth.js"; // <--- Add this import at the top
+import { appCache, getCachedUserProfile } from "./auth.js"; // <--- Add this import at the top
 // --- GLOBAL VARIABLES ---
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
@@ -82,14 +82,23 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 });
 
 
-// --- 3. ROUTE & SHOP LIST LOGIC ---
+// --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
 async function loadAssignedRoute(uid) {
     const routeNameEl = document.getElementById('route-name');
     const shopsListEl = document.getElementById('shops-list');
 
     try {
-        // Query routes assigned to this user
+        // 1. Check Cache for Route Metadata
+        if (appCache.route) {
+            console.log("⚡ Loaded Route from Cache");
+            routeNameEl.innerText = appCache.route.name;
+            loadShops(appCache.route.id); // Pass ID to next function
+            return;
+        }
+
+        // 2. Network Fetch
+        console.log("🌐 Fetching Route from Firestore...");
         const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
         const routeSnap = await getDocs(q);
 
@@ -101,9 +110,11 @@ async function loadAssignedRoute(uid) {
 
         const routeDoc = routeSnap.docs[0];
         const routeData = routeDoc.data();
-        routeNameEl.innerText = routeData.name;
         
-        // Load Outlets linked to this route
+        // 3. Save to Cache
+        appCache.route = { id: routeDoc.id, ...routeData };
+
+        routeNameEl.innerText = routeData.name;
         loadShops(routeDoc.id);
 
     } catch (error) {
@@ -115,75 +126,55 @@ async function loadAssignedRoute(uid) {
 async function loadShops(routeId) {
     const list = document.getElementById('shops-list');
     
-    // Note: Requires Index (routeId ASC, sequence ASC)
+    // 1. Check Cache for Outlets List (Heavy Operation)
+    if (appCache.routeOutlets) {
+        console.log("⚡ Loaded Shops from Cache");
+        renderShopsList(appCache.routeOutlets);
+        return;
+    }
+
+    // 2. Network Fetch
+    console.log("🌐 Fetching Outlets from Firestore...");
     const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
     
     try {
         const snap = await getDocs(q);
-        list.innerHTML = "";
         
         if(snap.empty) { 
             list.innerHTML = "<li style='padding:15px;'>No shops in this route.</li>"; 
             return; 
         }
 
-        // Iterate through route_outlets
-        for (const docSnap of snap.docs) {
-            const routeOutletData = docSnap.data();
+        // 3. Process & Merge Data (Parallel Fetching)
+        const outletPromises = snap.docs.map(async (docSnap) => {
+            const linkData = docSnap.data();
             
-            // Fetch the actual Outlet Document to get Coordinates (Lat/Lng)
-            const outletDocRef = doc(db, "outlets", routeOutletData.outletId);
-            const outletDoc = await getDoc(outletDocRef);
-            
-            if(!outletDoc.exists()) continue; // Skip if outlet was deleted
-            
+            // Fetch actual Outlet details (for GPS/Name)
+            const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
+            if (!outletDoc.exists()) return null;
+
             const outletData = outletDoc.data();
-            const shopLat = outletData.geo ? outletData.geo.lat : 0;
-            const shopLng = outletData.geo ? outletData.geo.lng : 0;
-
-            const li = document.createElement('li');
-            li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
             
-            // --- UPDATED HTML STRUCTURE FOR TWO BUTTONS ---
-            li.innerHTML = `
-                <div>
-                    <strong style="font-size:1.1rem;">${routeOutletData.outletName}</strong><br>
-                    <small>Seq: ${routeOutletData.sequence}</small>
-                </div>
-                <div style="display:flex; gap:10px;">
-                    <!-- Phone Order Button -->
-                    <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">
-                        📞
-                    </button>
-                    
-                    <!-- Map/Visit Button -->
-                    <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">
-                        Open 🗺️
-                    </button>
-                </div>
-            `;
-            
-            // --- 1. ATTACH PHONE ORDER LISTENER ---
-            li.querySelector('.btn-phone-order').onclick = () => {
-                // Ensure openOrderForm is defined (from the previous step)
-                if (window.openOrderForm) {
-                    window.openOrderForm(routeOutletData.outletId, routeOutletData.outletName);
-                } else {
-                    alert("Order system not loaded yet.");
-                }
+            return {
+                id: linkData.outletId,
+                name: linkData.outletName, // or outletData.shopName
+                sequence: linkData.sequence,
+                lat: outletData.geo ? outletData.geo.lat : 0,
+                lng: outletData.geo ? outletData.geo.lng : 0,
+                // Store extra data needed for orders
+                fullData: outletData 
             };
+        });
 
-            // --- 2. ATTACH MAP LISTENER ---
-            li.querySelector('.btn-open-map').onclick = () => {
-                if(shopLat === 0 && shopLng === 0) {
-                    alert("This outlet has no GPS coordinates set by Admin.");
-                } else {
-                    openVisitPanel(routeOutletData.outletId, routeOutletData.outletName, shopLat, shopLng);
-                }
-            };
+        // Wait for all fetches
+        const results = await Promise.all(outletPromises);
+        const validShops = results.filter(s => s !== null);
 
-            list.appendChild(li);
-        }
+        // 4. Save to Cache
+        appCache.routeOutlets = validShops;
+
+        // 5. Render
+        renderShopsList(validShops);
 
     } catch (error) {
         console.error("Load Shops Error:", error);
@@ -193,7 +184,36 @@ async function loadShops(routeId) {
     }
 }
 
+// Helper to Render UI (Reused by Cache and Network)
+function renderShopsList(shops) {
+    const list = document.getElementById('shops-list');
+    list.innerHTML = "";
 
+    shops.forEach(shop => {
+        const li = document.createElement('li');
+        li.style.cssText = "background:white; margin:10px 0; padding:15px; border-radius:8px; border:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;";
+        
+        li.innerHTML = `
+            <div>
+                <strong style="font-size:1.1rem;">${shop.name}</strong><br>
+                <small>Seq: ${shop.sequence}</small>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-phone-order" style="background:#ffc107; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer;" title="Take Phone Order">📞</button>
+                <button class="btn-open-map" style="background:#007bff; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Open 🗺️</button>
+            </div>
+        `;
+        
+        // Attach Listeners
+        li.querySelector('.btn-phone-order').onclick = () => window.openOrderForm(shop.id, shop.name);
+        li.querySelector('.btn-open-map').onclick = () => {
+            if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
+            else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
+        };
+
+        list.appendChild(li);
+    });
+}
 
 
 
@@ -999,40 +1019,53 @@ window.submitLeaveRequest = async function() {
 
 
 
-// --- DAILY TARGET SYSTEM (FIXED) ---
+// --- DAILY TARGET SYSTEM (CACHED) ---
 
 async function loadDailyTarget() {
     const card = document.getElementById('target-card');
     const uid = auth.currentUser.uid;
 
-    // 1. FIX: Generate Local Date String (YYYY-MM-DD) manually to match Admin Input
+    // 1. Generate ID (uid_YYYY-MM-DD)
     const d = new Date();
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     const todayStr = `${year}-${month}-${day}`;
-
-    console.log("Looking for Target ID:", `${uid}_${todayStr}`); // Debugging
+    const targetId = `${uid}_${todayStr}`;
 
     try {
-        // 2. Fetch Target Document
-        const targetId = `${uid}_${todayStr}`;
-        const targetSnap = await getDoc(doc(db, "daily_targets", targetId));
+        let targetData;
 
-        if (!targetSnap.exists()) {
-            console.log("No target found for today.");
-            card.style.display = 'none';
-            return;
+        // 2. Check Cache
+        if (appCache.dailyTarget && appCache.dailyTarget.id === targetId) {
+            console.log("⚡ Loaded Target from Cache");
+            targetData = appCache.dailyTarget.data;
+        } else {
+            // 3. Network Fetch
+            console.log("🌐 Fetching Target from Firestore...");
+            const targetSnap = await getDoc(doc(db, "daily_targets", targetId));
+
+            if (!targetSnap.exists()) {
+                console.log("No target found for today.");
+                card.style.display = 'none';
+                return;
+            }
+
+            targetData = targetSnap.data();
+            // Cache It
+            appCache.dailyTarget = { id: targetId, data: targetData };
         }
 
-        const targetData = targetSnap.data();
+        // --- RENDER LOGIC (Same as before) ---
         const targetBoxes = Number(targetData.targetBoxes) || 0;
         const incentiveRate = Number(targetData.incentivePerBox) || 0;
 
-        card.classList.remove('hidden'); // Show card
-        card.style.display = 'block';    // Force display
+        card.classList.remove('hidden'); 
+        card.style.display = 'block';
 
-        // 3. Calculate Actual Sales
+        // 4. Calculate Actual Sales (We DO NOT Cache this, as it changes with every order)
+        // Optimization: We could cache this but invalidating it after every order is complex.
+        // For now, we only query the orders, but we saved the read on the 'daily_targets' doc.
         const startOfDay = new Date();
         startOfDay.setHours(0,0,0,0);
         
@@ -1049,24 +1082,16 @@ async function loadDailyTarget() {
         const orderSnaps = await getDocs(q);
         
         let totalBoxesSold = 0;
-        
         orderSnaps.forEach(doc => {
             const order = doc.data();
-            // Count items only if status is NOT rejected (optional, based on your rule)
             if(order.items && Array.isArray(order.items)) {
-                order.items.forEach(item => {
-                    totalBoxesSold += (Number(item.qty) || 0);
-                });
+                order.items.forEach(item => totalBoxesSold += (Number(item.qty) || 0));
             }
         });
 
-        console.log(`Target: ${targetBoxes}, Sold: ${totalBoxesSold}`);
-
-        // 4. Update UI
+        // Update UI
         const progress = targetBoxes > 0 ? Math.min((totalBoxesSold / targetBoxes) * 100, 100) : 0;
         const remaining = Math.max(0, targetBoxes - totalBoxesSold);
-        
-        // Incentive: Only for boxes ABOVE target
         const extraBoxes = Math.max(0, totalBoxesSold - targetBoxes);
         const incentiveEarned = extraBoxes * incentiveRate;
 
@@ -1087,7 +1112,7 @@ async function loadDailyTarget() {
         msgRemaining.classList.add('hidden');
         msgAlmost.classList.add('hidden');
         msgSuccess.classList.add('hidden');
-        bar.className = "h-3 rounded-full transition-all duration-1000 ease-out"; // Reset colors
+        bar.className = "h-3 rounded-full transition-all duration-1000 ease-out"; 
 
         if (totalBoxesSold >= targetBoxes && targetBoxes > 0) {
             msgSuccess.classList.remove('hidden');
@@ -1102,13 +1127,8 @@ async function loadDailyTarget() {
 
     } catch (error) {
         console.error("Target Load Error:", error);
-        // CRITICAL: Check console if index is missing
-        if(error.message.includes("index")) {
-            alert("⚠️ Admin needs to create a Database Index. Check Console.");
-        }
     }
 }
-
 
 
 
