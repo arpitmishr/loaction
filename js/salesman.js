@@ -1340,20 +1340,18 @@ window.toggleCreditFields = function() {
 async function submitNewShop() {
     const btn = document.getElementById('btnSaveShop');
     
-    // 1. Gather Basic Data
+    // 1. Gather Data
     const name = document.getElementById('newShopName').value.trim();
     const owner = document.getElementById('newOwnerName').value.trim();
     const phone = document.getElementById('newShopPhone').value.trim();
     const address = document.getElementById('newShopAddress').value.trim();
     const gst = document.getElementById('newShopGST').value.trim() || "N/A";
     
-    // Types & Credit
     const catType = document.getElementById('newShopType').value;
     const storeType = document.getElementById('newStoreType').value;
     const creditDays = storeType === 'Credit' ? Number(document.getElementById('newCreditDays').value) : 0;
     const creditLimit = storeType === 'Credit' ? Number(document.getElementById('newCreditLimit').value) : 0;
 
-    // GPS
     const lat = document.getElementById('newShopLat').value;
     const lng = document.getElementById('newShopLng').value;
 
@@ -1384,33 +1382,40 @@ async function submitNewShop() {
             status: 'active'
         };
 
-        // 3. Save to Firestore (WRITE OPERATION)
+        // 3. Save to 'outlets' Collection
         const docRef = await addDoc(collection(db, "outlets"), shopData);
 
-        // --- OPTIMIZATION START: Update UI Locally (No Read) ---
-        
-        // Create a local representation matching the 'routeOutlets' structure
+        // --- THE FIX: LINK TO CURRENT ROUTE ---
+        // We must add an entry to 'route_outlets' so it loads on refresh
+        if (appCache.route && appCache.route.id) {
+            await addDoc(collection(db, "route_outlets"), {
+                routeId: appCache.route.id,
+                outletId: docRef.id,
+                outletName: name, // Denormalized for faster loading
+                sequence: 0 // 0 puts it at the top as "New"
+            });
+            console.log("✅ Linked new shop to Route:", appCache.route.id);
+        } else {
+            console.warn("⚠️ No active route found in cache. Shop saved but not linked to route.");
+        }
+        // --------------------------------------
+
+        // 4. Update UI Locally (Immediate Feedback)
         const newLocalShop = {
             id: docRef.id,
             name: name,
-            sequence: 0, // 0 indicates it's new/unassigned
+            sequence: 0, 
             lat: parseFloat(lat),
             lng: parseFloat(lng),
             fullData: shopData
         };
 
-        // Initialize cache if empty
         if (!appCache.routeOutlets) appCache.routeOutlets = [];
-        
-        // Push to local cache
         appCache.routeOutlets.push(newLocalShop);
 
-        // Re-render the list immediately
         renderShopsList(appCache.routeOutlets);
         
-        // --- OPTIMIZATION END ---
-
-        alert("✅ Shop Added! It is now available in your list.");
+        alert("✅ Shop Added! It is now permanently in your route.");
         document.getElementById('addShopModal').classList.add('hidden');
 
     } catch (e) {
