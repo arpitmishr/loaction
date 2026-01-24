@@ -252,8 +252,7 @@ async function loadShops(routeId) {
     }
 }
 
-// --- REPLACE EXISTING renderShopsList FUNCTION ---
-
+// --- UPDATED RENDER LIST WITH NAVIGATION BUTTON ---
 function renderShopsList(shops, visitedSet = new Set()) {
     const list = document.getElementById('shops-list');
     list.innerHTML = "";
@@ -270,30 +269,39 @@ function renderShopsList(shops, visitedSet = new Set()) {
         const isVisited = visitedSet.has(shop.id);
         const li = document.createElement('li');
         
-        // Dynamic Styling
         const bgStyle = isVisited ? "background:#f0fdf4; border:1px solid #86efac;" : "background:white; border:1px solid #ddd;";
         const checkMark = isVisited ? `<span style="color:green; font-weight:bold; font-size:12px;">✅ Visited</span>` : "";
 
-        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);`;
+        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:16px; display:flex; flex-direction:column; gap:10px; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);`;
         
         li.innerHTML = `
-            <div style="flex-grow:1;">
-                <strong style="font-size:1rem; color:${isVisited ? '#15803d' : '#1e293b'}">${shop.name}</strong><br>
-                <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
-                    <span style="font-size:0.7rem; background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px;">Seq: ${shop.sequence || 'New'}</span>
-                    ${checkMark}
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <strong style="font-size:1rem; color:${isVisited ? '#15803d' : '#1e293b'}">${shop.name}</strong><br>
+                    <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
+                        <span style="font-size:0.7rem; background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px;">Seq: ${shop.sequence || 'New'}</span>
+                        ${checkMark}
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:8px;">
-                <!-- NEW COLLECTION BUTTON -->
+            
+            <div style="display:flex; gap:8px; justify-content:flex-end; border-top:1px dashed #eee; padding-top:10px;">
+                <!-- NAVIGATION BUTTON (NEW) -->
+                <button class="btn-nav" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Navigate">
+                    <span class="material-icons-round" style="font-size:18px;">near_me</span>
+                </button>
+
+                <!-- COLLECTION BUTTON -->
                 <button class="btn-collect" style="background:#ecfccb; color:#4d7c0f; border:1px solid #d9f99d; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Collect Payment">
                     <span class="material-icons-round" style="font-size:18px;">payments</span>
                 </button>
 
+                <!-- PHONE ORDER -->
                 <button class="btn-phone-order" style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Phone Order">
                     <span class="material-icons-round" style="font-size:18px;">call</span>
                 </button>
 
+                <!-- VISIT BUTTON -->
                 <button class="btn-open-map" style="background:${isVisited ? '#f1f5f9' : '#eff6ff'}; color:${isVisited ? '#64748b' : '#2563eb'}; border:1px solid ${isVisited ? '#e2e8f0' : '#bfdbfe'}; padding:0 12px; height:36px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:0.75rem;">
                     ${isVisited ? 'View' : 'Visit'}
                 </button>
@@ -301,6 +309,7 @@ function renderShopsList(shops, visitedSet = new Set()) {
         `;
         
         // Attach Listeners
+        li.querySelector('.btn-nav').onclick = () => openGoogleMapsNavigation(shop.lat, shop.lng);
         li.querySelector('.btn-collect').onclick = () => openQuickCollection(shop.id, shop.name);
         li.querySelector('.btn-phone-order').onclick = () => window.openOrderForm(shop.id, shop.name);
         li.querySelector('.btn-open-map').onclick = () => {
@@ -1607,4 +1616,32 @@ window.fetchOutletBalance = async function() {
         btn.innerText = "Retry";
         btn.disabled = false;
     }
+};
+
+
+
+
+
+
+// --- NEW NAVIGATION HELPER (Zero Firebase Reads/Writes) ---
+window.openGoogleMapsNavigation = function(lat, lng) {
+    // 1. Validation (Memory check only)
+    if (!lat || !lng || (lat === 0 && lng === 0)) {
+        alert("⚠️ No GPS coordinates available for this shop.");
+        return;
+    }
+
+    // 2. Hardware Check (Constraint: Alert if no GPS, but don't block)
+    if (!navigator.geolocation) {
+        alert("Please enable GPS to navigate");
+    }
+
+    // 3. Construct URL (Google Maps Intent)
+    // api=1: Uses the new universal cross-platform syntax
+    // destination: The target lat,lng
+    // travelmode: driving
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+
+    // 4. Execute (Opens Native App on Mobile, New Tab on Desktop)
+    window.open(url, '_blank');
 };
