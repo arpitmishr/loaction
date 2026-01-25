@@ -1,880 +1,818 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Admin Dashboard</title>
+    <title>Nexus Admin | Futuristic Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons (Cleaner/Modern than Heroicons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script>
-      tailwind.config = {
-        theme: {
-          fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
-          },
-          extend: {
-            colors: {
-              primary: '#4F46E5', // Indigo 600
-              primaryDark: '#4338ca', // Indigo 700
-              secondary: '#64748b', // Slate 500
-              surface: '#ffffff',
-              background: '#f8fafc', // Slate 50
-              success: '#10b981', // Emerald 500
-              warning: '#f59e0b', // Amber 500
-              danger: '#ef4444', // Red 500
-            },
-            boxShadow: {
-              'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
-              'card': '0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01)',
-              'nav': '0 -4px 20px -5px rgba(0, 0, 0, 0.05)',
-            },
-            spacing: {
-              'golden': '1.618rem', // Golden ratio unit
+        tailwind.config = {
+            theme: {
+                fontFamily: {
+                    sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                },
+                extend: {
+                    colors: {
+                        primary: '#6366f1', // Indigo 500
+                        primaryDark: '#4f46e5', // Indigo 600
+                        accent: '#8b5cf6', // Violet 500
+                        surface: 'rgba(255, 255, 255, 0.7)',
+                        glass: 'rgba(255, 255, 255, 0.4)',
+                        dark: '#0f172a',
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                        'glow': '0 0 20px rgba(99, 102, 241, 0.3)',
+                        'neumorphic': '20px 20px 60px #d1d5db, -20px -20px 60px #ffffff',
+                    },
+                    spacing: {
+                        'phi': '1.618rem', // Golden ratio unit
+                    },
+                    backdropBlur: {
+                        'xs': '2px',
+                    }
+                }
             }
-          }
         }
-      }
     </script>
-    <!-- Google Fonts: Inter for clean, modern typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        -webkit-tap-highlight-color: transparent;
-      }
-
-      /* Hide scrollbar but keep functionality */
-      .hide-scroll::-webkit-scrollbar {
-        display: none;
-      }
-
-      .hide-scroll {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-
-      /* Smooth transitions */
-      .tab-content {
-        animation: fadeIn 0.3s ease-in-out;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(5px);
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #f0f4f8;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%), 
+                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+            -webkit-tap-highlight-color: transparent; 
         }
+        
+        /* Smooth Fade In */
+        .tab-content { animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-        to {
-          opacity: 1;
-          transform: translateY(0);
+        /* Floating Nav Active State */
+        .nav-item.active div {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            transform: translateY(-5px);
         }
-      }
+        .nav-item div { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-      /* Nav Item Active State */
-      .nav-item.active .icon-container {
-        background-color: #EEF2FF;
-        /* Indigo 50 */
-        color: #4F46E5;
-        /* Indigo 600 */
-      }
-
-      .nav-item.active span {
-        color: #4F46E5;
-        font-weight: 600;
-      }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Floating Table Rows */
+        .table-row-floating { transition: transform 0.2s; }
+        .table-row-floating:hover { transform: scale-[1.01]; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
     </style>
-  </head>
-  <body class="bg-background text-slate-600 antialiased h-screen flex flex-col">
+</head>
+<body class="text-slate-600 h-screen flex flex-col overflow-hidden">
+
     <!-- LOADER -->
-    <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white z-[100]">
-      <svg class="animate-spin h-10 w-10 text-primary mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <h2 class="text-sm font-medium text-slate-400 tracking-widest uppercase">Initializing</h2>
+    <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-xl z-[100] transition-opacity duration-500">
+        <div class="relative">
+            <div class="w-16 h-16 rounded-full border-4 border-slate-100 border-t-primary animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+            </div>
+        </div>
+        <h2 class="mt-4 text-xs font-bold text-slate-400 tracking-[0.2em] uppercase animate-pulse">System Initialization</h2>
     </div>
+
     <!-- MAIN APP WRAPPER -->
-    <div id="content" style="display: none;" class="flex flex-col min-h-screen">
-      <!-- HEADER (Fixed Top) -->
-      <header class="fixed top-0 left-0 right-0 h-16 bg-surface shadow-soft z-40 flex items-center justify-between px-5 border-b border-slate-100">
-        <div class="flex items-center gap-3">
-          <div class="bg-primary/10 p-2 rounded-lg text-primary">
-            <!-- Lightning/Power Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-              <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clip-rule="evenodd" />
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-base font-bold text-slate-800 leading-none">Admin Panel</h1>
-            <p class="text-[11px] text-slate-400 font-medium mt-0.5">Management Console</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-4">
-          <button id="refreshBtn" onclick="refreshDashboard()" class="text-slate-400 hover:text-primary transition-colors p-1" title="Refresh Data">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-          </button>
-          <span id="user-email" class="hidden md:block text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full"></span>
-          <button id="logoutBtn" class="text-slate-400 hover:text-danger transition-colors p-1">
-            <!-- Logout Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
-          </button>
-        </div>
-      </header>
-      <!-- CONTENT AREA (Scrollable) -->
-      <!-- Added pt-20 (top padding) and pb-28 (bottom padding) to clear fixed bars -->
-      <main class="flex-grow pt-20 pb-28 px-4 md:px-6 container mx-auto max-w-6xl">
-        <!-- =======================
-                 TAB 1: DASHBOARD
-            ======================== -->
-        <div id="tab-dashboard" class="tab-content block">
-          <div class="mb-6">
-            <h2 class="text-xl font-bold text-slate-800">Dashboard</h2>
-            <p class="text-sm text-slate-500">Overview of daily activities.</p>
-          </div>
-          <!-- NOTIFICATIONS SECTION -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
-            <!-- Payment Approvals -->
-            <div id="approval-section" class="hidden bg-surface border border-warning/20 rounded-2xl p-5 shadow-card relative overflow-hidden group">
-              <div class="absolute right-0 top-0 p-3 opacity-10">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-warning">
-                  <path fill-rule="evenodd" d="M5.25 9a6.75 6.75 0 0113.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 01-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 11-7.48 0 24.585 24.585 0 01-4.831-1.244.75.75 0 01-.298-1.205A8.217 8.217 0 005.25 9.75V9zm4.502 8.9a2.25 2.25 0 104.496 0 25.057 25.057 0 01-4.496 0z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <h3 class="text-sm font-bold text-warning mb-4 flex items-center gap-2 relative z-10">
-                <span class="bg-warning/10 p-1.5 rounded-md">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                    <path d="M12 7.5a2.25 2.25 0 100 4.5 2.25 2.25 0 000-4.5z" />
-                    <path fill-rule="evenodd" d="M1.5 4.875C1.5 3.839 2.34 3 3.375 3h17.25c1.035 0 1.875.84 1.875 1.875v9.75c0 1.036-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 011.5 14.625v-9.75zM8.25 9.75a3.75 3.75 0 117.5 0 3.75 3.75 0 01-7.5 0zM18.75 9a.75.75 0 00-.75.75v.008c0 .414.336.75.75.75h.008a.75.75 0 00.75-.75V9.75a.75.75 0 00-.75-.75h-.008zM4.5 9.75A.75.75 0 015.25 9h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75H5.25a.75.75 0 01-.75-.75V9.75z" clip-rule="evenodd" />
-                  </svg>
-                </span> Pending Payments
-              </h3>
-              <div class="relative z-10 overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                  <thead class="text-slate-400 border-b border-warning/10">
-                    <tr>
-                      <th class="pb-2 font-medium">Shop</th>
-                      <th class="pb-2 font-medium">Amount</th>
-                      <th class="pb-2 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="approval-list" class="divide-y divide-warning/10 text-slate-700"></tbody>
-                </table>
-              </div>
-            </div>
-            <!-- Leave Approvals -->
-            <div id="leave-approval-section" class="hidden bg-surface border border-primary/20 rounded-2xl p-5 shadow-card relative overflow-hidden">
-              <div class="absolute right-0 top-0 p-3 opacity-10">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-24 h-24 text-primary">
-                  <path d="M12.75 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM7.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM8.25 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM9.75 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM10.5 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM12.75 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM14.25 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 17.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 15.75a.75.75 0 100-1.5.75.75 0 000 1.5zM15 12.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM16.5 13.5a.75.75 0 100-1.5.75.75 0 000 1.5z" />
-                  <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3v1.5h9V3A.75.75 0 0118 3v1.5h.75a3 3 0 013 3v11.25a3 3 0 01-3 3H5.25a3 3 0 01-3-3V7.5a3 3 0 013-3H6V3a.75.75 0 01.75-.75zm13.5 9a1.5 1.5 0 00-1.5-1.5H5.25a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 001.5 1.5h13.5a1.5 1.5 0 001.5-1.5v-7.5z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <h3 class="text-sm font-bold text-primary mb-4 flex items-center gap-2 relative z-10">
-                <span class="bg-primary/10 p-1.5 rounded-md">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
-                    <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd" />
-                  </svg>
-                </span> Leave Requests
-              </h3>
-              <div class="relative z-10 overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                  <thead class="text-slate-400 border-b border-primary/10">
-                    <tr>
-                      <th class="pb-2 font-medium">Staff</th>
-                      <th class="pb-2 font-medium">Reason</th>
-                      <th class="pb-2 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="leave-approval-list" class="divide-y divide-primary/10 text-slate-700"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <!-- TARGET ASSIGNMENT SECTION (New) -->
-          <div class="bg-surface p-5 rounded-2xl shadow-card border border-indigo-100 mb-6">
-            <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <span class="bg-indigo-100 text-indigo-600 p-1.5 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </span> Assign Daily Target
-            </h3>
-            <form id="targetForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-              <!-- Select Salesman -->
-              <div class="md:col-span-1">
-                <label class="text-xs font-bold text-slate-400 uppercase">Salesman</label>
-                <select id="targetSalesmanId" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
-                  <option value="">Select Staff...</option>
-                  <!-- Populated by JS -->
-                </select>
-              </div>
-              <!-- Date -->
-              <div class="md:col-span-1">
-                <label class="text-xs font-bold text-slate-400 uppercase">Target Date</label>
-                <input type="date" id="targetDate" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
-              </div>
-              <!-- Target Boxes -->
-              <div class="md:col-span-1">
-                <label class="text-xs font-bold text-slate-400 uppercase">Target (Boxes)</label>
-                <input type="number" id="targetBoxes" placeholder="e.g. 50" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
-              </div>
-              <!-- Incentive -->
-              <div class="md:col-span-1">
-                <label class="text-xs font-bold text-slate-400 uppercase">Incentive / Box</label>
-                <input type="number" id="incentivePerBox" placeholder="₹ per extra box" required class="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500">
-              </div>
-              <!-- Submit -->
-              <div class="md:col-span-1">
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-all"> Set Target </button>
-              </div>
-            </form>
-          </div>
-          <!-- STATS CARDS -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <!-- Attendance -->
-            <div class="bg-surface p-5 rounded-2xl shadow-card flex flex-col items-center text-center justify-center h-32 border border-slate-50">
-              <div class="bg-blue-50 text-blue-600 p-2.5 rounded-full mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-              </div>
-              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Present</p>
-              <p class="text-xl font-bold text-slate-800 mt-1" id="stat-attendance">0</p>
-            </div>
-            <!-- Orders -->
-            <div class="bg-surface p-5 rounded-2xl shadow-card flex flex-col items-center text-center justify-center h-32 border border-slate-50">
-              <div class="bg-purple-50 text-purple-600 p-2.5 rounded-full mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-                </svg>
-              </div>
-              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Orders</p>
-              <p class="text-xl font-bold text-slate-800 mt-1" id="stat-orders">0</p>
-            </div>
-            <!-- Sales -->
-            <div class="bg-surface p-5 rounded-2xl shadow-card flex flex-col items-center text-center justify-center h-32 border border-slate-50">
-              <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-full mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Revenue</p>
-              <p class="text-xl font-bold text-emerald-600 mt-1" id="stat-sales">0</p>
-            </div>
-            <!-- Credit -->
-            <div class="bg-surface p-5 rounded-2xl shadow-card flex flex-col items-center text-center justify-center h-32 border border-slate-50">
-              <div class="bg-orange-50 text-orange-600 p-2.5 rounded-full mb-2">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
-                </svg>
-              </div>
-              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Credit</p>
-              <p class="text-xl font-bold text-orange-600 mt-1" id="stat-credit">0</p>
-            </div>
-          </div>
-          <!-- ATTENDANCE TABLE -->
-          <div class="bg-surface rounded-2xl shadow-card overflow-hidden border border-slate-100">
-            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-              <h3 class="font-bold text-slate-800">Daily Register</h3>
-              <div class="flex gap-2 w-full sm:w-auto">
-                <input type="date" id="attendanceDateFilter" class="bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/50 w-full sm:w-auto">
-                <button onclick="loadAttendanceByDate()" class="bg-primary text-white p-2 rounded-lg shadow hover:bg-primaryDark transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-sm text-slate-600">
-                <thead class="bg-slate-50 text-xs text-slate-400 uppercase tracking-wider font-semibold">
-                  <tr>
-                    <th class="p-4">Salesman</th>
-                    <th class="p-4">Status</th>
-                    <th class="p-4">Logs</th>
-                  </tr>
-                </thead>
-                <tbody id="attendance-list" class="divide-y divide-slate-100">
-                  <tr>
-                    <td colspan="3" class="p-6 text-center text-slate-400 italic">Fetching records...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <!-- =======================
-                 TAB 2: OUTLETS
-            ======================== -->
-        <div id="tab-outlets" class="tab-content hidden">
-          <div class="flex flex-col gap-6">
-            <!-- ADD OUTLET FORM -->
-            <div class="bg-surface rounded-2xl shadow-card border border-slate-100 p-6">
-              <div class="flex justify-between items-center mb-6">
-                <h4 class="text-lg font-bold text-slate-800" id="formTitle">New Outlet</h4>
-                <div class="bg-primary/10 p-2 rounded-lg text-primary">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </div>
-              </div>
-              <form id="addOutletForm" class="space-y-5">
-                <input type="hidden" id="editOutletId">
-                <!-- Basic Info -->
-                <div class="space-y-4">
-                  <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Establishment</label>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="shopName" placeholder="Shop Name" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all">
-                    <select id="outletType" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                      <option value="" disabled selected>Select Type</option>
-                      <option value="Shop">Shop</option>
-                      <option value="Dhaba">Dhaba</option>
-                      <option value="Cafe">Cafe</option>
-                      <option value="Restaurant">Restaurant</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-                <!-- Contact Info -->
-                <div class="space-y-4">
-                  <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Details</label>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="ownerName" placeholder="Owner Name" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                    <input type="tel" id="contactPhone" placeholder="Mobile Number" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                  </div>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="contactPerson" placeholder="Point of Contact" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                    <input type="text" id="gstNumber" placeholder="GST (Optional)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                  </div>
-                </div>
-                <!-- Financial -->
-                <div class="space-y-4">
-                  <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Terms</label>
-                  <select id="storeType" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary outline-none">
-                    <option value="Cash">Cash Store</option>
-                    <option value="Credit">Credit Store</option>
-                  </select>
-                  <div class="grid grid-cols-2 gap-4">
-                    <input type="number" id="creditDays" placeholder="Cr. Days" disabled class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm disabled:opacity-50">
-                    <input type="number" id="creditLimit" placeholder="Limit Amount" disabled class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm disabled:opacity-50">
-                  </div>
-                </div>
-                <!-- Geolocation -->
-                <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="bg-blue-100 text-blue-600 p-2 rounded-full">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                      </svg>
+    <div id="content" style="display: none;" class="flex flex-col h-full">
+        
+        <!-- HEADER (Floating Glass) -->
+        <header class="absolute top-0 left-0 right-0 z-40 px-4 py-3 md:px-6 md:py-4">
+            <div class="glass-panel rounded-2xl shadow-glass flex items-center justify-between p-3 md:p-4 max-w-7xl mx-auto">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center text-white shadow-glow">
+                        <i class="ph ph-hexagon text-xl font-bold"></i>
                     </div>
-                    <div class="flex flex-col">
-                      <span class="text-sm font-bold text-slate-700">Location</span>
-                      <span id="geoDisplay" class="text-xs text-slate-500">Coordinates required</span>
-                    </div>
-                  </div>
-                  <button type="button" id="geoBtn" class="bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors"> Capture </button>
-                  <input type="hidden" id="lat">
-                  <input type="hidden" id="lng">
-                </div>
-                <!-- Actions -->
-                <div class="flex gap-3 pt-2">
-                  <button type="submit" id="submitBtn" class="flex-1 bg-slate-900 text-white py-3.5 rounded-xl text-sm font-semibold shadow hover:bg-slate-800 transition-all">Save Outlet</button>
-                  <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-1/3 bg-slate-200 text-slate-600 py-3.5 rounded-xl text-sm font-semibold hover:bg-slate-300">Cancel</button>
-                </div>
-              </form>
-            </div>
-            <!-- OUTLET LIST -->
-            <div class="bg-surface rounded-2xl shadow-card overflow-hidden border border-slate-100">
-              <div class="p-5 bg-slate-50/50 border-b border-slate-100">
-                <h4 class="font-bold text-slate-700 text-sm uppercase tracking-wide">Registry</h4>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                  <thead class="bg-white text-slate-400 border-b border-slate-100">
-                    <tr>
-                      <th class="p-4 font-medium">Shop</th>
-                      <th class="p-4 font-medium">Contact</th>
-                      <th class="p-4 font-medium">Type</th>
-                      <th class="p-4 text-right font-medium">Manage</th>
-                    </tr>
-                  </thead>
-                  <tbody id="outlets-table-body" class="divide-y divide-slate-100">
-                    <tr>
-                      <td colspan="4" class="p-6 text-center text-slate-400 italic">Loading outlets...</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- =======================
-                 TAB 3: ROUTES
-            ======================== -->
-        <div id="tab-routes" class="tab-content hidden">
-          <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
-            <!-- Left: Route Creation & List -->
-            <div class="lg:col-span-2 space-y-6">
-              <!-- Creator -->
-              <div class="bg-surface p-6 rounded-2xl shadow-card border border-slate-100">
-                <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-primary">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.159.69.159 1.006 0z" />
-                  </svg>
-                  <span>Create Route</span>
-                </h4>
-                <form id="createRouteForm" class="flex flex-col gap-4">
-                  <input type="text" id="routeNameInput" placeholder="Route Name" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  <select id="routeSalesmanSelect" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option value="">Assign Salesman</option>
-                  </select>
-                  <button type="submit" class="bg-primary hover:bg-primaryDark text-white py-3 rounded-xl text-sm font-bold shadow transition-colors">Add Route</button>
-                </form>
-              </div>
-              <!-- List -->
-              <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-                <div class="p-4 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">Available Routes</div>
-                <ul id="routes-list-group" class="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                  <li class="p-5 text-center text-sm text-slate-400 italic">Loading routes...</li>
-                </ul>
-              </div>
-            </div>
-            <!-- Right: Editor -->
-            <div class="lg:col-span-3">
-              <div class="bg-surface rounded-2xl shadow-card border border-slate-100 h-full min-h-[400px] flex flex-col relative overflow-hidden">
-                <div class="p-5 border-b border-slate-100 bg-slate-50/30">
-                  <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Editor</p>
-                  <h4 class="font-bold text-lg text-primary truncate" id="selectedRouteName">Select a Route</h4>
-                  <input type="hidden" id="selectedRouteId">
-                </div>
-                <div class="p-5 flex-grow relative">
-                  <div id="routeConfigPanel" class="hidden h-full flex flex-col">
-                    <!-- Add Shop -->
-                    <div class="flex gap-2 mb-4">
-                      <div class="relative flex-grow">
-                        <select id="allOutletsDropdown" class="w-full p-3 pl-4 bg-white border border-slate-200 rounded-xl text-sm shadow-sm appearance-none focus:ring-2 focus:ring-primary outline-none">
-                          <option value="">Select Outlet to Add</option>
-                        </select>
-                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-500">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                          </svg>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-800 tracking-tight leading-none">Nexus<span class="text-primary">Admin</span></h1>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.6)] animate-pulse"></span>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Live System</p>
                         </div>
-                      </div>
-                      <button onclick="addOutletToRoute()" class="bg-success text-white px-5 rounded-xl shadow hover:bg-green-600 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                      </button>
                     </div>
-                    <!-- Sequence Table -->
-                    <div class="flex-grow overflow-auto border border-slate-100 rounded-xl">
-                      <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 sticky top-0 z-10 text-xs text-slate-500">
-                          <tr>
-                            <th class="p-3 w-16 text-center">Seq</th>
-                            <th class="p-3">Stop Name</th>
-                            <th class="p-3 text-right">Remove</th>
-                          </tr>
-                        </thead>
-                        <tbody id="route-outlets-list" class="divide-y divide-slate-100 bg-white"></tbody>
-                      </table>
+                </div>
+                
+                <div class="flex items-center gap-3 md:gap-5">
+                    <span id="user-email" class="hidden md:inline-block text-xs font-semibold text-slate-500 bg-slate-100/80 px-4 py-2 rounded-full border border-slate-200"></span>
+                    
+                    <button id="refreshBtn" onclick="refreshDashboard()" class="relative group p-2 text-slate-400 hover:text-primary transition-colors">
+                        <i class="ph ph-arrows-clockwise text-xl group-active:animate-spin"></i>
+                    </button>
+                    
+                    <button id="logoutBtn" class="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+                        <i class="ph ph-sign-out text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENT AREA -->
+        <main class="flex-grow overflow-y-auto pt-24 pb-32 px-4 md:px-6">
+            <div class="max-w-7xl mx-auto h-full">
+
+                <!-- =======================
+                     TAB 1: DASHBOARD
+                ======================== -->
+                <div id="tab-dashboard" class="tab-content block">
+                    <header class="mb-6 flex justify-between items-end">
+                        <div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Dashboard Overview</h2>
+                            <p class="text-sm text-slate-500 font-medium mt-1">Real-time metrics & management.</p>
+                        </div>
+                    </header>
+
+                    <!-- Stats Grid (Golden Ratio Spacing) -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                        <!-- Card: Attendance -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                    <i class="ph ph-users-three text-xl"></i>
+                                </div>
+                                <span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">+4%</span>
+                            </div>
+                            <p class="text-3xl font-bold text-slate-800 tracking-tight" id="stat-attendance">0</p>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">Staff Present</p>
+                        </div>
+                        
+                        <!-- Card: Orders -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="bg-violet-50 text-violet-600 p-2.5 rounded-xl group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                                    <i class="ph ph-shopping-cart-simple text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-3xl font-bold text-slate-800 tracking-tight" id="stat-orders">0</p>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">New Orders</p>
+                        </div>
+                        
+                        <!-- Card: Revenue -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden">
+                            <div class="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full blur-2xl opacity-10"></div>
+                            <div class="flex justify-between items-start mb-4 relative z-10">
+                                <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                    <i class="ph ph-currency-inr text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-3xl font-bold text-emerald-600 tracking-tight relative z-10" id="stat-sales">0</p>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1 relative z-10">Revenue</p>
+                        </div>
+
+                        <!-- Card: Credit -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="bg-orange-50 text-orange-600 p-2.5 rounded-xl group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                    <i class="ph ph-clock-countdown text-xl"></i>
+                                </div>
+                            </div>
+                            <p class="text-3xl font-bold text-orange-600 tracking-tight" id="stat-credit">0</p>
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">Outstanding</p>
+                        </div>
                     </div>
-                  </div>
-                  <!-- Empty State -->
-                  <div id="routeConfigMsg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 mb-2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
-                    </svg>
-                    <p class="text-sm">Select a route from the left to manage stops</p>
-                  </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        <!-- TARGET SETTING (Dominant) -->
+                        <div class="lg:col-span-2 glass-panel p-6 md:p-8 rounded-[2rem] border-primary/20 relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                            
+                            <h3 class="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+                                <i class="ph ph-target text-primary text-xl"></i>
+                                Daily Target Assignment
+                            </h3>
+                            
+                            <form id="targetForm" class="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Staff Member</label>
+                                    <select id="targetSalesmanId" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm">
+                                        <option value="">Select Personnel</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Target Date</label>
+                                    <input type="date" id="targetDate" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm">
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="flex-1">
+                                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Boxes</label>
+                                        <input type="number" id="targetBoxes" placeholder="Qty" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm text-center">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Inc./Box</label>
+                                        <input type="number" id="incentivePerBox" placeholder="₹" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm text-center">
+                                    </div>
+                                </div>
+                                <button type="submit" class="h-[46px] w-full bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                                    <span>Assign</span> <i class="ph ph-arrow-right-bold"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- ALERTS SECTION -->
+                        <div class="lg:col-span-1 flex flex-col gap-4">
+                            <!-- Pending Payment Widget -->
+                            <div id="approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-amber-400 shadow-sm relative overflow-hidden group">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                        <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div> Pending Payments
+                                    </h3>
+                                    <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg font-bold">Action Req</span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-xs">
+                                        <tbody id="approval-list" class="divide-y divide-dashed divide-amber-100"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- Leave Requests Widget -->
+                            <div id="leave-approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-indigo-400 shadow-sm">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                        <i class="ph ph-calendar-x text-indigo-500"></i> Leave Requests
+                                    </h3>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-xs">
+                                        <tbody id="leave-approval-list" class="divide-y divide-dashed divide-indigo-100"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ATTENDANCE TABLE (Daily Register) -->
+                    <div class="glass-panel rounded-3xl overflow-hidden border border-white/50 shadow-glass">
+                        <div class="px-6 py-5 border-b border-slate-100/50 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/40">
+                            <h3 class="font-bold text-slate-700">Daily Register Log</h3>
+                            <div class="flex items-center gap-2">
+                                <input type="date" id="attendanceDateFilter" class="bg-white/80 border-0 rounded-lg text-xs px-3 py-2 text-slate-600 shadow-sm focus:ring-2 focus:ring-primary/50">
+                                <button onclick="loadAttendanceByDate()" class="bg-primary text-white p-2 rounded-lg shadow-lg hover:bg-primaryDark transition-all">
+                                    <i class="ph ph-magnifying-glass font-bold"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-slate-50/80 text-xs text-slate-400 uppercase tracking-widest font-semibold border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-5">Salesman</th>
+                                        <th class="p-5">Check-In Status</th>
+                                        <th class="p-5">Time Logs</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-list" class="divide-y divide-slate-50 text-sm text-slate-600">
+                                    <tr><td colspan="3" class="p-8 text-center text-slate-400 italic">Connecting to live feed...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- =======================
-                 TAB 4: PRODUCTS
-            ======================== -->
-        <div id="tab-products" class="tab-content hidden">
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Form -->
-            <div class="lg:col-span-1">
-              <div class="bg-surface p-6 rounded-2xl shadow-card border border-slate-100 sticky top-24">
-                <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 text-primary">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3.75h3m-3 3h3m-3-3.375c-1.88 0-3.75-1.687-3.75-3.375V6.75h7.5v.75c0 1.688-1.88 3.375-3.75 3.375z" />
-                  </svg>
-                  <span>Add Item</span>
-                </h4>
-                <form id="addProductForm" class="space-y-4">
-                  <input type="text" id="prodName" placeholder="Product Name" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  <input type="text" id="prodCategory" placeholder="Category" list="catSuggestions" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  <datalist id="catSuggestions">
-                    <option value="Beverages">
-                    <option value="Snacks">
-                    <option value="Dairy">
-                  </datalist>
-                  <div class="grid grid-cols-2 gap-4">
-                    <input type="text" id="prodHSN" placeholder="HSN Code" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                    <input type="number" id="prodPrice" placeholder="Price (₹)" step="0.01" required class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-                  </div>
-                  <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white py-3 rounded-xl text-sm font-bold shadow transition-colors mt-2">Add to Inventory</button>
-                </form>
-              </div>
-            </div>
-            <!-- Table -->
-            <div class="lg:col-span-2">
-              <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-                <div class="p-5 bg-slate-50/50 border-b border-slate-100 font-bold text-slate-700 text-sm">Product Catalog</div>
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm text-left">
-                    <thead class="bg-white text-slate-500 border-b border-slate-100">
-                      <tr>
-                        <th class="p-4">Name</th>
-                        <th class="p-4">Category</th>
-                        <th class="p-4">Price</th>
-                        <th class="p-4 text-right">Delete</th>
-                      </tr>
-                    </thead>
-                    <tbody id="product-list-body" class="divide-y divide-slate-100">
-                      <tr>
-                        <td colspan="4" class="p-6 text-center text-slate-400 text-sm">Loading items...</td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                <!-- =======================
+                     TAB 2: OUTLETS
+                ======================== -->
+                <div id="tab-outlets" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-140px)]">
+                        
+                        <!-- LEFT: LIST -->
+                        <div class="lg:col-span-8 flex flex-col h-full gap-4">
+                            <div class="flex justify-between items-center px-2">
+                                <h2 class="text-2xl font-bold text-slate-800">Outlets Registry</h2>
+                                <span class="text-xs bg-white px-3 py-1 rounded-full shadow-sm text-slate-500 font-mono" id="outletCountBadge">0 Records</span>
+                            </div>
+                            
+                            <div class="glass-panel rounded-3xl overflow-hidden flex-grow flex flex-col shadow-sm border border-white/60">
+                                <div class="overflow-y-auto flex-grow p-1">
+                                    <table class="w-full text-sm text-left border-separate border-spacing-y-1 px-2">
+                                        <thead class="sticky top-0 bg-white/95 backdrop-blur z-10 text-xs text-slate-400 uppercase tracking-widest font-bold">
+                                            <tr>
+                                                <th class="p-4 rounded-l-xl">Establishment</th>
+                                                <th class="p-4">Contact</th>
+                                                <th class="p-4">Type</th>
+                                                <th class="p-4 rounded-r-xl text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="outlets-table-body" class="space-y-2">
+                                            <tr><td colspan="4" class="p-10 text-center text-slate-400">Loading directory...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: FORM (Sticky) -->
+                        <div class="lg:col-span-4 h-full overflow-y-auto hide-scroll pb-20">
+                            <div class="glass-panel p-6 rounded-[2rem] border border-white/60 shadow-xl sticky top-0">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h4 class="text-lg font-bold text-slate-800" id="formTitle">Add New Outlet</h4>
+                                    <button onclick="resetOutletForm()" class="bg-slate-100 text-slate-500 p-2 rounded-full hover:bg-slate-200 transition">
+                                        <i class="ph ph-plus font-bold"></i>
+                                    </button>
+                                </div>
+
+                                <form id="addOutletForm" class="flex flex-col gap-4">
+                                    <input type="hidden" id="editOutletId">
+                                    
+                                    <div class="space-y-1">
+                                        <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Basic Info</label>
+                                        <input type="text" id="shopName" placeholder="Shop Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                        <select id="outletType" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                            <option value="" disabled selected>Category</option>
+                                            <option value="Shop">Shop</option>
+                                            <option value="Dhaba">Dhaba</option>
+                                            <option value="Cafe">Cafe</option>
+                                            <option value="Restaurant">Restaurant</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="space-y-1">
+                                        <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Owner Details</label>
+                                        <input type="text" id="ownerName" placeholder="Owner Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                        <input type="tel" id="contactPhone" placeholder="Mobile Number" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                        <input type="text" id="contactPerson" placeholder="Point of Contact" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Mode</label>
+                                            <select id="storeType" class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none">
+                                                <option value="Cash">Cash</option>
+                                                <option value="Credit">Credit</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">GST</label>
+                                            <input type="text" id="gstNumber" placeholder="Optional" class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none">
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50 grid grid-cols-2 gap-3">
+                                        <input type="number" id="creditDays" placeholder="Cr. Days" disabled class="bg-white/50 border-0 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-300 disabled:opacity-50">
+                                        <input type="number" id="creditLimit" placeholder="Limit ₹" disabled class="bg-white/50 border-0 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-300 disabled:opacity-50">
+                                    </div>
+
+                                    <!-- Geolocation Capture -->
+                                    <div class="relative group">
+                                        <button type="button" id="geoBtn" class="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl text-blue-700 hover:from-blue-100 hover:to-indigo-100 transition-all">
+                                            <div class="flex flex-col text-left">
+                                                <span class="text-xs font-bold uppercase tracking-wider">Geo Tagging</span>
+                                                <span id="geoDisplay" class="text-[10px] opacity-70">Coordinates Pending</span>
+                                            </div>
+                                            <i class="ph ph-crosshair text-xl animate-pulse"></i>
+                                        </button>
+                                        <input type="hidden" id="lat"><input type="hidden" id="lng">
+                                    </div>
+
+                                    <div class="pt-2 flex gap-3">
+                                        <button type="submit" id="submitBtn" class="flex-1 bg-gradient-to-br from-slate-800 to-black text-white py-3.5 rounded-xl font-bold shadow-xl hover:shadow-2xl transition-all transform active:scale-95">Save Entry</button>
+                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-1/3 bg-slate-200 text-slate-600 rounded-xl font-bold">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-              </div>
+
+                <!-- =======================
+                     TAB 3: ROUTES
+                ======================== -->
+                <div id="tab-routes" class="tab-content hidden h-full pb-20">
+                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+                        <!-- Sidebar: Route List -->
+                        <div class="lg:col-span-4 flex flex-col gap-4 h-full">
+                            <div class="glass-panel p-5 rounded-2xl border border-white/60">
+                                <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                    <i class="ph ph-map-trifold text-primary text-xl"></i> Create Route
+                                </h3>
+                                <form id="createRouteForm" class="space-y-3">
+                                    <input type="text" id="routeNameInput" placeholder="New Route Name" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white">
+                                    <select id="routeSalesmanSelect" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white">
+                                        <option value="">Assign To...</option>
+                                    </select>
+                                    <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white py-3 rounded-xl font-bold text-sm shadow-glow transition-all">Add Route</button>
+                                </form>
+                            </div>
+
+                            <div class="glass-panel rounded-2xl flex-grow flex flex-col overflow-hidden border border-white/60 shadow-sm">
+                                <div class="p-3 bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Routes</div>
+                                <ul id="routes-list-group" class="flex-grow overflow-y-auto divide-y divide-slate-100/50 p-2"></ul>
+                            </div>
+                        </div>
+
+                        <!-- Main: Map/Editor Interface -->
+                        <div class="lg:col-span-8 h-full">
+                            <div class="glass-panel h-full rounded-[2rem] border border-white/60 shadow-lg relative flex flex-col overflow-hidden">
+                                <!-- Editor Header -->
+                                <div class="px-6 py-5 bg-white/40 backdrop-blur border-b border-white/20 z-10 flex justify-between items-center">
+                                    <div>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Route Editor</p>
+                                        <h2 id="selectedRouteName" class="text-xl font-bold text-slate-800">No Selection</h2>
+                                    </div>
+                                    <input type="hidden" id="selectedRouteId">
+                                </div>
+
+                                <!-- Route Canvas -->
+                                <div class="flex-grow relative bg-slate-50/50">
+                                    <div id="routeConfigPanel" class="hidden h-full flex flex-col p-6">
+                                        <!-- Control Bar -->
+                                        <div class="flex gap-3 mb-6">
+                                            <div class="relative flex-grow">
+                                                <select id="allOutletsDropdown" class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent outline-none shadow-sm appearance-none">
+                                                    <option value="">Find outlet to add...</option>
+                                                </select>
+                                                <i class="ph ph-caret-down absolute right-4 top-3.5 text-slate-400"></i>
+                                            </div>
+                                            <button onclick="addOutletToRoute()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 rounded-xl shadow-lg transition-all flex items-center gap-2">
+                                                <i class="ph ph-plus-circle text-lg"></i> <span class="hidden sm:inline font-bold text-sm">Add</span>
+                                            </button>
+                                        </div>
+
+                                        <!-- Sequence List -->
+                                        <div class="bg-white/80 rounded-2xl shadow-inner flex-grow overflow-y-auto border border-slate-100">
+                                            <table class="w-full text-sm">
+                                                <thead class="bg-slate-50 sticky top-0">
+                                                    <tr>
+                                                        <th class="p-3 text-xs text-slate-400 uppercase font-bold text-center w-16">Seq</th>
+                                                        <th class="p-3 text-xs text-slate-400 uppercase font-bold text-left">Stop Name</th>
+                                                        <th class="p-3 text-right"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="route-outlets-list" class="divide-y divide-slate-100"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Empty State -->
+                                    <div id="routeConfigMsg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
+                                        <i class="ph ph-arrows-left-right text-6xl mb-4 opacity-50"></i>
+                                        <p class="text-sm font-medium">Select a route to manage sequence</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =======================
+                     TAB 4: PRODUCTS
+                ======================== -->
+                <div id="tab-products" class="tab-content hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-1 glass-panel p-6 rounded-3xl border border-white/60 sticky top-4 shadow-lg">
+                             <h4 class="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                <i class="ph ph-package text-accent text-xl"></i> Inventory Entry
+                            </h4>
+                            <form id="addProductForm" class="space-y-4">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Item Name</label>
+                                    <input type="text" id="prodName" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent transition-all">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Category</label>
+                                    <input type="text" id="prodCategory" list="catSuggestions" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent transition-all">
+                                    <datalist id="catSuggestions">
+                                        <option value="Beverages"><option value="Snacks"><option value="Dairy"><option value="General">
+                                    </datalist>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Price</label>
+                                        <div class="relative">
+                                            <span class="absolute left-3 top-3 text-slate-400 text-sm font-bold">₹</span>
+                                            <input type="number" id="prodPrice" step="0.01" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-accent">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">HSN Code</label>
+                                        <input type="text" id="prodHSN" class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent">
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-accent hover:bg-violet-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-violet-200 transition-all mt-4">Add to Catalog</button>
+                            </form>
+                        </div>
+
+                        <div class="md:col-span-2 glass-panel rounded-3xl overflow-hidden border border-white/60 shadow-sm min-h-[500px]">
+                            <div class="p-5 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
+                                <span class="font-bold text-slate-700">Product List</span>
+                                <span class="text-xs bg-slate-200 px-2 py-1 rounded text-slate-500 font-mono">Live Sync</span>
+                            </div>
+                            <div class="overflow-x-auto p-2">
+                                <table class="w-full text-sm text-left border-separate border-spacing-y-1">
+                                    <thead class="text-xs text-slate-400 uppercase">
+                                        <tr>
+                                            <th class="p-3">Item</th>
+                                            <th class="p-3">Category</th>
+                                            <th class="p-3">Unit Price</th>
+                                            <th class="p-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="product-list-body">
+                                        <tr><td colspan="4" class="text-center p-10 text-slate-400">Loading inventory...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- =======================
+                     TAB 5: STAFF
+                ======================== -->
+                <div id="tab-staff" class="tab-content hidden">
+                    <div class="glass-panel max-w-2xl mx-auto rounded-[2.5rem] p-8 md:p-12 shadow-neumorphic border border-white">
+                        <div class="flex items-center gap-4 mb-10 border-b border-slate-100 pb-6">
+                            <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm">
+                                <i class="ph ph-identification-badge"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-bold text-slate-800">Sales Team</h3>
+                                <p class="text-slate-400 text-sm">Active Field Personnel</p>
+                            </div>
+                        </div>
+                        
+                        <ul id="salesmen-list" class="space-y-4">
+                            <!-- Loader -->
+                             <li class="flex flex-col items-center justify-center py-10 opacity-50">
+                                <i class="ph ph-circle-notch animate-spin text-3xl text-indigo-400 mb-2"></i>
+                                <span class="text-xs font-bold tracking-widest uppercase">Fetching Agents</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- =======================
+                     TAB 6: SHEET
+                ======================== -->
+                <div id="tab-attendance-sheet" class="tab-content hidden">
+                    <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-800">Attendance Matrix</h2>
+                            <p class="text-sm text-slate-500">Monthly Retention View</p>
+                        </div>
+                        <div class="flex gap-3 bg-white/60 p-2 rounded-xl border border-white shadow-sm">
+                            <input type="month" id="sheetMonthPicker" class="bg-transparent border-0 text-sm font-bold text-slate-600 outline-none">
+                            <button onclick="loadAttendanceSheet()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-slate-700 transition">View Data</button>
+                        </div>
+                    </header>
+                    
+                    <div class="glass-panel rounded-2xl overflow-hidden border border-white shadow-glass">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs border-collapse">
+                                <thead>
+                                    <tr id="sheet-header-row" class="bg-slate-50 text-slate-400 uppercase tracking-widest">
+                                        <th class="p-4 text-left border-r sticky left-0 bg-slate-50 z-20 font-bold min-w-[150px] border-b">Personnel</th>
+                                        <!-- Days injected here -->
+                                        <th class="p-4 w-full text-center border-b font-light italic">Select Month to Generate Matrix</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sheet-body" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-4 justify-end mt-4 px-2">
+                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span> Full Day</span>
+                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm"></span> Half Day</span>
+                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm"></span> Leave</span>
+                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span> Absent</span>
+                        
+                        <button onclick="runRetentionCleanup()" class="ml-auto text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 px-4 py-1.5 rounded-full hover:bg-rose-100 transition">
+                            <i class="ph ph-trash"></i> Clean Old Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- =======================
+                     TAB 7: ACTIVITY LOG
+                ======================== -->
+                <div id="tab-transactions" class="tab-content hidden">
+                    <div class="glass-panel p-5 rounded-3xl mb-6 border border-white/60 shadow-lg sticky top-0 z-30">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div class="col-span-2 md:col-span-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Start</label>
+                                <input type="date" id="transStart" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
+                            </div>
+                            <div class="col-span-2 md:col-span-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">End</label>
+                                <input type="date" id="transEnd" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
+                            </div>
+                            <div class="col-span-2 md:col-span-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Agent</label>
+                                <select id="transSalesman" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary"><option value="all">All</option></select>
+                            </div>
+                             <div class="col-span-2 md:col-span-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Filter</label>
+                                <select id="transType" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
+                                    <option value="all">Everything</option>
+                                    <option value="Order">Orders</option>
+                                    <option value="Payment">Payments</option>
+                                    <option value="Visit">Visits</option>
+                                </select>
+                            </div>
+                            <div class="col-span-2 md:col-span-1 flex items-end">
+                                <button onclick="loadTransactions()" class="w-full bg-slate-800 text-white p-2 rounded-lg text-xs font-bold shadow-md hover:bg-black transition-colors">Apply</button>
+                            </div>
+                        </div>
+                        <input type="text" id="transOutletSearch" onkeyup="filterTransactionsClientSide()" placeholder="Filter results by Shop Name..." class="w-full mt-3 bg-transparent border-b border-slate-200 text-xs py-2 outline-none focus:border-primary">
+                    </div>
+
+                    <div class="glass-panel rounded-3xl overflow-hidden border border-white shadow-sm">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+                                    <tr>
+                                        <th class="p-4">Timestamp</th>
+                                        <th class="p-4">Staff</th>
+                                        <th class="p-4">Event</th>
+                                        <th class="p-4">Context</th>
+                                        <th class="p-4 text-right">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trans-table-body" class="divide-y divide-slate-100">
+                                    <tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs italic">Set filters to view history.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- =======================
+                     TAB 8: SALARY
+                ======================== -->
+                <div id="tab-salary" class="tab-content hidden">
+                    <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-[2rem] p-8 text-white mb-6 shadow-2xl relative overflow-hidden">
+                        <div class="absolute right-0 top-0 opacity-10 p-4 transform translate-x-4 -translate-y-4">
+                            <i class="ph ph-receipt text-9xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold relative z-10">Payroll Generator</h2>
+                        <div class="mt-4 flex flex-col md:flex-row items-start md:items-center gap-4 relative z-10">
+                            <input type="month" id="salaryMonthPicker" class="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2.5 backdrop-blur-md outline-none focus:ring-2 focus:ring-emerald-400 placeholder-white/50">
+                            <button onclick="generateSalaryReport()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-glow transition-all">Generate Slip</button>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-3xl overflow-hidden border border-white shadow-glass">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="p-4 text-left">Staff Member</th>
+                                        <th class="p-4 text-center">Work Days</th>
+                                        <th class="p-4 text-center">Paid Leaves</th>
+                                        <th class="p-4 text-right">Base Salary</th>
+                                        <th class="p-4 text-right">Incentive</th>
+                                        <th class="p-4 text-right">Total Payout</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salary-table-body" class="divide-y divide-slate-100 text-slate-700">
+                                     <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">No report generated yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-          </div>
+        </main>
+
+        <!-- FLOATING BOTTOM NAV -->
+        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
+            <nav class="bg-white/80 backdrop-blur-xl border border-white/40 shadow-glass rounded-2xl md:rounded-full px-2 py-3 flex justify-around items-center gap-1 transition-all hover:scale-[1.01] hover:shadow-2xl">
+                
+                <button onclick="switchTab('tab-dashboard')" class="nav-item active flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-squares-four text-xl"></i>
+                    </div>
+                </button>
+
+                <button onclick="switchTab('tab-outlets')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-storefront text-xl"></i>
+                    </div>
+                </button>
+
+                <button onclick="switchTab('tab-routes')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-path text-xl"></i>
+                    </div>
+                </button>
+
+                <div class="w-px h-8 bg-slate-200/60 mx-1"></div>
+
+                <button onclick="switchTab('tab-products')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-package text-xl"></i>
+                    </div>
+                </button>
+
+                 <button onclick="switchTab('tab-attendance-sheet')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-calendar-check text-xl"></i>
+                    </div>
+                </button>
+
+                <button onclick="switchTab('tab-staff')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
+                        <i class="ph ph-users text-xl"></i>
+                    </div>
+                </button>
+                
+                <!-- Expanded Menu Button (for Transaction/Salary on Mobile) -->
+                 <button onclick="switchTab('tab-transactions')" class="md:hidden nav-item flex-1 flex flex-col items-center gap-1 group">
+                     <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary transition-all">
+                        <i class="ph ph-list-dashes text-xl"></i>
+                     </div>
+                 </button>
+                 
+                  <button onclick="switchTab('tab-salary')" class="hidden md:flex nav-item flex-1 flex-col items-center gap-1 group">
+                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-all">
+                        <i class="ph ph-money text-xl"></i>
+                    </div>
+                </button>
+
+            </nav>
         </div>
-        <!-- =======================
-                 TAB 5: STAFF
-            ======================== -->
-        <div id="tab-staff" class="tab-content hidden">
-          <div class="bg-surface rounded-2xl shadow-card border border-slate-100 p-8 min-h-[50vh] max-w-2xl mx-auto">
-            <h3 class="text-xl font-bold mb-6 flex items-center gap-3 border-b border-slate-100 pb-4">
-              <div class="bg-purple-100 text-purple-600 p-2 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                </svg>
-              </div> Sales Team
-            </h3>
-            <ul id="salesmen-list" class="space-y-4">
-              <li class="text-slate-400 italic text-center mt-12 flex flex-col items-center">
-                <svg class="animate-pulse w-8 h-8 mb-2 opacity-50" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                </svg> Connecting to database...
-              </li>
-            </ul>
-          </div>
-        </div>
-        <!-- =======================
-     TAB 6: ATTENDANCE SHEET
-======================== -->
-        <div id="tab-attendance-sheet" class="tab-content hidden">
-          <!-- Controls Header -->
-          <div class="bg-surface p-5 rounded-2xl shadow-card border border-slate-100 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-              <h2 class="text-xl font-bold text-slate-800">Attendance Sheet</h2>
-              <p class="text-sm text-slate-500">Monthly overview & retention management.</p>
-            </div>
-            <div class="flex items-center gap-3">
-              <!-- Month Picker -->
-              <input type="month" id="sheetMonthPicker" class="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary">
-              <!-- Load Button -->
-              <button onclick="loadAttendanceSheet()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-primaryDark transition"> Load Sheet </button>
-            </div>
-            <!-- Retention Action -->
-            <button onclick="runRetentionCleanup()" class="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg> Clean Old Data (>3 Months) </button>
-          </div>
-          <!-- The Matrix Table -->
-          <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm text-left border-collapse">
-                <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                  <tr id="sheet-header-row">
-                    <!-- JS will populate: Name | 1 | 2 | ... | 31 -->
-                    <th class="p-4 border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-10 min-w-[150px]">Salesman</th>
-                    <th class="p-4 border-b text-center w-full">Select Month to View Data</th>
-                  </tr>
-                </thead>
-                <tbody id="sheet-body" class="divide-y divide-slate-100 text-slate-600">
-                  <!-- JS will populate rows -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <!-- Legend -->
-          <div class="mt-4 flex gap-4 text-xs font-medium text-slate-500 justify-end">
-            <div class="flex items-center gap-1">
-              <span class="w-3 h-3 rounded-full bg-green-500"></span> Present
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="w-3 h-3 rounded-full bg-amber-500"></span> Half Day
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="w-3 h-3 rounded-full bg-red-500"></span> Leave
-            </div>
-            <div class="flex items-center gap-1">
-              <span class="w-3 h-3 rounded-full bg-slate-200"></span> Absent
-            </div>
-          </div>
-        </div>
-        <!-- =======================
-     TAB 7: TRANSACTIONS (ACTIVITY LOG)
-======================== -->
-        <div id="tab-transactions" class="tab-content hidden">
-          <!-- Header -->
-          <div class="mb-6">
-            <h2 class="text-xl font-bold text-slate-800">Activity Log</h2>
-            <p class="text-sm text-slate-500">Master view of all field activities.</p>
-          </div>
-          <!-- Filters Section (Sticky Top) -->
-          <div class="bg-surface p-5 rounded-2xl shadow-card border border-slate-100 mb-6 sticky top-20 z-30">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-              <!-- Date Range -->
-              <div class="md:col-span-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
-                <input type="date" id="transStart" class="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500">
-              </div>
-              <div class="md:col-span-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase">End Date</label>
-                <input type="date" id="transEnd" class="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500">
-              </div>
-              <!-- Filters -->
-              <div class="md:col-span-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Salesman</label>
-                <select id="transSalesman" class="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500">
-                  <option value="all">All Staff</option>
-                  <!-- Populated by JS -->
-                </select>
-              </div>
-              <div class="md:col-span-1">
-                <label class="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-                <select id="transType" class="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500">
-                  <option value="all">All Activity</option>
-                  <option value="Order">Orders</option>
-                  <option value="Payment">Payments</option>
-                  <option value="Visit">Visits</option>
-                  <option value="Attendance">Attendance</option>
-                  <option value="Target">Targets</option>
-                </select>
-              </div>
-              <!-- Action -->
-              <div class="md:col-span-1">
-                <button onclick="loadTransactions()" class="w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold shadow hover:bg-slate-700 transition"> Apply Filters </button>
-              </div>
-            </div>
-            <!-- Search Outlet (Secondary Filter) -->
-            <div class="mt-3">
-              <input type="text" id="transOutletSearch" onkeyup="filterTransactionsClientSide()" placeholder="Filter by Outlet Name..." class="w-full p-2 bg-white border-b border-slate-200 text-xs focus:outline-none focus:border-indigo-500">
-            </div>
-          </div>
-          <!-- Results Table -->
-          <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                  <tr>
-                    <th class="p-4">Date & Time</th>
-                    <th class="p-4">Salesman</th>
-                    <th class="p-4">Activity</th>
-                    <th class="p-4">Outlet / Details</th>
-                    <th class="p-4 text-right">Value / Time</th>
-                  </tr>
-                </thead>
-                <tbody id="trans-table-body" class="divide-y divide-slate-100 text-slate-600">
-                  <tr>
-                    <td colspan="5" class="p-6 text-center text-slate-400">Select dates and click Apply Filters.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <!-- =======================
-     TAB 8: SALARY GENERATION
-======================== -->
-        <div id="tab-salary" class="tab-content hidden">
-          <!-- Controls -->
-          <div class="bg-surface p-5 rounded-2xl shadow-card border border-slate-100 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-              <h2 class="text-xl font-bold text-slate-800">Payroll</h2>
-              <p class="text-sm text-slate-500">Generate monthly slips with incentives.</p>
-            </div>
-            <div class="flex items-center gap-3 w-full md:w-auto">
-              <input type="month" id="salaryMonthPicker" class="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 w-full md:w-auto">
-              <button onclick="generateSalaryReport()" class="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-bold shadow hover:bg-slate-700 transition whitespace-nowrap"> ⚡ Generate </button>
-            </div>
-          </div>
-          <!-- Salary Table -->
-          <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-                  <tr>
-                    <th class="p-4">Staff</th>
-                    <th class="p-4 text-center">Attendance</th>
-                    <th class="p-4 text-center">Sick Leaves</th>
-                    <th class="p-4 text-right">Base Pay</th>
-                    <th class="p-4 text-right">Incentive</th>
-                    <th class="p-4 text-right">Total Payout</th>
-                  </tr>
-                </thead>
-                <tbody id="salary-table-body" class="divide-y divide-slate-100 text-slate-600">
-                  <tr>
-                    <td colspan="6" class="p-6 text-center text-slate-400">Select a month and click Generate.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </main>
-      <!-- BOTTOM NAVIGATION (Fixed Bottom) -->
-      <nav class="fixed bottom-0 left-0 w-full bg-surface border-t border-slate-100 shadow-nav z-50 pb-safe">
-        <div class="container mx-auto max-w-6xl">
-          <div class="flex justify-between items-center h-20" id="tabs-container">
-            <!-- Dashboard Tab -->
-            <button onclick="switchTab('tab-dashboard')" class="nav-item active flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Home</span>
-            </button>
-            <!-- Outlets Tab -->
-            <button onclick="switchTab('tab-outlets')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Outlets</span>
-            </button>
-            <!-- Routes Tab -->
-            <button onclick="switchTab('tab-routes')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Routes</span>
-            </button>
-            <!-- Products Tab -->
-            <button onclick="switchTab('tab-products')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Stock</span>
-            </button>
-            <!-- Attendance Sheet Tab -->
-            <button onclick="switchTab('tab-attendance-sheet')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Sheet</span>
-            </button>
-            <!-- Staff Tab -->
-            <button onclick="switchTab('tab-staff')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Team</span>
-            </button>
-            <!-- Salary Tab Button -->
-            <button onclick="switchTab('tab-salary')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-emerald-600">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Salary</span>
-            </button>
-            <!-- Activity Log Tab -->
-            <button onclick="switchTab('tab-transactions')" class="nav-item flex-1 h-full flex flex-col items-center justify-center group active:scale-95 transition-transform">
-              <div class="icon-container p-1.5 rounded-xl mb-1 text-slate-400 transition-colors group-hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                </svg>
-              </div>
-              <span class="text-[10px] font-medium text-slate-400 transition-colors">Log</span>
-            </button>
-          </div>
-        </div>
-      </nav>
+
     </div>
-    <!-- TAB SWITCHING LOGIC -->
+
+    <!-- MODAL: Salary Settings -->
+    <div id="salarySettingsModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="document.getElementById('salarySettingsModal').classList.add('hidden')"></div>
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-neumorphic transform scale-100 transition-transform relative">
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Compensation Config</h3>
+            <p id="salaryModalUser" class="text-sm font-semibold text-primary mb-6"></p>
+            <input type="hidden" id="salaryEditUid">
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Daily Base Rate</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-3.5 text-slate-400 font-bold">₹</span>
+                        <input type="number" id="baseSalaryInput" class="w-full pl-8 pr-4 py-3 bg-white border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                    <p class="text-xs text-blue-800 leading-relaxed">
+                        <strong class="block mb-1">Logic:</strong>
+                        1. <strong>Present:</strong> 100% Rate<br>
+                        2. <strong>Half-Day:</strong> 50% Rate<br>
+                        3. <strong>Leaves:</strong> 0% (unless specific policy)
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-2 mt-4">
+                    <button onclick="saveSalarySettings()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-transform active:scale-95">
+                        Save Changes
+                    </button>
+                    <button onclick="document.getElementById('salarySettingsModal').classList.add('hidden')" class="w-full py-3 text-slate-400 text-xs font-bold hover:text-slate-600">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-      function switchTab(tabId) {
-        // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(el => {
-          el.classList.add('hidden');
-          el.classList.remove('block');
-        });
-        // Deactivate all nav items
-        document.querySelectorAll('.nav-item').forEach(el => {
-          el.classList.remove('active');
-        });
-        // Show selected tab
-        const target = document.getElementById(tabId);
-        if (target) {
-          target.classList.remove('hidden');
-          target.classList.add('block');
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('block', 'hidden'));
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            if(target) {
+                target.classList.remove('hidden');
+                target.classList.add('block');
+            }
+
+            // Button activation
+            const navBtn = Array.from(document.querySelectorAll('.nav-item'))
+                .find(btn => btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId));
+            if(navBtn) navBtn.classList.add('active');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        // Activate nav button
-        const navBtn = Array.from(document.querySelectorAll('.nav-item')).find(btn => btn.getAttribute('onclick').includes(tabId));
-        if (navBtn) navBtn.classList.add('active');
-        // Scroll to top
-        window.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        });
-      }
     </script>
-    <!-- MAIN LOGIC FILE -->
     <script type="module" src="js/admin.js"></script>
-    <!-- Salary Settings Modal -->
-    <div id="salarySettingsModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-      <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl transform transition-all">
-        <h3 class="text-lg font-bold text-slate-800 mb-4">Payroll Settings</h3>
-        <p id="salaryModalUser" class="text-sm text-slate-500 mb-4 font-medium"></p>
-        <input type="hidden" id="salaryEditUid">
-        <div class="space-y-4">
-          <div>
-            <label class="text-[10px] font-bold text-slate-400 uppercase">Base Salary (Per Day)</label>
-            <div class="relative mt-1">
-              <span class="absolute left-3 top-2.5 text-slate-400 font-bold">₹</span>
-              <input type="number" id="baseSalaryInput" class="w-full pl-8 p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500">
-            </div>
-          </div>
-          <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
-            <p class="text-xs text-blue-800">
-              <strong>Note:</strong>
-              <br> • Full Day: 100% Pay <br> • Half Day: 50% Pay <br> • Absent/Leave: 0% Pay
-            </p>
-          </div>
-          <button onclick="saveSalarySettings()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition"> Save Configuration </button>
-          <button onclick="document.getElementById('salarySettingsModal').classList.add('hidden')" class="w-full text-slate-400 text-xs font-bold py-2 hover:text-slate-600">Cancel</button>
-        </div>
-      </div>
-    </div>
-  </body>
+</body>
 </html>
