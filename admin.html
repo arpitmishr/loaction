@@ -6,7 +6,7 @@
     <title>Nexus Admin | Futuristic Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Phosphor Icons (Cleaner/Modern than Heroicons) -->
+    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script>
         tailwind.config = {
@@ -29,10 +29,7 @@
                         'neumorphic': '20px 20px 60px #d1d5db, -20px -20px 60px #ffffff',
                     },
                     spacing: {
-                        'phi': '1.618rem', // Golden ratio unit
-                    },
-                    backdropBlur: {
-                        'xs': '2px',
+                        'phi': '1.618rem', // Golden ratio
                     }
                 }
             }
@@ -49,7 +46,6 @@
             -webkit-tap-highlight-color: transparent; 
         }
         
-        /* Smooth Fade In */
         .tab-content { animation: fadeInUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
@@ -58,11 +54,10 @@
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
             box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-            transform: translateY(-5px);
+            transform: translateY(-6px) scale(1.1);
         }
         .nav-item div { transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -70,17 +65,25 @@
         
         .glass-panel {
             background: rgba(255, 255, 255, 0.65);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.5);
         }
-        
-        /* Floating Table Rows */
-        .table-row-floating { transition: transform 0.2s; }
-        .table-row-floating:hover { transform: scale-[1.01]; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+
+        /* Timeline Connector for Logs */
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 2rem;
+            top: 3rem;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, #e2e8f0 0%, transparent 100%);
+            z-index: 0;
+        }
     </style>
 </head>
-<body class="text-slate-600 h-screen flex flex-col overflow-hidden">
+<body class="text-slate-600 h-screen flex flex-col overflow-hidden selection:bg-primary/20">
 
     <!-- LOADER -->
     <div id="loader" class="fixed inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-xl z-[100] transition-opacity duration-500">
@@ -90,44 +93,44 @@
                 <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
             </div>
         </div>
-        <h2 class="mt-4 text-xs font-bold text-slate-400 tracking-[0.2em] uppercase animate-pulse">System Initialization</h2>
+        <h2 class="mt-4 text-xs font-bold text-slate-400 tracking-[0.2em] uppercase animate-pulse">Initializing System</h2>
     </div>
 
-    <!-- MAIN APP WRAPPER -->
+    <!-- MAIN WRAPPER -->
     <div id="content" style="display: none;" class="flex flex-col h-full">
         
-        <!-- HEADER (Floating Glass) -->
+        <!-- HEADER (Floating) -->
         <header class="absolute top-0 left-0 right-0 z-40 px-4 py-3 md:px-6 md:py-4">
             <div class="glass-panel rounded-2xl shadow-glass flex items-center justify-between p-3 md:p-4 max-w-7xl mx-auto">
                 <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center text-white shadow-glow">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center text-white shadow-glow transform rotate-3 hover:rotate-0 transition-transform">
                         <i class="ph ph-hexagon text-xl font-bold"></i>
                     </div>
                     <div>
                         <h1 class="text-lg font-bold text-slate-800 tracking-tight leading-none">Nexus<span class="text-primary">Admin</span></h1>
                         <div class="flex items-center gap-1.5 mt-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.6)] animate-pulse"></span>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Live System</p>
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Connected</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="flex items-center gap-3 md:gap-5">
-                    <span id="user-email" class="hidden md:inline-block text-xs font-semibold text-slate-500 bg-slate-100/80 px-4 py-2 rounded-full border border-slate-200"></span>
+                <div class="flex items-center gap-3 md:gap-4">
+                    <span id="user-email" class="hidden md:inline-block text-xs font-semibold text-slate-500 bg-slate-50/80 px-4 py-2 rounded-full border border-slate-200/50"></span>
                     
-                    <button id="refreshBtn" onclick="refreshDashboard()" class="relative group p-2 text-slate-400 hover:text-primary transition-colors">
+                    <button id="refreshBtn" onclick="refreshDashboard()" class="relative group p-2 text-slate-400 hover:text-primary transition-colors bg-white/50 rounded-lg border border-transparent hover:border-slate-100 hover:shadow-sm">
                         <i class="ph ph-arrows-clockwise text-xl group-active:animate-spin"></i>
                     </button>
                     
-                    <button id="logoutBtn" class="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+                    <button id="logoutBtn" class="p-2 text-slate-400 hover:text-rose-500 transition-colors bg-white/50 rounded-lg border border-transparent hover:border-rose-100 hover:bg-rose-50 hover:shadow-sm">
                         <i class="ph ph-sign-out text-xl"></i>
                     </button>
                 </div>
             </div>
         </header>
 
-        <!-- CONTENT AREA -->
-        <main class="flex-grow overflow-y-auto pt-24 pb-32 px-4 md:px-6">
+        <!-- MAIN SCROLL AREA -->
+        <main class="flex-grow overflow-y-auto pt-28 pb-36 px-4 md:px-6">
             <div class="max-w-7xl mx-auto h-full">
 
                 <!-- =======================
@@ -136,106 +139,105 @@
                 <div id="tab-dashboard" class="tab-content block">
                     <header class="mb-6 flex justify-between items-end">
                         <div>
-                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Dashboard Overview</h2>
-                            <p class="text-sm text-slate-500 font-medium mt-1">Real-time metrics & management.</p>
+                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Overview</h2>
+                            <p class="text-sm text-slate-500 font-medium mt-1">System Metrics & Tasks</p>
                         </div>
                     </header>
 
-                    <!-- Stats Grid (Golden Ratio Spacing) -->
+                    <!-- Stats Grid -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-                        <!-- Card: Attendance -->
-                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <!-- Card 1 -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                             <div class="flex justify-between items-start mb-4">
-                                <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <div class="bg-blue-50 text-blue-600 p-2.5 rounded-xl">
                                     <i class="ph ph-users-three text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">+4%</span>
                             </div>
                             <p class="text-3xl font-bold text-slate-800 tracking-tight" id="stat-attendance">0</p>
-                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">Staff Present</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Staff Present</p>
                         </div>
                         
-                        <!-- Card: Orders -->
-                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <!-- Card 2 -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                             <div class="flex justify-between items-start mb-4">
-                                <div class="bg-violet-50 text-violet-600 p-2.5 rounded-xl group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                                <div class="bg-violet-50 text-violet-600 p-2.5 rounded-xl">
                                     <i class="ph ph-shopping-cart-simple text-xl"></i>
                                 </div>
                             </div>
                             <p class="text-3xl font-bold text-slate-800 tracking-tight" id="stat-orders">0</p>
-                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">New Orders</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">New Orders</p>
                         </div>
                         
-                        <!-- Card: Revenue -->
-                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden">
-                            <div class="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full blur-2xl opacity-10"></div>
+                        <!-- Card 3 -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                            <div class="absolute -right-6 -top-6 w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-opacity"></div>
                             <div class="flex justify-between items-start mb-4 relative z-10">
-                                <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                <div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl">
                                     <i class="ph ph-currency-inr text-xl"></i>
                                 </div>
                             </div>
                             <p class="text-3xl font-bold text-emerald-600 tracking-tight relative z-10" id="stat-sales">0</p>
-                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1 relative z-10">Revenue</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 relative z-10">Revenue</p>
                         </div>
 
-                        <!-- Card: Credit -->
-                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <!-- Card 4 -->
+                        <div class="glass-panel p-5 rounded-3xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                             <div class="flex justify-between items-start mb-4">
-                                <div class="bg-orange-50 text-orange-600 p-2.5 rounded-xl group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                <div class="bg-orange-50 text-orange-600 p-2.5 rounded-xl">
                                     <i class="ph ph-clock-countdown text-xl"></i>
                                 </div>
                             </div>
                             <p class="text-3xl font-bold text-orange-600 tracking-tight" id="stat-credit">0</p>
-                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-1">Outstanding</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Outstanding</p>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                        <!-- TARGET SETTING (Dominant) -->
+                        <!-- TARGET ASSIGNMENT -->
                         <div class="lg:col-span-2 glass-panel p-6 md:p-8 rounded-[2rem] border-primary/20 relative overflow-hidden">
                             <div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                             
                             <h3 class="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
                                 <i class="ph ph-target text-primary text-xl"></i>
-                                Daily Target Assignment
+                                Daily Target Control
                             </h3>
                             
                             <form id="targetForm" class="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Staff Member</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Staff Member</label>
                                     <select id="targetSalesmanId" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm">
                                         <option value="">Select Personnel</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Target Date</label>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Target Date</label>
                                     <input type="date" id="targetDate" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm">
                                 </div>
                                 <div class="flex gap-2">
                                     <div class="flex-1">
-                                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Boxes</label>
-                                        <input type="number" id="targetBoxes" placeholder="Qty" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm text-center">
+                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Boxes</label>
+                                        <input type="number" id="targetBoxes" placeholder="Qty" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-center text-sm focus:ring-2 focus:ring-primary">
                                     </div>
                                     <div class="flex-1">
-                                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Inc./Box</label>
-                                        <input type="number" id="incentivePerBox" placeholder="₹" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-all shadow-sm text-center">
+                                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Incentive</label>
+                                        <input type="number" id="incentivePerBox" placeholder="₹" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-center text-sm focus:ring-2 focus:ring-primary">
                                     </div>
                                 </div>
-                                <button type="submit" class="h-[46px] w-full bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
-                                    <span>Assign</span> <i class="ph ph-arrow-right-bold"></i>
+                                <button type="submit" class="h-[46px] w-full bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                                    Assign <i class="ph ph-arrow-right-bold"></i>
                                 </button>
                             </form>
                         </div>
 
-                        <!-- ALERTS SECTION -->
+                        <!-- ALERTS -->
                         <div class="lg:col-span-1 flex flex-col gap-4">
-                            <!-- Pending Payment Widget -->
-                            <div id="approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-amber-400 shadow-sm relative overflow-hidden group">
+                            <!-- Pending Payments -->
+                            <div id="approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-amber-400 shadow-sm">
                                 <div class="flex justify-between items-center mb-3">
                                     <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div> Pending Payments
+                                        <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div> Payment Approval
                                     </h3>
-                                    <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg font-bold">Action Req</span>
+                                    <span class="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg font-bold border border-amber-100">Action Req</span>
                                 </div>
                                 <div class="overflow-x-auto">
                                     <table class="w-full text-xs">
@@ -244,11 +246,11 @@
                                 </div>
                             </div>
                             
-                            <!-- Leave Requests Widget -->
-                            <div id="leave-approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-indigo-400 shadow-sm">
+                            <!-- Leave Requests -->
+                            <div id="leave-approval-section" class="hidden glass-panel p-5 rounded-3xl border-l-4 border-l-primary shadow-sm">
                                 <div class="flex justify-between items-center mb-3">
                                     <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                        <i class="ph ph-calendar-x text-indigo-500"></i> Leave Requests
+                                        <i class="ph ph-calendar-x text-primary"></i> Leave Approval
                                     </h3>
                                 </div>
                                 <div class="overflow-x-auto">
@@ -260,24 +262,24 @@
                         </div>
                     </div>
 
-                    <!-- ATTENDANCE TABLE (Daily Register) -->
+                    <!-- ATTENDANCE REGISTER -->
                     <div class="glass-panel rounded-3xl overflow-hidden border border-white/50 shadow-glass">
-                        <div class="px-6 py-5 border-b border-slate-100/50 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/40">
-                            <h3 class="font-bold text-slate-700">Daily Register Log</h3>
+                        <div class="px-6 py-5 border-b border-slate-100/50 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/30 backdrop-blur">
+                            <h3 class="font-bold text-slate-700 text-sm uppercase tracking-wide">Daily Register</h3>
                             <div class="flex items-center gap-2">
                                 <input type="date" id="attendanceDateFilter" class="bg-white/80 border-0 rounded-lg text-xs px-3 py-2 text-slate-600 shadow-sm focus:ring-2 focus:ring-primary/50">
-                                <button onclick="loadAttendanceByDate()" class="bg-primary text-white p-2 rounded-lg shadow-lg hover:bg-primaryDark transition-all">
+                                <button onclick="loadAttendanceByDate()" class="bg-white hover:bg-slate-50 text-primary p-2 rounded-lg shadow-sm border border-slate-100 transition-all">
                                     <i class="ph ph-magnifying-glass font-bold"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-slate-50/80 text-xs text-slate-400 uppercase tracking-widest font-semibold border-b border-slate-100">
+                                <thead class="bg-slate-50/50 text-[10px] text-slate-400 uppercase tracking-widest font-bold border-b border-slate-100">
                                     <tr>
-                                        <th class="p-5">Salesman</th>
-                                        <th class="p-5">Check-In Status</th>
-                                        <th class="p-5">Time Logs</th>
+                                        <th class="p-5 pl-8">Salesman</th>
+                                        <th class="p-5">Status</th>
+                                        <th class="p-5">Logs</th>
                                     </tr>
                                 </thead>
                                 <tbody id="attendance-list" class="divide-y divide-slate-50 text-sm text-slate-600">
@@ -292,22 +294,21 @@
                      TAB 2: OUTLETS
                 ======================== -->
                 <div id="tab-outlets" class="tab-content hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-140px)]">
-                        
-                        <!-- LEFT: LIST -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-160px)]">
+                        <!-- List (Left) -->
                         <div class="lg:col-span-8 flex flex-col h-full gap-4">
-                            <div class="flex justify-between items-center px-2">
-                                <h2 class="text-2xl font-bold text-slate-800">Outlets Registry</h2>
-                                <span class="text-xs bg-white px-3 py-1 rounded-full shadow-sm text-slate-500 font-mono" id="outletCountBadge">0 Records</span>
+                            <div class="flex justify-between items-center px-1">
+                                <h2 class="text-2xl font-bold text-slate-800">Directory</h2>
+                                <span class="text-xs bg-white px-3 py-1.5 rounded-full shadow-sm text-slate-500 font-mono border border-slate-100" id="outletCountBadge">0 Shops</span>
                             </div>
                             
                             <div class="glass-panel rounded-3xl overflow-hidden flex-grow flex flex-col shadow-sm border border-white/60">
                                 <div class="overflow-y-auto flex-grow p-1">
                                     <table class="w-full text-sm text-left border-separate border-spacing-y-1 px-2">
-                                        <thead class="sticky top-0 bg-white/95 backdrop-blur z-10 text-xs text-slate-400 uppercase tracking-widest font-bold">
+                                        <thead class="sticky top-0 bg-white/90 backdrop-blur z-10 text-[10px] text-slate-400 uppercase tracking-widest font-bold">
                                             <tr>
-                                                <th class="p-4 rounded-l-xl">Establishment</th>
-                                                <th class="p-4">Contact</th>
+                                                <th class="p-4 rounded-l-xl">Shop Name</th>
+                                                <th class="p-4">Owner</th>
                                                 <th class="p-4">Type</th>
                                                 <th class="p-4 rounded-r-xl text-right">Actions</th>
                                             </tr>
@@ -320,13 +321,16 @@
                             </div>
                         </div>
 
-                        <!-- RIGHT: FORM (Sticky) -->
-                        <div class="lg:col-span-4 h-full overflow-y-auto hide-scroll pb-20">
-                            <div class="glass-panel p-6 rounded-[2rem] border border-white/60 shadow-xl sticky top-0">
+                        <!-- Form (Right Sticky) -->
+                        <div class="lg:col-span-4 h-full overflow-y-auto pb-20 no-scrollbar">
+                            <div class="glass-panel p-6 rounded-[2rem] border border-white/60 shadow-lg sticky top-0">
                                 <div class="flex justify-between items-center mb-6">
-                                    <h4 class="text-lg font-bold text-slate-800" id="formTitle">Add New Outlet</h4>
-                                    <button onclick="resetOutletForm()" class="bg-slate-100 text-slate-500 p-2 rounded-full hover:bg-slate-200 transition">
-                                        <i class="ph ph-plus font-bold"></i>
+                                    <h4 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <span class="w-2 h-6 bg-accent rounded-full"></span>
+                                        <span id="formTitle">Add Outlet</span>
+                                    </h4>
+                                    <button onclick="resetOutletForm()" class="bg-slate-100 text-slate-400 p-2 rounded-full hover:bg-slate-200 transition">
+                                        <i class="ph ph-plus-bold"></i>
                                     </button>
                                 </div>
 
@@ -334,9 +338,9 @@
                                     <input type="hidden" id="editOutletId">
                                     
                                     <div class="space-y-1">
-                                        <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Basic Info</label>
-                                        <input type="text" id="shopName" placeholder="Shop Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
-                                        <select id="outletType" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                        <label class="ml-1 text-[9px] uppercase font-bold text-slate-400">Essentials</label>
+                                        <input type="text" id="shopName" placeholder="Business Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-shadow">
+                                        <select id="outletType" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-shadow">
                                             <option value="" disabled selected>Category</option>
                                             <option value="Shop">Shop</option>
                                             <option value="Dhaba">Dhaba</option>
@@ -347,46 +351,41 @@
                                     </div>
 
                                     <div class="space-y-1">
-                                        <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Owner Details</label>
-                                        <input type="text" id="ownerName" placeholder="Owner Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
-                                        <input type="tel" id="contactPhone" placeholder="Mobile Number" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
-                                        <input type="text" id="contactPerson" placeholder="Point of Contact" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white outline-none">
+                                        <label class="ml-1 text-[9px] uppercase font-bold text-slate-400">Contact</label>
+                                        <input type="text" id="ownerName" placeholder="Owner Name" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white transition-shadow">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <input type="tel" id="contactPhone" placeholder="Mobile" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-shadow">
+                                            <input type="text" id="contactPerson" placeholder="Contact Person" required class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary transition-shadow">
+                                        </div>
                                     </div>
 
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">Mode</label>
-                                            <select id="storeType" class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none">
-                                                <option value="Cash">Cash</option>
+                                    <div class="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50">
+                                        <div class="flex justify-between items-center mb-2">
+                                             <label class="text-[9px] uppercase font-bold text-slate-400">Payment Terms</label>
+                                             <select id="storeType" class="bg-transparent text-xs font-bold text-indigo-700 outline-none">
+                                                <option value="Cash">Cash Only</option>
                                                 <option value="Credit">Credit</option>
                                             </select>
                                         </div>
-                                        <div>
-                                            <label class="ml-2 text-[10px] uppercase font-bold text-slate-400">GST</label>
-                                            <input type="text" id="gstNumber" placeholder="Optional" class="w-full bg-white/60 border-0 ring-1 ring-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary outline-none">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <input type="number" id="creditDays" placeholder="Days" disabled class="bg-white border-0 rounded-xl p-2.5 text-xs shadow-sm disabled:opacity-50">
+                                            <input type="number" id="creditLimit" placeholder="Limit ₹" disabled class="bg-white border-0 rounded-xl p-2.5 text-xs shadow-sm disabled:opacity-50">
                                         </div>
                                     </div>
 
-                                    <div class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50 grid grid-cols-2 gap-3">
-                                        <input type="number" id="creditDays" placeholder="Cr. Days" disabled class="bg-white/50 border-0 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-300 disabled:opacity-50">
-                                        <input type="number" id="creditLimit" placeholder="Limit ₹" disabled class="bg-white/50 border-0 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-300 disabled:opacity-50">
-                                    </div>
-
                                     <!-- Geolocation Capture -->
-                                    <div class="relative group">
-                                        <button type="button" id="geoBtn" class="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl text-blue-700 hover:from-blue-100 hover:to-indigo-100 transition-all">
-                                            <div class="flex flex-col text-left">
-                                                <span class="text-xs font-bold uppercase tracking-wider">Geo Tagging</span>
-                                                <span id="geoDisplay" class="text-[10px] opacity-70">Coordinates Pending</span>
-                                            </div>
-                                            <i class="ph ph-crosshair text-xl animate-pulse"></i>
-                                        </button>
-                                        <input type="hidden" id="lat"><input type="hidden" id="lng">
-                                    </div>
+                                    <button type="button" id="geoBtn" class="w-full flex items-center justify-between p-3 px-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl text-blue-700 hover:shadow-md transition-all">
+                                        <div class="flex flex-col text-left">
+                                            <span class="text-xs font-bold uppercase tracking-wider">Geo-Tag Location</span>
+                                            <span id="geoDisplay" class="text-[10px] opacity-70">Tap to capture</span>
+                                        </div>
+                                        <i class="ph ph-crosshair text-lg animate-pulse"></i>
+                                    </button>
+                                    <input type="hidden" id="lat"><input type="hidden" id="lng">
 
                                     <div class="pt-2 flex gap-3">
-                                        <button type="submit" id="submitBtn" class="flex-1 bg-gradient-to-br from-slate-800 to-black text-white py-3.5 rounded-xl font-bold shadow-xl hover:shadow-2xl transition-all transform active:scale-95">Save Entry</button>
-                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-1/3 bg-slate-200 text-slate-600 rounded-xl font-bold">Cancel</button>
+                                        <button type="submit" id="submitBtn" class="flex-1 bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-black transition-all transform active:scale-95">Save</button>
+                                        <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden w-1/3 bg-slate-200 text-slate-600 rounded-xl font-bold text-sm">Cancel</button>
                                     </div>
                                 </form>
                             </div>
@@ -398,75 +397,78 @@
                      TAB 3: ROUTES
                 ======================== -->
                 <div id="tab-routes" class="tab-content hidden h-full pb-20">
-                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-160px)]">
                         <!-- Sidebar: Route List -->
                         <div class="lg:col-span-4 flex flex-col gap-4 h-full">
-                            <div class="glass-panel p-5 rounded-2xl border border-white/60">
+                            <div class="glass-panel p-5 rounded-3xl border border-white/60">
                                 <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
                                     <i class="ph ph-map-trifold text-primary text-xl"></i> Create Route
                                 </h3>
                                 <form id="createRouteForm" class="space-y-3">
-                                    <input type="text" id="routeNameInput" placeholder="New Route Name" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white">
+                                    <input type="text" id="routeNameInput" placeholder="Name (e.g., Downtown)" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white">
                                     <select id="routeSalesmanSelect" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:bg-white">
-                                        <option value="">Assign To...</option>
+                                        <option value="">Assign Driver/Staff</option>
                                     </select>
-                                    <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white py-3 rounded-xl font-bold text-sm shadow-glow transition-all">Add Route</button>
+                                    <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white py-3 rounded-xl font-bold text-sm shadow-glow transition-all">Create Route</button>
                                 </form>
                             </div>
 
-                            <div class="glass-panel rounded-2xl flex-grow flex flex-col overflow-hidden border border-white/60 shadow-sm">
-                                <div class="p-3 bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Routes</div>
+                            <div class="glass-panel rounded-3xl flex-grow flex flex-col overflow-hidden border border-white/60 shadow-sm">
+                                <div class="p-4 bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">Active Routes</div>
                                 <ul id="routes-list-group" class="flex-grow overflow-y-auto divide-y divide-slate-100/50 p-2"></ul>
                             </div>
                         </div>
 
-                        <!-- Main: Map/Editor Interface -->
+                        <!-- Main: Editor -->
                         <div class="lg:col-span-8 h-full">
-                            <div class="glass-panel h-full rounded-[2rem] border border-white/60 shadow-lg relative flex flex-col overflow-hidden">
+                            <div class="glass-panel h-full rounded-[2.5rem] border border-white/60 shadow-xl relative flex flex-col overflow-hidden bg-white/20">
                                 <!-- Editor Header -->
-                                <div class="px-6 py-5 bg-white/40 backdrop-blur border-b border-white/20 z-10 flex justify-between items-center">
+                                <div class="px-8 py-6 bg-white/60 backdrop-blur-md border-b border-white/20 z-10 flex justify-between items-center">
                                     <div>
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Route Editor</p>
-                                        <h2 id="selectedRouteName" class="text-xl font-bold text-slate-800">No Selection</h2>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Editor Mode</p>
+                                        <h2 id="selectedRouteName" class="text-2xl font-bold text-slate-800 tracking-tight">Select Route</h2>
                                     </div>
                                     <input type="hidden" id="selectedRouteId">
                                 </div>
 
                                 <!-- Route Canvas -->
-                                <div class="flex-grow relative bg-slate-50/50">
-                                    <div id="routeConfigPanel" class="hidden h-full flex flex-col p-6">
+                                <div class="flex-grow relative bg-slate-50/30">
+                                    <div id="routeConfigPanel" class="hidden h-full flex flex-col p-6 md:p-8">
                                         <!-- Control Bar -->
                                         <div class="flex gap-3 mb-6">
-                                            <div class="relative flex-grow">
-                                                <select id="allOutletsDropdown" class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-accent outline-none shadow-sm appearance-none">
-                                                    <option value="">Find outlet to add...</option>
+                                            <div class="relative flex-grow shadow-sm rounded-xl">
+                                                <select id="allOutletsDropdown" class="w-full bg-white border border-transparent text-slate-700 text-sm rounded-xl px-5 py-3.5 focus:ring-2 focus:ring-accent outline-none appearance-none">
+                                                    <option value="">Search Outlet to add...</option>
                                                 </select>
-                                                <i class="ph ph-caret-down absolute right-4 top-3.5 text-slate-400"></i>
+                                                <i class="ph ph-caret-down absolute right-5 top-4 text-slate-400 pointer-events-none"></i>
                                             </div>
-                                            <button onclick="addOutletToRoute()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                                                <i class="ph ph-plus-circle text-lg"></i> <span class="hidden sm:inline font-bold text-sm">Add</span>
+                                            <button onclick="addOutletToRoute()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 transform active:scale-95">
+                                                <i class="ph ph-plus-circle text-lg"></i>
+                                                <span class="hidden sm:inline font-bold text-sm">Append</span>
                                             </button>
                                         </div>
 
                                         <!-- Sequence List -->
-                                        <div class="bg-white/80 rounded-2xl shadow-inner flex-grow overflow-y-auto border border-slate-100">
+                                        <div class="bg-white/80 rounded-2xl shadow-inner flex-grow overflow-y-auto border border-white custom-scrollbar p-1">
                                             <table class="w-full text-sm">
-                                                <thead class="bg-slate-50 sticky top-0">
+                                                <thead class="bg-slate-50/90 sticky top-0 z-10">
                                                     <tr>
-                                                        <th class="p-3 text-xs text-slate-400 uppercase font-bold text-center w-16">Seq</th>
-                                                        <th class="p-3 text-xs text-slate-400 uppercase font-bold text-left">Stop Name</th>
-                                                        <th class="p-3 text-right"></th>
+                                                        <th class="p-4 text-[10px] text-slate-400 uppercase font-bold text-center w-20">Seq</th>
+                                                        <th class="p-4 text-[10px] text-slate-400 uppercase font-bold text-left">Stop Point</th>
+                                                        <th class="p-4 text-right"></th>
                                                     </tr>
                                                 </thead>
-                                                <tbody id="route-outlets-list" class="divide-y divide-slate-100"></tbody>
+                                                <tbody id="route-outlets-list" class="divide-y divide-slate-50"></tbody>
                                             </table>
                                         </div>
                                     </div>
 
                                     <!-- Empty State -->
                                     <div id="routeConfigMsg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
-                                        <i class="ph ph-arrows-left-right text-6xl mb-4 opacity-50"></i>
-                                        <p class="text-sm font-medium">Select a route to manage sequence</p>
+                                        <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                                            <i class="ph ph-path text-3xl opacity-50"></i>
+                                        </div>
+                                        <p class="text-sm font-medium">Select a route from the sidebar</p>
                                     </div>
                                 </div>
                             </div>
@@ -479,17 +481,17 @@
                 ======================== -->
                 <div id="tab-products" class="tab-content hidden">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="md:col-span-1 glass-panel p-6 rounded-3xl border border-white/60 sticky top-4 shadow-lg">
-                             <h4 class="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                <i class="ph ph-package text-accent text-xl"></i> Inventory Entry
+                        <div class="md:col-span-1 glass-panel p-6 rounded-[2rem] border border-white/60 sticky top-4 shadow-lg">
+                             <h4 class="font-bold text-slate-800 mb-6 flex items-center gap-2 text-lg">
+                                <i class="ph ph-package text-accent text-2xl"></i> Catalog Entry
                             </h4>
                             <form id="addProductForm" class="space-y-4">
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Item Name</label>
+                                    <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Item Name</label>
                                     <input type="text" id="prodName" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent transition-all">
                                 </div>
                                 <div>
-                                    <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Category</label>
+                                    <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Category</label>
                                     <input type="text" id="prodCategory" list="catSuggestions" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent transition-all">
                                     <datalist id="catSuggestions">
                                         <option value="Beverages"><option value="Snacks"><option value="Dairy"><option value="General">
@@ -497,38 +499,38 @@
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Price</label>
+                                        <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Unit Price</label>
                                         <div class="relative">
                                             <span class="absolute left-3 top-3 text-slate-400 text-sm font-bold">₹</span>
-                                            <input type="number" id="prodPrice" step="0.01" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl pl-8 pr-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-accent">
+                                            <input type="number" id="prodPrice" step="0.01" required class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl pl-7 pr-3 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-accent">
                                         </div>
                                     </div>
                                     <div>
-                                        <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">HSN Code</label>
+                                        <label class="text-[9px] font-bold text-slate-400 uppercase mb-1 block">HSN</label>
                                         <input type="text" id="prodHSN" class="w-full bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-accent">
                                     </div>
                                 </div>
-                                <button type="submit" class="w-full bg-accent hover:bg-violet-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-violet-200 transition-all mt-4">Add to Catalog</button>
+                                <button type="submit" class="w-full bg-accent hover:bg-violet-600 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-violet-200 transition-all mt-4 transform active:scale-95">Add to Inventory</button>
                             </form>
                         </div>
 
-                        <div class="md:col-span-2 glass-panel rounded-3xl overflow-hidden border border-white/60 shadow-sm min-h-[500px]">
-                            <div class="p-5 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-                                <span class="font-bold text-slate-700">Product List</span>
-                                <span class="text-xs bg-slate-200 px-2 py-1 rounded text-slate-500 font-mono">Live Sync</span>
+                        <div class="md:col-span-2 glass-panel rounded-[2rem] overflow-hidden border border-white/60 shadow-sm min-h-[500px] flex flex-col">
+                            <div class="p-6 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center backdrop-blur">
+                                <span class="font-bold text-slate-700">Master Stock List</span>
+                                <span class="text-[10px] font-bold uppercase bg-slate-200/50 px-2 py-1 rounded text-slate-500 tracking-wider">Live</span>
                             </div>
-                            <div class="overflow-x-auto p-2">
-                                <table class="w-full text-sm text-left border-separate border-spacing-y-1">
-                                    <thead class="text-xs text-slate-400 uppercase">
+                            <div class="overflow-x-auto p-2 flex-grow">
+                                <table class="w-full text-sm text-left border-separate border-spacing-y-2">
+                                    <thead class="text-[10px] text-slate-400 uppercase tracking-widest font-bold ml-2">
                                         <tr>
-                                            <th class="p-3">Item</th>
+                                            <th class="p-3 pl-4">Product</th>
                                             <th class="p-3">Category</th>
-                                            <th class="p-3">Unit Price</th>
-                                            <th class="p-3 text-right">Action</th>
+                                            <th class="p-3">Price</th>
+                                            <th class="p-3 text-right pr-4">Remove</th>
                                         </tr>
                                     </thead>
                                     <tbody id="product-list-body">
-                                        <tr><td colspan="4" class="text-center p-10 text-slate-400">Loading inventory...</td></tr>
+                                        <tr><td colspan="4" class="text-center p-10 text-slate-400 italic">Syncing inventory...</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -537,27 +539,73 @@
                 </div>
 
                 <!-- =======================
-                     TAB 5: STAFF
+                     TAB 5: ACTIVITY LOG (NEW & ENHANCED)
                 ======================== -->
-                <div id="tab-staff" class="tab-content hidden">
-                    <div class="glass-panel max-w-2xl mx-auto rounded-[2.5rem] p-8 md:p-12 shadow-neumorphic border border-white">
-                        <div class="flex items-center gap-4 mb-10 border-b border-slate-100 pb-6">
-                            <div class="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm">
-                                <i class="ph ph-identification-badge"></i>
+                <div id="tab-transactions" class="tab-content hidden">
+                    <!-- Filters -->
+                    <div class="glass-panel p-6 rounded-[2.5rem] mb-6 border border-white/60 shadow-lg sticky top-0 z-30 backdrop-blur-xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <span class="flex h-3 w-3 rounded-full bg-red-500 animate-pulse"></span> Activity Timeline
+                            </h2>
+                            <button onclick="loadTransactions()" class="text-xs bg-slate-800 text-white px-4 py-2 rounded-full font-bold shadow hover:bg-black transition-colors">Apply Filters</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-2 mb-1">From</label>
+                                <input type="date" id="transStart" class="w-full bg-slate-50/50 border border-slate-200 rounded-xl text-xs px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
                             </div>
                             <div>
-                                <h3 class="text-2xl font-bold text-slate-800">Sales Team</h3>
-                                <p class="text-slate-400 text-sm">Active Field Personnel</p>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-2 mb-1">To</label>
+                                <input type="date" id="transEnd" class="w-full bg-slate-50/50 border border-slate-200 rounded-xl text-xs px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-2 mb-1">Agent</label>
+                                <div class="relative">
+                                    <select id="transSalesman" class="w-full bg-slate-50/50 border border-slate-200 rounded-xl text-xs px-3 py-2.5 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50"><option value="all">All Staff</option></select>
+                                    <i class="ph ph-caret-down absolute right-3 top-2.5 text-slate-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-2 mb-1">Type</label>
+                                <div class="relative">
+                                    <select id="transType" class="w-full bg-slate-50/50 border border-slate-200 rounded-xl text-xs px-3 py-2.5 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <option value="all">All Activities</option>
+                                        <option value="Order">Orders</option>
+                                        <option value="Payment">Payments</option>
+                                        <option value="Visit">Visits</option>
+                                        <option value="Attendance">Check-ins</option>
+                                    </select>
+                                    <i class="ph ph-funnel absolute right-3 top-2.5 text-slate-400 pointer-events-none"></i>
+                                </div>
                             </div>
                         </div>
                         
-                        <ul id="salesmen-list" class="space-y-4">
-                            <!-- Loader -->
-                             <li class="flex flex-col items-center justify-center py-10 opacity-50">
-                                <i class="ph ph-circle-notch animate-spin text-3xl text-indigo-400 mb-2"></i>
-                                <span class="text-xs font-bold tracking-widest uppercase">Fetching Agents</span>
-                            </li>
-                        </ul>
+                        <div class="relative">
+                             <input type="text" id="transOutletSearch" onkeyup="filterTransactionsClientSide()" placeholder="Type to filter stream by Shop Name..." class="w-full bg-white/40 border-b border-slate-200/60 text-xs py-2 pl-8 outline-none focus:border-primary placeholder-slate-400">
+                             <i class="ph ph-magnifying-glass absolute left-0 top-1.5 text-slate-400"></i>
+                        </div>
+                    </div>
+
+                    <!-- Timeline / Table View -->
+                    <div class="glass-panel rounded-[2.5rem] overflow-hidden border border-white shadow-sm min-h-[400px]">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm timeline-line relative">
+                                <thead class="bg-slate-50/80 text-slate-400 uppercase text-[9px] font-bold tracking-[0.1em] border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-5 w-24 text-center">Time</th>
+                                        <th class="p-5">User</th>
+                                        <th class="p-5">Event</th>
+                                        <th class="p-5">Details</th>
+                                        <th class="p-5 text-right">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trans-table-body" class="divide-y divide-slate-100/60">
+                                    <tr><td colspan="5" class="p-12 text-center text-slate-400 text-sm font-medium">Select dates above and click 'Apply Filters' to load the stream.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -567,23 +615,22 @@
                 <div id="tab-attendance-sheet" class="tab-content hidden">
                     <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                         <div>
-                            <h2 class="text-2xl font-bold text-slate-800">Attendance Matrix</h2>
-                            <p class="text-sm text-slate-500">Monthly Retention View</p>
+                            <h2 class="text-2xl font-bold text-slate-800">Retention Matrix</h2>
+                            <p class="text-sm text-slate-500">Monthly Attendance View</p>
                         </div>
-                        <div class="flex gap-3 bg-white/60 p-2 rounded-xl border border-white shadow-sm">
-                            <input type="month" id="sheetMonthPicker" class="bg-transparent border-0 text-sm font-bold text-slate-600 outline-none">
-                            <button onclick="loadAttendanceSheet()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-slate-700 transition">View Data</button>
+                        <div class="flex gap-3 bg-white/60 p-1.5 rounded-2xl border border-white shadow-sm items-center pr-4">
+                            <input type="month" id="sheetMonthPicker" class="bg-transparent border-0 text-sm font-bold text-slate-600 outline-none p-2 cursor-pointer">
+                            <button onclick="loadAttendanceSheet()" class="bg-slate-800 text-white px-5 py-2 rounded-xl text-xs font-bold shadow hover:bg-slate-700 transition transform active:scale-95">Fetch</button>
                         </div>
                     </header>
                     
-                    <div class="glass-panel rounded-2xl overflow-hidden border border-white shadow-glass">
-                        <div class="overflow-x-auto">
+                    <div class="glass-panel rounded-3xl overflow-hidden border border-white shadow-glass">
+                        <div class="overflow-x-auto pb-4">
                             <table class="w-full text-xs border-collapse">
                                 <thead>
-                                    <tr id="sheet-header-row" class="bg-slate-50 text-slate-400 uppercase tracking-widest">
-                                        <th class="p-4 text-left border-r sticky left-0 bg-slate-50 z-20 font-bold min-w-[150px] border-b">Personnel</th>
-                                        <!-- Days injected here -->
-                                        <th class="p-4 w-full text-center border-b font-light italic">Select Month to Generate Matrix</th>
+                                    <tr id="sheet-header-row" class="bg-slate-50 text-slate-400 uppercase tracking-widest text-[10px]">
+                                        <th class="p-4 text-left border-r border-slate-200/50 sticky left-0 bg-slate-50 z-20 font-bold min-w-[140px] border-b border-slate-200">Personnel</th>
+                                        <th class="p-4 w-full text-center border-b font-light italic">Select Month</th>
                                     </tr>
                                 </thead>
                                 <tbody id="sheet-body" class="divide-y divide-slate-100"></tbody>
@@ -591,102 +638,89 @@
                         </div>
                     </div>
                     
-                    <div class="flex flex-wrap gap-4 justify-end mt-4 px-2">
-                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span> Full Day</span>
-                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm"></span> Half Day</span>
-                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm"></span> Leave</span>
-                        <span class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-white/50 px-3 py-1.5 rounded-full"><span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span> Absent</span>
+                    <div class="flex flex-wrap gap-3 justify-end mt-4 px-2">
+                        <div class="flex items-center gap-1.5 bg-white/50 px-3 py-1.5 rounded-full border border-white/60">
+                            <span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]"></span> 
+                            <span class="text-[10px] font-bold uppercase text-slate-600">Present</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 bg-white/50 px-3 py-1.5 rounded-full border border-white/60">
+                            <span class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.6)]"></span> 
+                            <span class="text-[10px] font-bold uppercase text-slate-600">Half Day</span>
+                        </div>
+                         <div class="flex items-center gap-1.5 bg-white/50 px-3 py-1.5 rounded-full border border-white/60">
+                            <span class="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_5px_rgba(244,63,94,0.6)]"></span> 
+                            <span class="text-[10px] font-bold uppercase text-slate-600">Leave</span>
+                        </div>
+                         <div class="flex items-center gap-1.5 bg-white/50 px-3 py-1.5 rounded-full border border-white/60">
+                            <span class="w-2 h-2 rounded-full bg-slate-200"></span> 
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Absent</span>
+                        </div>
                         
-                        <button onclick="runRetentionCleanup()" class="ml-auto text-xs font-bold text-rose-500 bg-rose-50 border border-rose-100 px-4 py-1.5 rounded-full hover:bg-rose-100 transition">
-                            <i class="ph ph-trash"></i> Clean Old Data
+                        <button onclick="runRetentionCleanup()" class="ml-auto text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-4 py-1.5 rounded-full hover:bg-rose-100 transition flex items-center gap-1">
+                            <i class="ph ph-trash"></i> Auto-Clean > 90 Days
                         </button>
                     </div>
                 </div>
 
                 <!-- =======================
-                     TAB 7: ACTIVITY LOG
+                     TAB 7: STAFF
                 ======================== -->
-                <div id="tab-transactions" class="tab-content hidden">
-                    <div class="glass-panel p-5 rounded-3xl mb-6 border border-white/60 shadow-lg sticky top-0 z-30">
-                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                            <div class="col-span-2 md:col-span-1">
-                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Start</label>
-                                <input type="date" id="transStart" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
+                <div id="tab-staff" class="tab-content hidden">
+                    <div class="glass-panel max-w-2xl mx-auto rounded-[3rem] p-10 shadow-neumorphic border border-white relative overflow-hidden">
+                        <div class="absolute -left-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                        <div class="flex items-center gap-5 mb-8 border-b border-slate-100 pb-6 relative z-10">
+                            <div class="w-16 h-16 bg-white border border-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl shadow-sm">
+                                <i class="ph ph-identification-badge"></i>
                             </div>
-                            <div class="col-span-2 md:col-span-1">
-                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">End</label>
-                                <input type="date" id="transEnd" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
-                            </div>
-                            <div class="col-span-2 md:col-span-1">
-                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Agent</label>
-                                <select id="transSalesman" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary"><option value="all">All</option></select>
-                            </div>
-                             <div class="col-span-2 md:col-span-1">
-                                <label class="text-[9px] font-bold text-slate-400 uppercase block pl-1">Filter</label>
-                                <select id="transType" class="w-full mt-1 bg-slate-50 border-0 rounded-lg text-xs p-2 focus:ring-2 focus:ring-primary">
-                                    <option value="all">Everything</option>
-                                    <option value="Order">Orders</option>
-                                    <option value="Payment">Payments</option>
-                                    <option value="Visit">Visits</option>
-                                </select>
-                            </div>
-                            <div class="col-span-2 md:col-span-1 flex items-end">
-                                <button onclick="loadTransactions()" class="w-full bg-slate-800 text-white p-2 rounded-lg text-xs font-bold shadow-md hover:bg-black transition-colors">Apply</button>
+                            <div>
+                                <h3 class="text-3xl font-bold text-slate-800">Team</h3>
+                                <p class="text-slate-400 text-sm font-medium">Active Agents & Metadata</p>
                             </div>
                         </div>
-                        <input type="text" id="transOutletSearch" onkeyup="filterTransactionsClientSide()" placeholder="Filter results by Shop Name..." class="w-full mt-3 bg-transparent border-b border-slate-200 text-xs py-2 outline-none focus:border-primary">
-                    </div>
-
-                    <div class="glass-panel rounded-3xl overflow-hidden border border-white shadow-sm">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="bg-slate-50/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
-                                    <tr>
-                                        <th class="p-4">Timestamp</th>
-                                        <th class="p-4">Staff</th>
-                                        <th class="p-4">Event</th>
-                                        <th class="p-4">Context</th>
-                                        <th class="p-4 text-right">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="trans-table-body" class="divide-y divide-slate-100">
-                                    <tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs italic">Set filters to view history.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        
+                        <ul id="salesmen-list" class="space-y-4 relative z-10 min-h-[200px]">
+                             <li class="flex flex-col items-center justify-center py-10 opacity-50">
+                                <i class="ph ph-circle-notch animate-spin text-3xl text-indigo-400 mb-2"></i>
+                                <span class="text-[10px] font-bold tracking-widest uppercase">Fetching Agents...</span>
+                            </li>
+                        </ul>
                     </div>
                 </div>
-                
+
                 <!-- =======================
                      TAB 8: SALARY
                 ======================== -->
                 <div id="tab-salary" class="tab-content hidden">
-                    <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-[2rem] p-8 text-white mb-6 shadow-2xl relative overflow-hidden">
-                        <div class="absolute right-0 top-0 opacity-10 p-4 transform translate-x-4 -translate-y-4">
-                            <i class="ph ph-receipt text-9xl"></i>
+                    <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-[3rem] p-10 text-white mb-8 shadow-2xl relative overflow-hidden">
+                        <div class="absolute right-0 top-0 opacity-10 p-4 transform translate-x-8 -translate-y-8">
+                            <i class="ph ph-receipt text-[10rem]"></i>
                         </div>
-                        <h2 class="text-2xl font-bold relative z-10">Payroll Generator</h2>
-                        <div class="mt-4 flex flex-col md:flex-row items-start md:items-center gap-4 relative z-10">
-                            <input type="month" id="salaryMonthPicker" class="bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2.5 backdrop-blur-md outline-none focus:ring-2 focus:ring-emerald-400 placeholder-white/50">
-                            <button onclick="generateSalaryReport()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-glow transition-all">Generate Slip</button>
+                        <div class="relative z-10">
+                             <h2 class="text-3xl font-bold">Payroll</h2>
+                             <p class="text-slate-400 mb-6 text-sm">Automated slip generation</p>
+                             
+                             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <input type="month" id="salaryMonthPicker" class="bg-white/10 border border-white/20 text-white rounded-2xl px-5 py-3 backdrop-blur-md outline-none focus:ring-2 focus:ring-emerald-400 placeholder-white/50 text-lg">
+                                <button onclick="generateSalaryReport()" class="bg-emerald-500 hover:bg-emerald-400 text-white px-8 py-3.5 rounded-2xl font-bold shadow-glow transition-all transform hover:-translate-y-0.5 active:translate-y-0">Generate Slip</button>
+                             </div>
                         </div>
                     </div>
 
-                    <div class="glass-panel rounded-3xl overflow-hidden border border-white shadow-glass">
+                    <div class="glass-panel rounded-[2.5rem] overflow-hidden border border-white shadow-glass">
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
-                                <thead class="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+                                <thead class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                     <tr>
-                                        <th class="p-4 text-left">Staff Member</th>
-                                        <th class="p-4 text-center">Work Days</th>
-                                        <th class="p-4 text-center">Paid Leaves</th>
-                                        <th class="p-4 text-right">Base Salary</th>
-                                        <th class="p-4 text-right">Incentive</th>
-                                        <th class="p-4 text-right">Total Payout</th>
+                                        <th class="p-6 text-left">Staff Member</th>
+                                        <th class="p-6 text-center">Working Days</th>
+                                        <th class="p-6 text-center">Paid Leaves</th>
+                                        <th class="p-6 text-right">Base</th>
+                                        <th class="p-6 text-right">Incentive</th>
+                                        <th class="p-6 text-right font-black text-slate-600">Payout</th>
                                     </tr>
                                 </thead>
-                                <tbody id="salary-table-body" class="divide-y divide-slate-100 text-slate-700">
-                                     <tr><td colspan="6" class="p-8 text-center text-slate-400 italic">No report generated yet.</td></tr>
+                                <tbody id="salary-table-body" class="divide-y divide-slate-100 text-slate-700 font-medium">
+                                     <tr><td colspan="6" class="p-10 text-center text-slate-400 italic font-normal">Select a month to compute salaries.</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -696,58 +730,59 @@
             </div>
         </main>
 
-        <!-- FLOATING BOTTOM NAV -->
-        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
-            <nav class="bg-white/80 backdrop-blur-xl border border-white/40 shadow-glass rounded-2xl md:rounded-full px-2 py-3 flex justify-around items-center gap-1 transition-all hover:scale-[1.01] hover:shadow-2xl">
+        <!-- DOCK NAVIGATION (7 Items) -->
+        <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+            <nav class="bg-white/80 backdrop-blur-xl border border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-3xl md:rounded-full px-4 py-2 flex justify-between items-center gap-1 md:gap-4 transition-all hover:scale-[1.01]">
                 
-                <button onclick="switchTab('tab-dashboard')" class="nav-item active flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-squares-four text-xl"></i>
+                <button onclick="switchTab('tab-dashboard')" class="nav-item active p-2 group" title="Dashboard">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-squares-four text-2xl"></i>
                     </div>
                 </button>
 
-                <button onclick="switchTab('tab-outlets')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-storefront text-xl"></i>
+                <button onclick="switchTab('tab-outlets')" class="nav-item p-2 group" title="Outlets">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-storefront text-2xl"></i>
                     </div>
                 </button>
 
-                <button onclick="switchTab('tab-routes')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-path text-xl"></i>
-                    </div>
-                </button>
-
-                <div class="w-px h-8 bg-slate-200/60 mx-1"></div>
-
-                <button onclick="switchTab('tab-products')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-package text-xl"></i>
-                    </div>
-                </button>
-
-                 <button onclick="switchTab('tab-attendance-sheet')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-calendar-check text-xl"></i>
-                    </div>
-                </button>
-
-                <button onclick="switchTab('tab-staff')" class="nav-item flex-1 flex flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary group-hover:bg-slate-50 transition-all">
-                        <i class="ph ph-users text-xl"></i>
+                <button onclick="switchTab('tab-routes')" class="nav-item p-2 group" title="Routes">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-path text-2xl"></i>
                     </div>
                 </button>
                 
-                <!-- Expanded Menu Button (for Transaction/Salary on Mobile) -->
-                 <button onclick="switchTab('tab-transactions')" class="md:hidden nav-item flex-1 flex flex-col items-center gap-1 group">
-                     <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-primary transition-all">
-                        <i class="ph ph-list-dashes text-xl"></i>
-                     </div>
-                 </button>
-                 
-                  <button onclick="switchTab('tab-salary')" class="hidden md:flex nav-item flex-1 flex-col items-center gap-1 group">
-                    <div class="p-2.5 rounded-xl text-slate-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 transition-all">
-                        <i class="ph ph-money text-xl"></i>
+                 <!-- Activity Log (Central) -->
+                 <button onclick="switchTab('tab-transactions')" class="nav-item p-2 group" title="Logs">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-rose-500 bg-transparent group-hover:bg-rose-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-pulse text-2xl"></i>
+                    </div>
+                </button>
+
+                <div class="w-px h-6 bg-slate-300/50 mx-1 hidden md:block"></div>
+
+                <button onclick="switchTab('tab-products')" class="nav-item p-2 group" title="Products">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-package text-2xl"></i>
+                    </div>
+                </button>
+
+                 <button onclick="switchTab('tab-attendance-sheet')" class="nav-item p-2 group hidden sm:block" title="Matrix">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-calendar-check text-2xl"></i>
+                    </div>
+                </button>
+                
+                 <!-- Menu for smaller screens to access rest -->
+                 <button onclick="switchTab('tab-staff')" class="nav-item p-2 group sm:hidden" title="Staff">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-primary bg-transparent group-hover:bg-slate-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-users text-2xl"></i>
+                    </div>
+                </button>
+
+                 <button onclick="switchTab('tab-salary')" class="nav-item p-2 group hidden md:block" title="Payroll">
+                    <div class="p-2.5 rounded-2xl text-slate-400 group-hover:text-emerald-500 bg-transparent group-hover:bg-emerald-50 transition-all flex flex-col items-center">
+                        <i class="ph ph-money text-2xl"></i>
                     </div>
                 </button>
 
@@ -756,63 +791,69 @@
 
     </div>
 
-    <!-- MODAL: Salary Settings -->
+    <!-- MODAL: Salary Config -->
     <div id="salarySettingsModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="document.getElementById('salarySettingsModal').classList.add('hidden')"></div>
-        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-neumorphic transform scale-100 transition-transform relative">
-            <h3 class="text-xl font-bold text-slate-800 mb-2">Compensation Config</h3>
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="document.getElementById('salarySettingsModal').classList.add('hidden')"></div>
+        <div class="glass-panel w-full max-w-sm rounded-[2rem] p-8 shadow-neumorphic transform scale-100 transition-all relative">
+            <h3 class="text-2xl font-bold text-slate-800 mb-1">Config</h3>
             <p id="salaryModalUser" class="text-sm font-semibold text-primary mb-6"></p>
             <input type="hidden" id="salaryEditUid">
             
-            <div class="space-y-4">
+            <div class="space-y-6">
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Daily Base Rate</label>
-                    <div class="relative">
-                        <span class="absolute left-4 top-3.5 text-slate-400 font-bold">₹</span>
-                        <input type="number" id="baseSalaryInput" class="w-full pl-8 pr-4 py-3 bg-white border border-slate-100 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                    <div class="relative group">
+                        <span class="absolute left-4 top-3.5 text-slate-400 font-bold group-focus-within:text-emerald-500 transition-colors">₹</span>
+                        <input type="number" id="baseSalaryInput" class="w-full pl-8 pr-4 py-3 bg-white border border-slate-100 rounded-xl font-bold text-lg text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm transition-all">
                     </div>
                 </div>
                 
                 <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                    <p class="text-xs text-blue-800 leading-relaxed">
-                        <strong class="block mb-1">Logic:</strong>
-                        1. <strong>Present:</strong> 100% Rate<br>
-                        2. <strong>Half-Day:</strong> 50% Rate<br>
-                        3. <strong>Leaves:</strong> 0% (unless specific policy)
-                    </p>
+                    <ul class="text-xs text-blue-800 space-y-1">
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> <b>Present:</b> 100% Rate</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> <b>Half-Day:</b> 50% Rate</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> <b>Absent:</b> 0% Rate</li>
+                    </ul>
                 </div>
 
-                <div class="flex flex-col gap-2 mt-4">
-                    <button onclick="saveSalarySettings()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-transform active:scale-95">
-                        Save Changes
+                <div class="flex flex-col gap-2 pt-2">
+                    <button onclick="saveSalarySettings()" class="w-full bg-slate-800 text-white py-3.5 rounded-xl font-bold shadow-lg hover:bg-black transition-transform active:scale-95">
+                        Update Configuration
                     </button>
-                    <button onclick="document.getElementById('salarySettingsModal').classList.add('hidden')" class="w-full py-3 text-slate-400 text-xs font-bold hover:text-slate-600">Dismiss</button>
+                    <button onclick="document.getElementById('salarySettingsModal').classList.add('hidden')" class="w-full py-3 text-slate-400 text-xs font-bold hover:text-slate-600">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- MAIN LOGIC -->
     <script>
+        // Simple Tab Switcher Logic
         function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('block', 'hidden'));
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('block');
+                el.classList.add('hidden');
+            });
+
+            // Show selected tab
             const target = document.getElementById(tabId);
             if(target) {
                 target.classList.remove('hidden');
                 target.classList.add('block');
             }
 
-            // Button activation
+            // Update Nav State
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             const navBtn = Array.from(document.querySelectorAll('.nav-item'))
                 .find(btn => btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabId));
             if(navBtn) navBtn.classList.add('active');
 
+            // Smooth Scroll top
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     </script>
+    <!-- Connects to external Firebase Logic -->
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
