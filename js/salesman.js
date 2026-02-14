@@ -328,7 +328,6 @@ async function loadRouteOnMap() {
 
     if (!appCache.routeOutlets) return;
 
-    // Define Icons
     const blueIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -346,9 +345,13 @@ async function loadRouteOnMap() {
         if (shop.lat !== 0) {
             const marker = L.marker([shop.lat, shop.lng], {
                 icon: shop.isVisited ? greenIcon : blueIcon
-            })
-            .addTo(routeMapInstance)
-            .bindPopup(`<b>${shop.name}</b><br>${shop.isVisited ? '✅ Done' : '⏳ Pending'}`);
+            }).addTo(routeMapInstance);
+
+            // CHANGED: Instead of a simple popup, we trigger a detailed fetch
+            marker.on('click', () => {
+                openOutletMapDetails(shop.id, shop.name, shop.lat, shop.lng);
+            });
+
             markers.push(marker);
         }
     });
@@ -1660,3 +1663,102 @@ window.openGoogleMapsNavigation = function(lat, lng) {
     // 4. Execute (Opens Native App on Mobile, New Tab on Desktop)
     window.open(url, '_blank');
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async function openOutletMapDetails(outletId, name, lat, lng) {
+    const modal = document.getElementById('mapDetailModal');
+    modal.classList.remove('hidden');
+
+    // UI Initial State
+    document.getElementById('md-shopName').innerText = name;
+    document.getElementById('md-ordersList').innerHTML = "Loading history...";
+    document.getElementById('md-paymentsList').innerHTML = "Loading history...";
+    document.getElementById('md-bestSeller').innerText = "Calculating...";
+
+    // Setup Direction & Visit Buttons
+    document.getElementById('md-navBtn').onclick = () => openGoogleMapsNavigation(lat, lng);
+    document.getElementById('md-visitBtn').onclick = () => {
+        modal.classList.add('hidden');
+        openVisitPanel(outletId, name, lat, lng);
+    };
+
+    try {
+        // 1. Fetch Outlet Doc (Balance/Type)
+        const outletSnap = await getDoc(doc(db, "outlets", outletId));
+        const outletData = outletSnap.data();
+        document.getElementById('md-shopType').innerText = outletData.outletType || 'Shop';
+        document.getElementById('md-balance').innerText = `₹${(outletData.currentBalance || 0).toFixed(2)}`;
+
+        // 2. Fetch Last 5 Orders
+        const orderQ = query(collection(db, "orders"), where("outletId", "==", outletId), orderBy("orderDate", "desc"), limit(5));
+        const orderSnap = await getDocs(orderQ);
+        
+        // 3. Fetch Last 5 Payments
+        const payQ = query(collection(db, "payments"), where("outletId", "==", outletId), orderBy("date", "desc"), limit(5));
+        const paySnap = await getDocs(payQ);
+
+        // Render Orders & Calculate Best Seller
+        let orderHtml = "";
+        let productCounts = {};
+        
+        if(orderSnap.empty) orderHtml = "<p class='text-slate-400'>No previous orders</p>";
+        orderSnap.forEach(d => {
+            const ord = d.data();
+            const date = ord.orderDate.toDate().toLocaleDateString();
+            orderHtml += `
+                <div class="flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <span>${date}</span>
+                    <span class="font-bold text-slate-700">₹${ord.financials.totalAmount}</span>
+                </div>`;
+            
+            // Tally products for Best Seller
+            ord.items.forEach(item => {
+                productCounts[item.name] = (productCounts[item.name] || 0) + item.qty;
+            });
+        });
+        document.getElementById('md-ordersList').innerHTML = orderHtml;
+
+        // Determine Best Seller
+        const bestSeller = Object.keys(productCounts).reduce((a, b) => productCounts[a] > productCounts[b] ? a : b, "None");
+        document.getElementById('md-bestSeller').innerText = bestSeller;
+
+        // Render Payments
+        let payHtml = "";
+        if(paySnap.empty) payHtml = "<p class='text-slate-400'>No previous payments</p>";
+        paySnap.forEach(d => {
+            const pay = d.data();
+            const date = pay.date.toDate().toLocaleDateString();
+            const statusColor = pay.status === 'approved' ? 'text-emerald-600' : 'text-orange-500';
+            payHtml += `
+                <div class="flex justify-between bg-emerald-50/50 p-2 rounded-lg border border-emerald-100">
+                    <span>${date} (${pay.method})</span>
+                    <span class="font-bold ${statusColor}">₹${pay.amount}</span>
+                </div>`;
+        });
+        document.getElementById('md-paymentsList').innerHTML = payHtml;
+
+    } catch (e) {
+        console.error("Detail Fetch Error:", e);
+        alert("Error loading outlet history. Check Firestore Indexes.");
+    }
+}
