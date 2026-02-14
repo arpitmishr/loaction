@@ -655,30 +655,10 @@ window.toggleOutletStatus = async function(id, newStatus) {
 
 
 // ==========================================
-//      CORRECTED ROUTE MANAGEMENT LOGIC
+//      ULTIMATE FIXED ROUTE MANAGEMENT
 // ==========================================
 
-// 1. Populate Salesman Dropdown
-async function populateSalesmanDropdown() {
-    const select = document.getElementById('routeSalesmanSelect');
-    if (!select) return;
-    
-    try {
-        const q = query(collection(db, "users"), where("role", "==", "salesman"));
-        const snap = await getDocs(q);
-        select.innerHTML = '<option value="">Select Salesman</option>';
-        
-        snap.forEach(doc => {
-            const d = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id; 
-            option.textContent = d.fullName || d.email;
-            select.appendChild(option);
-        });
-    } catch (e) { console.error(e); }
-}
-
-// 2. Load Existing Routes
+// 1. Load Existing Routes into the Sidebar
 async function loadRoutes() {
     const list = document.getElementById('routes-list-group');
     if (!list) return;
@@ -688,7 +668,10 @@ async function loadRoutes() {
         const snap = await getDocs(q);
         list.innerHTML = "";
 
-        if (snap.empty) { list.innerHTML = "<li class='p-5 text-center text-slate-400'>No routes.</li>"; return; }
+        if (snap.empty) { 
+            list.innerHTML = "<li class='p-5 text-center text-slate-400'>No routes found.</li>"; 
+            return; 
+        }
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
@@ -696,7 +679,8 @@ async function loadRoutes() {
             
             const li = document.createElement('li');
             li.className = `p-4 hover:bg-slate-50 cursor-pointer transition flex justify-between items-center ${isRest ? 'opacity-60 bg-slate-50' : ''}`;
-            // Set the click handler
+            
+            // Explicitly use window. here
             li.onclick = () => window.selectRoute(docSnap.id, data.name);
             
             li.innerHTML = `
@@ -710,10 +694,10 @@ async function loadRoutes() {
             `;
             list.appendChild(li);
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error loading sidebar routes:", e); }
 }
 
-// 3. Select Route (ATTACH TO WINDOW)
+// 2. Select a route to edit (Attached to Window)
 window.selectRoute = async function(routeId, routeName) {
     document.getElementById('selectedRouteId').value = routeId;
     document.getElementById('selectedRouteName').innerText = routeName;
@@ -722,8 +706,10 @@ window.selectRoute = async function(routeId, routeName) {
     
     try {
         const routeDoc = await getDoc(doc(db, "routes", routeId));
+        if (!routeDoc.exists()) return;
         const routeData = routeDoc.data();
 
+        // Populate Salesman Reassignment Dropdown
         const salesmanSelect = document.getElementById('editRouteSalesman');
         const userSnap = await getDocs(query(collection(db, "users"), where("role", "==", "salesman")));
         salesmanSelect.innerHTML = "";
@@ -735,17 +721,19 @@ window.selectRoute = async function(routeId, routeName) {
             salesmanSelect.appendChild(opt);
         });
 
+        // Set Rest/Active status
         document.getElementById('editRouteStatus').value = routeData.status || "active";
 
-        // Call the load function
+        // IMPORTANT: Call using window.
         window.loadRouteOutlets(routeId);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error selecting route:", e); }
 };
 
-// 4. Load Route Outlets (ATTACH TO WINDOW)
+// 3. Load Shops belonging to a route (Attached to Window)
 window.loadRouteOutlets = async function(routeId) {
     const tbody = document.getElementById('route-outlets-list');
-    tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Loading...</td></tr>';
+    if(!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Loading stops...</td></tr>';
 
     try {
         const q = query(
@@ -757,18 +745,18 @@ window.loadRouteOutlets = async function(routeId) {
         
         tbody.innerHTML = "";
         if (snap.empty) { 
-            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-400">No outlets in this route.</td></tr>'; 
+            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-400 italic">Route is empty. Add outlets below.</td></tr>'; 
             return; 
         }
 
         snap.forEach(docSnap => {
             const d = docSnap.data();
             tbody.innerHTML += `
-                <tr class="border-b border-slate-50">
-                    <td class="p-3 text-center font-bold text-slate-400">${d.sequence}</td>
-                    <td class="p-3 font-medium text-slate-700">${d.outletName}</td>
+                <tr class="border-b border-slate-50 hover:bg-slate-50/50">
+                    <td class="p-3 text-center font-bold text-slate-300 text-xs">${d.sequence}</td>
+                    <td class="p-3 font-medium text-slate-700 text-sm">${d.outletName}</td>
                     <td class="p-3 text-right">
-                        <button onclick="window.removeOutletFromRoute('${docSnap.id}')" class="text-red-400 hover:text-red-600 transition">
+                        <button onclick="window.removeOutletFromRoute('${docSnap.id}')" class="text-red-400 hover:text-red-600 transition p-1">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                     </td>
@@ -776,21 +764,28 @@ window.loadRouteOutlets = async function(routeId) {
             `;
         });
     } catch (e) { 
-        console.error(e); 
-        tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-red-500">Error loading outlets.</td></tr>';
+        console.error("Error loading route outlets:", e);
+        tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-red-500">Failed to load shops. Check Index.</td></tr>';
     }
 };
 
-// 5. Add Outlet to Route (ATTACH TO WINDOW)
+// 4. Add Shop to the selected route (Attached to Window)
 window.addOutletToRoute = async function() {
     const routeId = document.getElementById('selectedRouteId').value;
     const select = document.getElementById('allOutletsDropdown');
     const outletId = select.value;
-    const outletName = select.options[select.selectedIndex]?.dataset.name;
+    
+    // Safety check for selected option
+    const selectedOpt = select.options[select.selectedIndex];
+    const outletName = selectedOpt ? selectedOpt.dataset.name : null;
 
-    if (!routeId || !outletId) return alert("Select a route and an outlet.");
+    if (!routeId || !outletId) {
+        alert("Please select a route first and then choose an outlet.");
+        return;
+    }
 
     try {
+        // Get count to determine next sequence number
         const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId));
         const snap = await getDocs(q);
         const nextSeq = snap.size + 1;
@@ -798,24 +793,31 @@ window.addOutletToRoute = async function() {
         await addDoc(collection(db, "route_outlets"), {
             routeId: routeId,
             outletId: outletId,
-            outletName: outletName,
+            outletName: outletName || "Unknown Shop",
             sequence: nextSeq
         });
 
+        // IMPORTANT: Call using window.
         window.loadRouteOutlets(routeId); 
-    } catch (e) { alert("Error adding outlet."); }
+        select.value = ""; // Reset dropdown
+    } catch (e) { 
+        console.error("Error adding to route:", e);
+        alert("Error adding outlet. Check your internet or Firestore Index."); 
+    }
 };
 
-// 6. Remove Outlet (ATTACH TO WINDOW)
+// 5. Remove Shop from route (Attached to Window)
 window.removeOutletFromRoute = async function(docId) {
-    if(!confirm("Remove from route?")) return;
+    if(!confirm("Remove this stop from the route?")) return;
+    const routeId = document.getElementById('selectedRouteId').value;
     try {
         await deleteDoc(doc(db, "route_outlets", docId));
-        window.loadRouteOutlets(document.getElementById('selectedRouteId').value);
-    } catch (e) { console.error(e); }
+        // Refresh using window.
+        window.loadRouteOutlets(routeId);
+    } catch (e) { console.error("Error removing outlet:", e); }
 };
 
-// 7. Save Settings (ATTACH TO WINDOW)
+// 6. Save Route Settings (Salesman/Rest mode)
 window.saveRouteSettings = async function() {
     const routeId = document.getElementById('selectedRouteId').value;
     const newSalesmanId = document.getElementById('editRouteSalesman').value;
@@ -829,9 +831,9 @@ window.saveRouteSettings = async function() {
             status: newStatus,
             updatedAt: serverTimestamp()
         });
-        alert("✅ Route settings updated!");
-        loadRoutes(); 
-    } catch (e) { alert("Error: " + e.message); }
+        alert("✅ Route settings saved!");
+        loadRoutes(); // Refresh left sidebar list
+    } catch (e) { alert("Error updating settings: " + e.message); }
 };
 
 
