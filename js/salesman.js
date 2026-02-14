@@ -153,46 +153,123 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 });
 
 
+
+
+
+
+// --- MULTI-ROUTE SWITCHER ---
+window.switchRoute = function(newRouteId) {
+    // 1. SECURITY GUARD: Prevent switching if visit is active
+    if (currentVisitId) {
+        // Reset dropdown to previous value
+        if(appCache.route) document.getElementById('route-selector').value = appCache.route.id;
+        alert("⚠️ Active Visit in Progress!\n\nYou cannot switch routes while inside a shop.\nPlease 'End Visit' first.");
+        return;
+    }
+
+    // 2. Find data in cache
+    const selectedRoute = appCache.allAssignedRoutes.find(r => r.id === newRouteId);
+    if (!selectedRoute) return;
+
+    // 3. Update Current Cache
+    appCache.route = selectedRoute; // Set as active
+    
+    // 4. Reset UI
+    console.log("🔄 Switching to Route:", selectedRoute.name);
+    
+    // Clear the shops list first to show loading state
+    document.getElementById('shops-list').innerHTML = "<li style='padding:15px; text-align:center;'>Loading stops...</li>";
+    
+    // Load new shops
+    loadShops(selectedRoute.id);
+    
+    // Refresh Map if active
+    if(document.getElementById('map-view').classList.contains('hidden') === false) {
+        loadRouteOnMap();
+    }
+};
+
+
+
+
+
+
+
+
+
 // --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
+// --- UPDATED LOAD ROUTE (HANDLES MULTIPLE ROUTES) ---
 async function loadAssignedRoute(uid) {
-    const routeNameEl = document.getElementById('route-name');
-    const shopsListEl = document.getElementById('shops-list');
+    const nameEl = document.getElementById('route-name');
+    const selectEl = document.getElementById('route-selector');
+    const listEl = document.getElementById('shops-list');
 
     try {
-        // 1. Check Cache for Route Metadata
-        if (appCache.route) {
-            console.log("⚡ Loaded Route from Cache");
-            routeNameEl.innerText = appCache.route.name;
-            loadShops(appCache.route.id); // Pass ID to next function
-            return;
-        }
-
-        // 2. Network Fetch
-        console.log("🌐 Fetching Route from Firestore...");
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
-        const routeSnap = await getDocs(q);
-
-        if (routeSnap.empty) {
-            routeNameEl.innerText = "No Route Assigned";
-            shopsListEl.innerHTML = "<li style='padding:15px; color:orange;'>Contact Admin to assign a route.</li>";
-            return;
-        }
-
-        const routeDoc = routeSnap.docs[0];
-        const routeData = routeDoc.data();
+        console.log("🌐 Fetching Routes...");
         
-        // 3. Save to Cache
-        appCache.route = { id: routeDoc.id, ...routeData };
+        // 1. Fetch ALL routes for this salesman
+        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        const snap = await getDocs(q);
 
-        routeNameEl.innerText = routeData.name;
-        loadShops(routeDoc.id);
+        if (snap.empty) {
+            nameEl.innerText = "No Route Assigned";
+            nameEl.classList.remove('hidden');
+            selectEl.classList.add('hidden');
+            listEl.innerHTML = "<li style='padding:15px; color:orange; text-align:center;'>Contact Admin to assign a route.</li>";
+            return;
+        }
+
+        // 2. Prepare Data
+        const routes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        appCache.allAssignedRoutes = routes; // Store all in cache
+
+        // 3. UI Logic
+        if (routes.length === 1) {
+            // SCENARIO A: Single Route (Standard)
+            const r = routes[0];
+            appCache.route = r; // Set active
+            
+            nameEl.innerText = r.name;
+            nameEl.classList.remove('hidden');
+            selectEl.classList.add('hidden');
+            
+            loadShops(r.id);
+        } else {
+            // SCENARIO B: Multiple Routes (Dropdown)
+            nameEl.classList.add('hidden'); // Hide text title
+            selectEl.classList.remove('hidden'); // Show dropdown
+            
+            // Populate Options
+            selectEl.innerHTML = "";
+            routes.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.id;
+                opt.textContent = r.name;
+                selectEl.appendChild(opt);
+            });
+
+            // Auto-select the first one (or the last one they used if we cached it, but let's keep it simple)
+            appCache.route = routes[0];
+            selectEl.value = routes[0].id;
+            
+            loadShops(routes[0].id);
+        }
 
     } catch (error) {
         console.error("Load Route Error:", error);
-        routeNameEl.innerText = "Error Loading Route";
+        nameEl.innerText = "Error Loading";
     }
 }
+
+
+
+
+
+
+
+
+
 
 async function loadShops(routeId) {
     const list = document.getElementById('shops-list');
