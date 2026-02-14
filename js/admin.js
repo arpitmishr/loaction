@@ -692,18 +692,12 @@ if (createRouteForm) {
 }
 
 // 3. Load Existing Routes
-// --- LOAD ROUTES (LIMITED) ---
 async function loadRoutes() {
     const list = document.getElementById('routes-list-group');
     if (!list) return;
 
     try {
-        // OPTIMIZATION: Limit to 20
-        const q = query(
-            collection(db, "routes"), 
-            orderBy("createdAt", "desc"), 
-            limit(20)
-        );
+        const q = query(collection(db, "routes"), orderBy("createdAt", "desc"));
         const snap = await getDocs(q);
         list.innerHTML = "";
 
@@ -711,24 +705,60 @@ async function loadRoutes() {
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
+            const id = docSnap.id;
+            const isSleep = data.status === 'sleep';
+            
             const li = document.createElement('li');
-            li.style.padding = "10px";
-            li.style.borderBottom = "1px solid #eee";
-            li.style.cursor = "pointer";
-            li.style.display = "flex";
-            li.style.justifyContent = "space-between";
+            li.className = `p-4 border-b border-slate-100 transition-colors ${isSleep ? 'bg-slate-50 opacity-75' : 'bg-white'}`;
+            
             li.innerHTML = `
-                <span>
-                    <strong>${data.name}</strong><br>
-                    <small style="color:#666">Salesman ID: ${data.assignedSalesmanId.slice(0,5)}...</small>
-                </span>
-                <button onclick="selectRoute('${docSnap.id}', '${data.name}')" style="font-size:0.8rem;">Config</button>
+                <div class="flex justify-between items-start mb-2">
+                    <div onclick="selectRoute('${id}', '${data.name}')" class="cursor-pointer">
+                        <strong class="text-slate-800">${data.name}</strong>
+                        <div class="text-[10px] ${isSleep ? 'text-red-500' : 'text-green-500'} font-bold uppercase">
+                            ${isSleep ? '● Sleep Mode' : '● Active'}
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="toggleRouteStatus('${id}', '${isSleep ? 'active' : 'sleep'}')" 
+                                class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100" title="Toggle Sleep/Active">
+                            <span class="material-icons-round text-sm">${isSleep ? 'play_arrow' : 'pause'}</span>
+                        </button>
+                        <button onclick="selectRoute('${id}', '${data.name}')" class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <span class="material-icons-round text-sm">settings</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="space-y-2 mt-3">
+                    <label class="text-[9px] font-bold text-slate-400 uppercase">Assigned To</label>
+                    <select onchange="changeRouteSalesman('${id}', this.value)" class="w-full text-xs p-1.5 bg-white border border-slate-200 rounded-md">
+                        ${generateSalesmanOptions(data.assignedSalesmanId)}
+                    </select>
+                </div>
+
+                <div class="mt-2 text-[10px] text-slate-500">
+                    Last Route Activity: <span class="font-bold text-slate-700">${data.lastVisitDate || 'Never'}</span>
+                </div>
             `;
             list.appendChild(li);
         });
     } catch (e) { console.error(e); }
 }
 
+
+function generateSalesmanOptions(currentId) {
+    // This assumes you have global salesman data or we fetch it
+    let options = `<option value="">Unassigned</option>`;
+    const select = document.getElementById('routeSalesmanSelect'); // borrowing from your existing dropdown
+    if(select) {
+        Array.from(select.options).forEach(opt => {
+            if(!opt.value) return;
+            options += `<option value="${opt.value}" ${opt.value === currentId ? 'selected' : ''}>${opt.text}</option>`;
+        });
+    }
+    return options;
+}
 
 
 
@@ -2137,4 +2167,44 @@ window.deleteOutlet = async function(id, name) {
         console.error("Delete Error:", error);
         alert("Error deleting: " + error.message);
     }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// --- NEW ROUTE MANAGEMENT ACTIONS ---
+
+window.toggleRouteStatus = async function(routeId, newStatus) {
+    try {
+        await updateDoc(doc(db, "routes", routeId), { status: newStatus });
+        loadRoutes();
+    } catch (e) { alert("Error: " + e.message); }
+};
+
+window.changeRouteSalesman = async function(routeId, newSalesmanId) {
+    try {
+        await updateDoc(doc(db, "routes", routeId), { assignedSalesmanId: newSalesmanId });
+        alert("Salesman reassigned for this route.");
+        loadRoutes();
+    } catch (e) { alert("Error: " + e.message); }
 };
