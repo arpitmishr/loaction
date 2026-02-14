@@ -692,46 +692,43 @@ if (createRouteForm) {
 }
 
 // 3. Load Existing Routes
-// --- LOAD ROUTES (UPDATED: WITH EDIT BUTTON) ---
+// --- LOAD ROUTES (LIMITED) ---
 async function loadRoutes() {
     const list = document.getElementById('routes-list-group');
     if (!list) return;
 
     try {
-        const q = query(collection(db, "routes"), orderBy("createdAt", "desc"), limit(50));
+        // OPTIMIZATION: Limit to 20
+        const q = query(
+            collection(db, "routes"), 
+            orderBy("createdAt", "desc"), 
+            limit(20)
+        );
         const snap = await getDocs(q);
         list.innerHTML = "";
 
-        if (snap.empty) { list.innerHTML = "<li class='p-4 text-center text-slate-400'>No routes found.</li>"; return; }
+        if (snap.empty) { list.innerHTML = "<li>No routes found.</li>"; return; }
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
             const li = document.createElement('li');
-            li.className = "p-4 border-b border-slate-100 hover:bg-slate-50 transition flex justify-between items-center";
-            
+            li.style.padding = "10px";
+            li.style.borderBottom = "1px solid #eee";
+            li.style.cursor = "pointer";
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
             li.innerHTML = `
-                <div>
-                    <strong class="text-slate-700">${data.name}</strong><br>
-                    <small class="text-slate-400">Salesman ID: ${data.assignedSalesmanId ? data.assignedSalesmanId.slice(0,5) + '...' : 'Unassigned'}</small>
-                </div>
-                <div class="flex gap-2">
-                    <!-- EDIT BUTTON -->
-                    <button onclick="editRouteMetadata('${docSnap.id}', '${data.name}', '${data.assignedSalesmanId}')" 
-                            class="p-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100" title="Edit Route Details">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    </button>
-                    
-                    <!-- CONFIG BUTTON -->
-                    <button onclick="selectRoute('${docSnap.id}', '${data.name}')" 
-                            class="px-3 py-2 text-xs font-bold text-white bg-slate-800 rounded-lg hover:bg-slate-900 shadow-sm">
-                        Manage Stops
-                    </button>
-                </div>
+                <span>
+                    <strong>${data.name}</strong><br>
+                    <small style="color:#666">Salesman ID: ${data.assignedSalesmanId.slice(0,5)}...</small>
+                </span>
+                <button onclick="selectRoute('${docSnap.id}', '${data.name}')" style="font-size:0.8rem;">Config</button>
             `;
             list.appendChild(li);
         });
     } catch (e) { console.error(e); }
 }
+
 
 
 
@@ -2141,91 +2138,3 @@ window.deleteOutlet = async function(id, name) {
         alert("Error deleting: " + error.message);
     }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// --- NEW: EDIT ROUTE METADATA ---
-let editingRouteId = null; // Global variable to track edit state
-
-window.editRouteMetadata = function(id, name, salesmanId) {
-    // 1. Scroll to form
-    document.getElementById('createRouteForm').scrollIntoView({ behavior: 'smooth' });
-    
-    // 2. Populate fields
-    document.getElementById('routeNameInput').value = name;
-    document.getElementById('routeSalesmanSelect').value = salesmanId;
-    
-    // 3. Change Button UI
-    const btn = document.querySelector('#createRouteForm button');
-    btn.innerText = "Update Route Details";
-    btn.classList.remove('bg-primary');
-    btn.classList.add('bg-orange-500', 'hover:bg-orange-600');
-    
-    // 4. Set state
-    editingRouteId = id;
-};
-
-// --- UPDATED: FORM SUBMIT HANDLER ---
-// Replace your existing 'createRouteForm' listener with this:
-const createRouteForm = document.getElementById('createRouteForm');
-if (createRouteForm) {
-    createRouteForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('routeNameInput').value;
-        const salesmanId = document.getElementById('routeSalesmanSelect').value;
-        const btn = e.target.querySelector('button');
-
-        if (!name || !salesmanId) return alert("Fill all fields");
-
-        btn.disabled = true;
-        
-        try {
-            if (editingRouteId) {
-                // UPDATE MODE
-                await updateDoc(doc(db, "routes", editingRouteId), {
-                    name: name,
-                    assignedSalesmanId: salesmanId
-                });
-                alert("✅ Route Updated!");
-                
-                // Reset UI state
-                editingRouteId = null;
-                btn.innerText = "Add Route";
-                btn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
-                btn.classList.add('bg-primary');
-            } else {
-                // CREATE MODE
-                await addDoc(collection(db, "routes"), {
-                    name: name,
-                    assignedSalesmanId: salesmanId,
-                    createdAt: serverTimestamp(),
-                    active: true
-                });
-                alert("✅ Route Created!");
-            }
-
-            // Cleanup
-            document.getElementById('routeNameInput').value = "";
-            document.getElementById('routeSalesmanSelect').value = "";
-            loadRoutes(); // Refresh list
-
-        } catch (error) {
-            alert("Error: " + error.message);
-        } finally {
-            btn.disabled = false;
-        }
-    });
-}
