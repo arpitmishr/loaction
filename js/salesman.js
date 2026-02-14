@@ -161,115 +161,99 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 // --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
+// Updated: Fetches all routes assigned to the salesman
 async function loadAssignedRoute(uid) {
     const routeNameEl = document.getElementById('route-name');
     const shopsListEl = document.getElementById('shops-list');
 
     try {
-        // 1. Check Cache for Route Metadata
-        if (appCache.route) {
-            console.log("⚡ Loaded Route from Cache");
-            routeNameEl.innerText = appCache.route.name;
-            loadShops(appCache.route.id); // Pass ID to next function
-            return;
-        }
-
-        // 2. Network Fetch
-        console.log("🌐 Fetching Route from Firestore...");
+        // 1. Fetch all routes where assignedSalesmanId matches
         const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
         const routeSnap = await getDocs(q);
 
         if (routeSnap.empty) {
-            routeNameEl.innerText = "No Route Assigned";
-            shopsListEl.innerHTML = "<li style='padding:15px; color:orange;'>Contact Admin to assign a route.</li>";
+            routeNameEl.innerText = "No Routes Assigned";
+            shopsListEl.innerHTML = "<li class='p-5 text-orange-500'>No routes assigned yet.</li>";
             return;
         }
 
-        const routeDoc = routeSnap.docs[0];
-        const routeData = routeDoc.data();
-        
-        // 3. Save to Cache
-        appCache.route = { id: routeDoc.id, ...routeData };
-
-        routeNameEl.innerText = routeData.name;
-        loadShops(routeDoc.id);
-
-    } catch (error) {
-        console.error("Load Route Error:", error);
-        routeNameEl.innerText = "Error Loading Route";
-    }
-}
-
-async function loadShops(routeId) {
-    const list = document.getElementById('shops-list');
-    
-    // 1. Fetch Today's Visits (To mark them green)
-    // We do this every time to keep the "Visited" status fresh
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const todayTs = Timestamp.fromDate(today);
-    
-    let visitedSet = new Set();
-    
-    try {
-        const visitQ = query(
-            collection(db, "visits"), 
-            where("salesmanId", "==", auth.currentUser.uid),
-            where("checkInTime", ">=", todayTs)
-        );
-        const visitSnap = await getDocs(visitQ);
-        visitSnap.forEach(doc => visitedSet.add(doc.data().outletId));
-    } catch(e) { console.error("Error fetching daily visits:", e); }
-
-    // 2. Check Cache for Outlets List (Heavy Data)
-    if (appCache.routeOutlets) {
-        console.log("⚡ Loaded Shops from Cache");
-        renderShopsList(appCache.routeOutlets, visitedSet); // Pass visitedSet
-        return;
-    }
-
-    // 3. Network Fetch (If not cached)
-    console.log("🌐 Fetching Outlets from Firestore...");
-    const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId), orderBy("sequence", "asc"));
-    
-    try {
-        const snap = await getDocs(q);
-        
-        if(snap.empty) { 
-            list.innerHTML = "<li style='padding:15px;'>No shops in this route.</li>"; 
-            return; 
-        }
-
-        // Process & Merge Data
-        const outletPromises = snap.docs.map(async (docSnap) => {
-            const linkData = docSnap.data();
-            const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
-            if (!outletDoc.exists()) return null;
-            const outletData = outletDoc.data();
-            
-            return {
-                id: linkData.outletId,
-                name: linkData.outletName,
-                sequence: linkData.sequence,
-                lat: outletData.geo ? outletData.geo.lat : 0,
-                lng: outletData.geo ? outletData.geo.lng : 0,
-                fullData: outletData 
-            };
+        // 2. Store all route IDs in an array
+        const routes = [];
+        routeSnap.forEach(doc => {
+            routes.push({ id: doc.id, ...doc.data() });
         });
 
-        const results = await Promise.all(outletPromises);
-        const validShops = results.filter(s => s !== null);
+        // 3. Update UI to show multiple route names
+        const names = routes.map(r => r.name).join(", ");
+        routeNameEl.innerText = names;
 
-        // Save to Cache
-        appCache.routeOutlets = validShops;
+        // 4. Cache the array of routes
+        appCache.routes = routes; 
 
-        // Render
-        renderShopsList(validShops, visitedSet); // Pass visitedSet
+        // 5. Load all shops from all these routes
+        loadAllAssignedShops(routes);
 
     } catch (error) {
-        console.error("Load Shops Error:", error);
+        console.error("Load Routes Error:", error);
     }
 }
+
+
+
+
+
+
+// Updated: Merges shops from all assigned routes into one list
+async function loadAllAssignedShops(routes) {
+    const list = document.getElementById('shops-list');
+    const routeIds = routes.map(r => r.id);
+    
+    try {
+        // 1. Fetch today's visits to keep the "green" checkmark logic
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const visitedSet = new Set();
+        const visitQ = query(collection(db, "visits"), where("salesmanId", "==", auth.currentUser.uid), where("checkInTime", ">=", Timestamp.fromDate(today)));
+        const vSnap = await getDocs(visitQ);
+        vSnap.forEach(doc => visitedSet.add(doc.data().outletId));
+
+        // 2. Fetch all shops linked to any of these routes
+        let allRouteOutlets = [];
+        for (const rId of routeIds) {
+            const q = query(collection(db, "route_outlets"), where("routeId", "==", rId));
+            const snap = await getDocs(q);
+            snap.forEach(d => allRouteOutlets.push(d.data()));
+        }
+
+        // 3. Fetch unique shop details
+        const uniqueOutletIds = [...new Set(allRouteOutlets.map(item => item.outletId))];
+        const mergedShops = [];
+
+        for (const oId of uniqueOutletIds) {
+            const outletDoc = await getDoc(doc(db, "outlets", oId));
+            if (outletDoc.exists()) {
+                const data = outletDoc.data();
+                mergedShops.push({
+                    id: oId,
+                    name: data.shopName,
+                    lat: data.geo?.lat || 0,
+                    lng: data.geo?.lng || 0,
+                    sequence: 0 // In multi-route, sequence is secondary
+                });
+            }
+        }
+
+        appCache.routeOutlets = mergedShops; // Update cache
+        renderShopsList(mergedShops, visitedSet); // Use your existing render function
+
+    } catch (error) {
+        console.error("Merge Shops Error:", error);
+    }
+}
+
+
+
+
 
 // --- UPDATED RENDER LIST WITH NAVIGATION BUTTON ---
 function renderShopsList(shops, visitedSet = new Set()) {
@@ -348,84 +332,32 @@ function renderShopsList(shops, visitedSet = new Set()) {
 
 let routeMapInstance = null; // Separate variable to avoid conflict with visit map
 
+// Updated: Plots shops from ALL assigned routes on one map
 async function loadRouteOnMap() {
-    console.log("Loading Route Map...");
-    
-    // 1. Initialize Map (Leaflet)
-    // We check if it exists to avoid "Map container is already initialized" error
-    if (routeMapInstance) {
-        routeMapInstance.remove();
-    }
-    
-    // Default center (will change later)
+    if (routeMapInstance) routeMapInstance.remove();
     routeMapInstance = L.map('routeMap').setView([20.5937, 78.9629], 5); 
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMapInstance);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(routeMapInstance);
+    if (!appCache.routes || appCache.routes.length === 0) return;
 
-    // 2. Get Current User ID
-    const uid = auth.currentUser.uid;
-    const markers = []; // To store marker objects for auto-zooming
-
+    const markers = [];
     try {
-        // 3. Fetch Assigned Route
-        const routeQ = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
-        const routeSnap = await getDocs(routeQ);
-
-        if (routeSnap.empty) {
-            alert("No route assigned to you.");
-            return;
-        }
-
-        const routeId = routeSnap.docs[0].id;
-
-        // 4. Fetch Route Outlets (Sequence)
-        const roQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId));
-        const roSnap = await getDocs(roQ);
-
-        if (roSnap.empty) return;
-
-        // 5. Loop through assigned outlets and fetch their REAL GPS data
-        // We use Promise.all to fetch all outlets in parallel (Faster than await in loop)
-        const outletPromises = roSnap.docs.map(async (docSnap) => {
-            const linkData = docSnap.data();
-            const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
-            
-            if (outletDoc.exists()) {
-                const outData = outletDoc.data();
-                if (outData.geo && outData.geo.lat && outData.geo.lng) {
-                    return {
-                        name: outData.shopName,
-                        lat: outData.geo.lat,
-                        lng: outData.geo.lng,
-                        seq: linkData.sequence
-                    };
-                }
+        // Loop through the shops we already merged in loadAllAssignedShops
+        appCache.routeOutlets.forEach(shop => {
+            if (shop.lat !== 0) {
+                const marker = L.marker([shop.lat, shop.lng])
+                    .addTo(routeMapInstance)
+                    .bindPopup(`<b>${shop.name}</b>`);
+                markers.push(marker);
             }
-            return null; // Skip if no geo or deleted
         });
 
-        const validOutlets = (await Promise.all(outletPromises)).filter(o => o !== null);
-
-        // 6. Plot Markers
-        validOutlets.forEach(shop => {
-            const marker = L.marker([shop.lat, shop.lng])
-                .addTo(routeMapInstance)
-                .bindPopup(`<b>${shop.seq}. ${shop.name}</b>`);
-            
-            markers.push(marker);
-        });
-
-        // 7. Auto-Fit Map to show all markers
         if (markers.length > 0) {
             const group = new L.featureGroup(markers);
-            routeMapInstance.fitBounds(group.getBounds().pad(0.1)); // pad(0.1) adds a little breathing room
+            routeMapInstance.fitBounds(group.getBounds().pad(0.1));
         }
-
     } catch (error) {
-        console.error("Map Load Error:", error);
-        alert("Error loading map data.");
+        console.error("Map Merge Error:", error);
     }
 }
 
