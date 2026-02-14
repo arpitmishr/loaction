@@ -186,15 +186,23 @@
                     </div>
                 </div>
 
-                <!-- Route Info -->
-                <div class="bg-white rounded-3xl p-5 border border-slate-100 shadow-soft mb-6 relative overflow-hidden group">
-                     <div class="absolute right-0 top-0 h-full w-1 bg-indigo-500"></div>
-                     <p class="text-indigo-500 text-[10px] uppercase font-bold tracking-widest mb-1">Current Route</p>
-                     <div class="flex items-center justify-between">
-                         <h2 id="route-name" class="text-xl font-bold text-slate-800">Loading...</h2>
-                         <span class="material-icons-round text-slate-300 text-4xl -my-2 group-hover:text-indigo-100 transition-colors">map</span>
-                     </div>
-                </div>
+               <!-- Route Info (UPDATED FOR MULTIPLE ROUTES) -->
+<div class="bg-white rounded-3xl p-5 border border-slate-100 shadow-soft mb-6 relative overflow-hidden group">
+     <div class="absolute right-0 top-0 h-full w-1 bg-indigo-500"></div>
+     <p class="text-indigo-500 text-[10px] uppercase font-bold tracking-widest mb-1">Current Route</p>
+     
+     <div class="flex items-center justify-between">
+         <!-- Default Display (Single Route) -->
+         <h2 id="route-name" class="text-xl font-bold text-slate-800 truncate pr-2">Loading...</h2>
+         
+         <!-- Dropdown Selector (Hidden by default, shown if >1 route) -->
+         <select id="route-selector" onchange="switchRoute(this.value)" class="hidden w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 outline-none font-bold">
+            <!-- Options populated by JS -->
+         </select>
+
+         <span class="material-icons-round text-slate-300 text-4xl -my-2 group-hover:text-indigo-100 transition-colors ml-2">map</span>
+     </div>
+</div>
 
                 <!-- Shops List Header -->
                 <div class="flex items-center justify-between mb-3 px-1">
