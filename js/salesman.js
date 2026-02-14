@@ -161,63 +161,55 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 // --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
-// Updated: Fetches all routes assigned to the salesman
+// Updated: Fetches ALL routes assigned to salesman (ignoring Sleep ones)
 async function loadAssignedRoute(uid) {
     const routeNameEl = document.getElementById('route-name');
     const shopsListEl = document.getElementById('shops-list');
 
     try {
-        // 1. Fetch all routes where assignedSalesmanId matches
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        // Query for routes assigned to this UID that are NOT in sleep mode
+        const q = query(
+            collection(db, "routes"), 
+            where("assignedSalesmanId", "==", uid),
+            where("status", "==", "active")
+        );
         const routeSnap = await getDocs(q);
 
         if (routeSnap.empty) {
-            routeNameEl.innerText = "No Routes Assigned";
-            shopsListEl.innerHTML = "<li class='p-5 text-orange-500'>No routes assigned yet.</li>";
+            routeNameEl.innerText = "No Active Routes";
+            shopsListEl.innerHTML = "<li class='p-10 text-center text-slate-400'>No active routes assigned.</li>";
             return;
         }
 
-        // 2. Store all route IDs in an array
-        const routes = [];
-        routeSnap.forEach(doc => {
-            routes.push({ id: doc.id, ...doc.data() });
-        });
+        const activeRoutes = [];
+        routeSnap.forEach(doc => activeRoutes.push({ id: doc.id, ...doc.data() }));
 
-        // 3. Update UI to show multiple route names
-        const names = routes.map(r => r.name).join(", ");
-        routeNameEl.innerText = names;
+        routeNameEl.innerText = activeRoutes.map(r => r.name).join(", ");
+        appCache.routes = activeRoutes; 
 
-        // 4. Cache the array of routes
-        appCache.routes = routes; 
+        loadAllAssignedShops(activeRoutes);
 
-        // 5. Load all shops from all these routes
-        loadAllAssignedShops(routes);
-
-    } catch (error) {
-        console.error("Load Routes Error:", error);
-    }
+    } catch (error) { console.error(error); }
 }
 
-
-
-
-
-
-// Updated: Merges shops from all assigned routes into one list
+// Merges shops and determines if they were visited TODAY
 async function loadAllAssignedShops(routes) {
-    const list = document.getElementById('shops-list');
     const routeIds = routes.map(r => r.id);
     
     try {
-        // 1. Fetch today's visits to keep the "green" checkmark logic
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const visitedSet = new Set();
-        const visitQ = query(collection(db, "visits"), where("salesmanId", "==", auth.currentUser.uid), where("checkInTime", ">=", Timestamp.fromDate(today)));
-        const vSnap = await getDocs(visitQ);
-        vSnap.forEach(doc => visitedSet.add(doc.data().outletId));
+        // 1. Get Activity Set (Visited or Ordered Today)
+        const todayStr = getTodayDateString(); 
+        const activitySet = new Set();
 
-        // 2. Fetch all shops linked to any of these routes
+        // Check Visits Today
+        const vQ = query(collection(db, "visits"), where("salesmanId", "==", auth.currentUser.uid), where("status", "==", "completed"));
+        const vSnap = await getDocs(vQ);
+        vSnap.forEach(d => {
+            const date = d.data().checkInTime.toDate().toISOString().split('T')[0];
+            if(date === todayStr) activitySet.add(d.data().outletId);
+        });
+
+        // 2. Fetch all shops for these routes
         let allRouteOutlets = [];
         for (const rId of routeIds) {
             const q = query(collection(db, "route_outlets"), where("routeId", "==", rId));
@@ -225,7 +217,6 @@ async function loadAllAssignedShops(routes) {
             snap.forEach(d => allRouteOutlets.push(d.data()));
         }
 
-        // 3. Fetch unique shop details
         const uniqueOutletIds = [...new Set(allRouteOutlets.map(item => item.outletId))];
         const mergedShops = [];
 
@@ -238,19 +229,16 @@ async function loadAllAssignedShops(routes) {
                     name: data.shopName,
                     lat: data.geo?.lat || 0,
                     lng: data.geo?.lng || 0,
-                    sequence: 0 // In multi-route, sequence is secondary
+                    isVisited: activitySet.has(oId)
                 });
             }
         }
 
-        appCache.routeOutlets = mergedShops; // Update cache
-        renderShopsList(mergedShops, visitedSet); // Use your existing render function
+        appCache.routeOutlets = mergedShops; 
+        renderShopsList(mergedShops, activitySet);
 
-    } catch (error) {
-        console.error("Merge Shops Error:", error);
-    }
+    } catch (error) { console.error(error); }
 }
-
 
 
 
@@ -338,26 +326,36 @@ async function loadRouteOnMap() {
     routeMapInstance = L.map('routeMap').setView([20.5937, 78.9629], 5); 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMapInstance);
 
-    if (!appCache.routes || appCache.routes.length === 0) return;
+    if (!appCache.routeOutlets) return;
+
+    // Define Icons
+    const blueIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+
+    const greenIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
 
     const markers = [];
-    try {
-        // Loop through the shops we already merged in loadAllAssignedShops
-        appCache.routeOutlets.forEach(shop => {
-            if (shop.lat !== 0) {
-                const marker = L.marker([shop.lat, shop.lng])
-                    .addTo(routeMapInstance)
-                    .bindPopup(`<b>${shop.name}</b>`);
-                markers.push(marker);
-            }
-        });
-
-        if (markers.length > 0) {
-            const group = new L.featureGroup(markers);
-            routeMapInstance.fitBounds(group.getBounds().pad(0.1));
+    appCache.routeOutlets.forEach(shop => {
+        if (shop.lat !== 0) {
+            const marker = L.marker([shop.lat, shop.lng], {
+                icon: shop.isVisited ? greenIcon : blueIcon
+            })
+            .addTo(routeMapInstance)
+            .bindPopup(`<b>${shop.name}</b><br>${shop.isVisited ? '✅ Done' : '⏳ Pending'}`);
+            markers.push(marker);
         }
-    } catch (error) {
-        console.error("Map Merge Error:", error);
+    });
+
+    if (markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        routeMapInstance.fitBounds(group.getBounds().pad(0.1));
     }
 }
 
@@ -563,6 +561,18 @@ async function performEndVisit() {
     btn.disabled = true;
 
     try {
+
+
+// In salesman.js inside performEndVisit and submitOrder
+if (appCache.routes) {
+    appCache.routes.forEach(async (r) => {
+        await updateDoc(doc(db, "routes", r.id), { 
+            lastVisitDate: new Date().toLocaleDateString() 
+        });
+    });
+}
+
+        
         // 1. Get Current GPS
         const loc = await fetchCurrentGPS();
         
@@ -1024,6 +1034,18 @@ window.submitOrder = async function() {
     btn.innerText = "Processing...";
 
     try {
+
+
+// In salesman.js inside performEndVisit and submitOrder
+if (appCache.routes) {
+    appCache.routes.forEach(async (r) => {
+        await updateDoc(doc(db, "routes", r.id), { 
+            lastVisitDate: new Date().toLocaleDateString() 
+        });
+    });
+}
+
+        
         // 1. Calculate Financials
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
         const tax = applyTax ? (subtotal * 0.05) : 0;
