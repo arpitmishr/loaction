@@ -698,37 +698,33 @@ async function loadRoutes() {
     if (!list) return;
 
     try {
-        // OPTIMIZATION: Limit to 20
-        const q = query(
-            collection(db, "routes"), 
-            orderBy("createdAt", "desc"), 
-            limit(20)
-        );
+        const q = query(collection(db, "routes"), orderBy("createdAt", "desc"));
         const snap = await getDocs(q);
         list.innerHTML = "";
 
-        if (snap.empty) { list.innerHTML = "<li>No routes found.</li>"; return; }
+        if (snap.empty) { list.innerHTML = "<li class='p-5 text-center text-slate-400'>No routes.</li>"; return; }
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
+            const isRest = data.status === 'rest';
+            
             const li = document.createElement('li');
-            li.style.padding = "10px";
-            li.style.borderBottom = "1px solid #eee";
-            li.style.cursor = "pointer";
-            li.style.display = "flex";
-            li.style.justifyContent = "space-between";
+            li.className = `p-4 hover:bg-slate-50 cursor-pointer transition flex justify-between items-center ${isRest ? 'opacity-60 bg-slate-50' : ''}`;
+            li.onclick = () => selectRoute(docSnap.id, data.name);
+            
             li.innerHTML = `
-                <span>
-                    <strong>${data.name}</strong><br>
-                    <small style="color:#666">Salesman ID: ${data.assignedSalesmanId.slice(0,5)}...</small>
-                </span>
-                <button onclick="selectRoute('${docSnap.id}', '${data.name}')" style="font-size:0.8rem;">Config</button>
+                <div>
+                    <div class="font-bold text-sm text-slate-800">${data.name}</div>
+                    <div class="text-[10px] ${isRest ? 'text-amber-600' : 'text-slate-400'} font-bold uppercase">
+                        ${isRest ? '● Rest Mode' : '● Active'}
+                    </div>
+                </div>
+                <span class="material-icons-round text-slate-300">chevron_right</span>
             `;
             list.appendChild(li);
         });
     } catch (e) { console.error(e); }
 }
-
 
 
 
@@ -754,50 +750,38 @@ async function populateAllOutletsDropdown() {
 }
 
 // 5. Select Route (Setup UI)
-window.selectRoute = function(routeId, routeName) {
+window.selectRoute = async function(routeId, routeName) {
     document.getElementById('selectedRouteId').value = routeId;
     document.getElementById('selectedRouteName').innerText = routeName;
-    document.getElementById('routeConfigPanel').style.display = 'block';
-    document.getElementById('routeConfigMsg').style.display = 'none';
+    document.getElementById('routeConfigPanel').classList.remove('hidden');
+    document.getElementById('routeConfigMsg').classList.add('hidden');
     
-    loadRouteOutlets(routeId);
+    try {
+        // Fetch current route details
+        const routeDoc = await getDoc(doc(db, "routes", routeId));
+        const routeData = routeDoc.data();
+
+        // 1. Populate Salesman Dropdown (Reuse the global list if you have one, or fetch)
+        const salesmanSelect = document.getElementById('editRouteSalesman');
+        const userSnap = await getDocs(query(collection(db, "users"), where("role", "==", "salesman")));
+        salesmanSelect.innerHTML = "";
+        userSnap.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.data().fullName || u.data().email;
+            if(u.id === routeData.assignedSalesmanId) opt.selected = true;
+            salesmanSelect.appendChild(opt);
+        });
+
+        // 2. Set Status
+        document.getElementById('editRouteStatus').value = routeData.status || "active";
+
+        // 3. Load the shops as before
+        loadRouteOutlets(routeId);
+    } catch (e) { console.error(e); }
 };
 
-// 6. Load Outlets Attached to Route
-async function loadRouteOutlets(routeId) {
-    const tbody = document.getElementById('route-outlets-list');
-    tbody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
 
-    try {
-        const q = query(
-            collection(db, "route_outlets"), 
-            where("routeId", "==", routeId),
-            orderBy("sequence", "asc")
-        );
-        const snap = await getDocs(q);
-        
-        tbody.innerHTML = "";
-        if (snap.empty) { tbody.innerHTML = '<tr><td colspan="3">No outlets in this route.</td></tr>'; return; }
-
-        snap.forEach(docSnap => {
-            const d = docSnap.data();
-            tbody.innerHTML += `
-                <tr>
-                    <td>${d.sequence}</td>
-                    <td>${d.outletName}</td>
-                    <td>
-                        <button onclick="changeSequence('${docSnap.id}', -1, ${d.sequence})" style="padding:2px 5px;">⬆</button>
-                        <button onclick="changeSequence('${docSnap.id}', 1, ${d.sequence})" style="padding:2px 5px;">⬇</button>
-                        <button onclick="removeOutletFromRoute('${docSnap.id}')" style="color:red; margin-left:5px;">X</button>
-                    </td>
-                </tr>
-            `;
-        });
-    } catch (e) { 
-        console.error(e); 
-        tbody.innerHTML = '<tr><td colspan="3">Error (Check Console for Index).</td></tr>';
-    }
-}
 
 // 7. Add Outlet to Route
 window.addOutletToRoute = async function() {
@@ -2136,5 +2120,35 @@ window.deleteOutlet = async function(id, name) {
     } catch (error) {
         console.error("Delete Error:", error);
         alert("Error deleting: " + error.message);
+    }
+};
+
+
+
+
+
+
+
+
+
+window.saveRouteSettings = async function() {
+    const routeId = document.getElementById('selectedRouteId').value;
+    const newSalesmanId = document.getElementById('editRouteSalesman').value;
+    const newStatus = document.getElementById('editRouteStatus').value;
+    
+    if(!routeId) return;
+
+    try {
+        const routeRef = doc(db, "routes", routeId);
+        await updateDoc(routeRef, {
+            assignedSalesmanId: newSalesmanId,
+            status: newStatus,
+            updatedAt: serverTimestamp()
+        });
+        
+        alert("✅ Route settings updated successfully!");
+        loadRoutes(); // Refresh the left sidebar
+    } catch (e) {
+        alert("Error: " + e.message);
     }
 };
