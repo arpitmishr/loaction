@@ -20,6 +20,25 @@ let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
 let currentVisitTarget = null; 
+
+
+
+// --- NAVIGATION GUARD (PREVENT BACK BUTTON) ---
+window.addEventListener('popstate', (event) => {
+    // If a visit is currently active (currentVisitId is not null)
+    if (currentVisitId) {
+        // Push the state back so the URL doesn't change
+        history.pushState(null, null, window.location.href);
+        alert("⚠️ Action Required\n\nYou cannot leave this screen while a visit is in progress.\n\nPlease click 'End Visit' to finish.");
+    }
+});
+
+
+
+
+
+
+
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
@@ -503,7 +522,10 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
 
 
 window.closeVisitPanel = function() {
-    // FIX: Removed the line referring to 'watchId'
+    if (currentVisitId) {
+        alert("⚠️ Active Visit!\n\nYou must 'End Visit' to calculate duration before going back.");
+        return;
+    }
     
     // Switch Views
     document.getElementById('route-view').style.display = 'block';
@@ -578,6 +600,9 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
         currentVisitId = docRef.id;
         visitStartTime = new Date();
 
+
+
+        history.pushState(null, null, window.location.href); 
         btn.style.display = 'none';
         controls.style.display = 'block';
         startTimer();
@@ -640,6 +665,13 @@ async function performEndVisit() {
         });
 
         stopTimer();
+
+
+
+currentVisitId = null; // 1. Release the guard variable
+// 2. Clean up the history stack we pushed in CheckIn (optional but cleaner UI behavior)
+if(window.history.state === null) history.back(); 
+        
         alert(`✅ Visit Closed Successfully.\nDuration: ${duration} mins.`);
         closeVisitPanel();
 
@@ -776,6 +808,15 @@ function deg2rad(deg) {
 
 
 window.switchView = function(viewName) {
+
+
+ // 1. Check if Visit is Active
+    if (currentVisitId) {
+        alert("⚠️ You have an active visit!\n\nPlease click 'End Visit' before switching tabs.");
+        return; // STOP execution
+    }
+
+    
     // 1. Hide all views
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
