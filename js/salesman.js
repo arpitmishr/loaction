@@ -168,8 +168,9 @@ async function loadAssignedRoute(uid) {
 
     try {
         // 1. Fetch all routes where assignedSalesmanId matches
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
-        const routeSnap = await getDocs(q);
+        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid)); where("status", "==", "active");
+        const routeSnap = await getDocs(q); 
+        
 
         if (routeSnap.empty) {
             routeNameEl.innerText = "No Routes Assigned";
