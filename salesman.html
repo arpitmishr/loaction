@@ -672,6 +672,80 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/salesman.js"></script>
+
+
+
+
+
+
+    <!-- Map Outlet Detail Modal -->
+<div id="mapDetailModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-end justify-center transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-t-[32px] p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up">
+        
+        <!-- Header & Direction -->
+        <div class="flex justify-between items-start">
+            <div>
+                <h3 id="md-shopName" class="text-xl font-extrabold text-slate-800">Shop Name</h3>
+                <p id="md-shopType" class="text-xs text-indigo-500 font-bold uppercase tracking-wider">Category</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="md-navBtn" class="bg-blue-600 text-white p-3 rounded-2xl shadow-lg active:scale-95 transition">
+                    <span class="material-icons-round">directions</span>
+                </button>
+                <button onclick="document.getElementById('mapDetailModal').classList.add('hidden')" class="bg-slate-100 text-slate-400 p-3 rounded-2xl">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <p class="text-[10px] text-slate-400 font-bold uppercase">Outstanding</p>
+                <p id="md-balance" class="text-lg font-black text-slate-800">₹0.00</p>
+            </div>
+            <div class="bg-indigo-50 p-3 rounded-2xl border border-indigo-100">
+                <p class="text-[10px] text-indigo-400 font-bold uppercase">Best Seller</p>
+                <p id="md-bestSeller" class="text-sm font-bold text-indigo-700 truncate">None</p>
+            </div>
+        </div>
+
+        <!-- History Tabs -->
+        <div class="space-y-4">
+            <div>
+                <h4 class="text-xs font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="material-icons-round text-sm text-purple-500">shopping_bag</span> Recent Orders
+                </h4>
+                <div id="md-ordersList" class="space-y-2 text-xs">
+                    <!-- Orders injected here -->
+                </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-4">
+                <h4 class="text-xs font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="material-icons-round text-sm text-emerald-500">payments</span> Recent Payments
+                </h4>
+                <div id="md-paymentsList" class="space-y-2 text-xs">
+                    <!-- Payments injected here -->
+                </div>
+            </div>
+        </div>
+
+        <button id="md-visitBtn" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold active:scale-95 transition mt-4">
+            Start New Visit
+        </button>
+    </div>
+</div>
+
+<style>
+    @keyframes slide-up {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+    .animate-slide-up { animation: slide-up 0.3s ease-out; }
+</style>
+
+
     
 </body>
 </html>
