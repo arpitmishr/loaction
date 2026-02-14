@@ -631,15 +631,32 @@ window.toggleOutletStatus = async function(id, newStatus) {
 
 
 
-// ==========================================
-//      ROUTE MANAGEMENT LOGIC
-// ==========================================
 
-// Call this inside your main onAuthStateChanged/init block
-// Example: 
-// loadRoutes();
-// populateSalesmanDropdown(); 
-// populateAllOutletsDropdown();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      CORRECTED ROUTE MANAGEMENT LOGIC
+// ==========================================
 
 // 1. Populate Salesman Dropdown
 async function populateSalesmanDropdown() {
@@ -654,45 +671,14 @@ async function populateSalesmanDropdown() {
         snap.forEach(doc => {
             const d = doc.data();
             const option = document.createElement('option');
-            option.value = doc.id; // UID
+            option.value = doc.id; 
             option.textContent = d.fullName || d.email;
             select.appendChild(option);
         });
     } catch (e) { console.error(e); }
 }
 
-// 2. Create Route
-const createRouteForm = document.getElementById('createRouteForm');
-if (createRouteForm) {
-    createRouteForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = document.getElementById('routeNameInput').value;
-        const salesmanId = document.getElementById('routeSalesmanSelect').value;
-        const btn = e.target.querySelector('button');
-
-        if (!name || !salesmanId) return alert("Fill all fields");
-
-        try {
-            btn.disabled = true;
-            await addDoc(collection(db, "routes"), {
-                name: name,
-                assignedSalesmanId: salesmanId,
-                createdAt: serverTimestamp(),
-                active: true
-            });
-            alert("Route Created!");
-            document.getElementById('routeNameInput').value = "";
-            loadRoutes(); // Refresh list
-        } catch (error) {
-            alert("Error: " + error.message);
-        } finally {
-            btn.disabled = false;
-        }
-    });
-}
-
-// 3. Load Existing Routes
-// --- LOAD ROUTES (LIMITED) ---
+// 2. Load Existing Routes
 async function loadRoutes() {
     const list = document.getElementById('routes-list-group');
     if (!list) return;
@@ -710,7 +696,8 @@ async function loadRoutes() {
             
             const li = document.createElement('li');
             li.className = `p-4 hover:bg-slate-50 cursor-pointer transition flex justify-between items-center ${isRest ? 'opacity-60 bg-slate-50' : ''}`;
-            li.onclick = () => selectRoute(docSnap.id, data.name);
+            // Set the click handler
+            li.onclick = () => window.selectRoute(docSnap.id, data.name);
             
             li.innerHTML = `
                 <div>
@@ -726,30 +713,7 @@ async function loadRoutes() {
     } catch (e) { console.error(e); }
 }
 
-
-
-
-// 4. Populate All Outlets (for adding to route)
-async function populateAllOutletsDropdown() {
-    const select = document.getElementById('allOutletsDropdown');
-    if (!select) return;
-
-    try {
-        const snap = await getDocs(collection(db, "outlets"));
-        select.innerHTML = '<option value="">Select Outlet to Add</option>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${d.shopName} (${d.contactPhone})`;
-            // Store name in dataset to avoid extra fetching later
-            option.dataset.name = d.shopName; 
-            select.appendChild(option);
-        });
-    } catch (e) { console.error(e); }
-}
-
-// 5. Select Route (Setup UI)
+// 3. Select Route (ATTACH TO WINDOW)
 window.selectRoute = async function(routeId, routeName) {
     document.getElementById('selectedRouteId').value = routeId;
     document.getElementById('selectedRouteName').innerText = routeName;
@@ -757,11 +721,9 @@ window.selectRoute = async function(routeId, routeName) {
     document.getElementById('routeConfigMsg').classList.add('hidden');
     
     try {
-        // Fetch current route details
         const routeDoc = await getDoc(doc(db, "routes", routeId));
         const routeData = routeDoc.data();
 
-        // 1. Populate Salesman Dropdown (Reuse the global list if you have one, or fetch)
         const salesmanSelect = document.getElementById('editRouteSalesman');
         const userSnap = await getDocs(query(collection(db, "users"), where("role", "==", "salesman")));
         salesmanSelect.innerHTML = "";
@@ -773,91 +735,113 @@ window.selectRoute = async function(routeId, routeName) {
             salesmanSelect.appendChild(opt);
         });
 
-        // 2. Set Status
         document.getElementById('editRouteStatus').value = routeData.status || "active";
 
-        // 3. Load the shops as before
-        loadRouteOutlets(routeId);
+        // Call the load function
+        window.loadRouteOutlets(routeId);
     } catch (e) { console.error(e); }
 };
 
+// 4. Load Route Outlets (ATTACH TO WINDOW)
+window.loadRouteOutlets = async function(routeId) {
+    const tbody = document.getElementById('route-outlets-list');
+    tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center">Loading...</td></tr>';
 
+    try {
+        const q = query(
+            collection(db, "route_outlets"), 
+            where("routeId", "==", routeId),
+            orderBy("sequence", "asc")
+        );
+        const snap = await getDocs(q);
+        
+        tbody.innerHTML = "";
+        if (snap.empty) { 
+            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-400">No outlets in this route.</td></tr>'; 
+            return; 
+        }
 
-// 7. Add Outlet to Route
+        snap.forEach(docSnap => {
+            const d = docSnap.data();
+            tbody.innerHTML += `
+                <tr class="border-b border-slate-50">
+                    <td class="p-3 text-center font-bold text-slate-400">${d.sequence}</td>
+                    <td class="p-3 font-medium text-slate-700">${d.outletName}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="window.removeOutletFromRoute('${docSnap.id}')" class="text-red-400 hover:text-red-600 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (e) { 
+        console.error(e); 
+        tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-red-500">Error loading outlets.</td></tr>';
+    }
+};
+
+// 5. Add Outlet to Route (ATTACH TO WINDOW)
 window.addOutletToRoute = async function() {
     const routeId = document.getElementById('selectedRouteId').value;
     const select = document.getElementById('allOutletsDropdown');
     const outletId = select.value;
-    const outletName = select.options[select.selectedIndex].dataset.name;
+    const outletName = select.options[select.selectedIndex]?.dataset.name;
 
     if (!routeId || !outletId) return alert("Select a route and an outlet.");
 
     try {
-        // Find current max sequence
         const q = query(collection(db, "route_outlets"), where("routeId", "==", routeId));
         const snap = await getDocs(q);
         const nextSeq = snap.size + 1;
 
-        // Add doc
         await addDoc(collection(db, "route_outlets"), {
             routeId: routeId,
             outletId: outletId,
-            outletName: outletName, // Denormalized for display
+            outletName: outletName,
             sequence: nextSeq
         });
 
-        loadRouteOutlets(routeId); // Refresh
-    } catch (e) {
-        console.error(e);
-        alert("Error adding outlet.");
-    }
+        window.loadRouteOutlets(routeId); 
+    } catch (e) { alert("Error adding outlet."); }
 };
 
-// 8. Remove Outlet
+// 6. Remove Outlet (ATTACH TO WINDOW)
 window.removeOutletFromRoute = async function(docId) {
     if(!confirm("Remove from route?")) return;
     try {
         await deleteDoc(doc(db, "route_outlets", docId));
-        // Note: Real apps should re-calculate sequences here, 
-        // but for simplicity we skip re-indexing remaining items.
-        loadRouteOutlets(document.getElementById('selectedRouteId').value);
+        window.loadRouteOutlets(document.getElementById('selectedRouteId').value);
     } catch (e) { console.error(e); }
 };
 
-// 9. Reorder (Swap) Logic
-window.changeSequence = async function(docId, direction, currentSeq) {
-    // direction: -1 (Up), 1 (Down)
-    const newSeq = currentSeq + direction;
-    if (newSeq < 1) return; // Can't go below 1
-
+// 7. Save Settings (ATTACH TO WINDOW)
+window.saveRouteSettings = async function() {
     const routeId = document.getElementById('selectedRouteId').value;
+    const newSalesmanId = document.getElementById('editRouteSalesman').value;
+    const newStatus = document.getElementById('editRouteStatus').value;
+    
+    if(!routeId) return;
 
     try {
-        // Find the neighbor to swap with
-        const q = query(
-            collection(db, "route_outlets"), 
-            where("routeId", "==", routeId),
-            where("sequence", "==", newSeq)
-        );
-        const neighborSnap = await getDocs(q);
-
-        if (!neighborSnap.empty) {
-            // Update neighbor
-            const neighborDoc = neighborSnap.docs[0];
-            await updateDoc(doc(db, "route_outlets", neighborDoc.id), { sequence: currentSeq });
-        }
-
-        // Update current
-        await updateDoc(doc(db, "route_outlets", docId), { sequence: newSeq });
-
-        loadRouteOutlets(routeId);
-
-    } catch (e) {
-        console.error("Reorder error:", e);
-        // This query requires a composite index: routeId ASC, sequence ASC
-        if(e.message.includes("index")) alert("Index missing. Check console.");
-    }
+        await updateDoc(doc(db, "routes", routeId), {
+            assignedSalesmanId: newSalesmanId,
+            status: newStatus,
+            updatedAt: serverTimestamp()
+        });
+        alert("✅ Route settings updated!");
+        loadRoutes(); 
+    } catch (e) { alert("Error: " + e.message); }
 };
+
+
+
+
+
+
+
+
+
 
 // ==========================================
 //      PRODUCT MANAGEMENT LOGIC
