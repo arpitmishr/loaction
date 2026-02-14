@@ -20,19 +20,6 @@ let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
 let currentVisitTarget = null; 
-
-
-// --- NAVIGATION GUARD (PREVENT BACK BUTTON) ---
-window.addEventListener('popstate', (event) => {
-    // If a visit is currently active (currentVisitId is not null)
-    if (currentVisitId) {
-        // Push the state back so the URL doesn't change
-        history.pushState(null, null, window.location.href);
-        alert("⚠️ Action Required\n\nYou cannot leave this screen while a visit is in progress.\n\nPlease click 'End Visit' to finish.");
-    }
-});
-
-
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
@@ -153,296 +140,46 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 });
 
 
-
-
-
-
-// --- MULTI-ROUTE SWITCHER ---
-window.switchRoute = function(newRouteId) {
-    // 1. SECURITY GUARD: Prevent switching if visit is active
-    if (currentVisitId) {
-        // Reset dropdown to previous value
-        if(appCache.route) document.getElementById('route-selector').value = appCache.route.id;
-        alert("⚠️ Active Visit in Progress!\n\nYou cannot switch routes while inside a shop.\nPlease 'End Visit' first.");
-        return;
-    }
-
-    // 2. Find data in cache
-    const selectedRoute = appCache.allAssignedRoutes.find(r => r.id === newRouteId);
-    if (!selectedRoute) return;
-
-    // 3. Update Current Cache
-    appCache.route = selectedRoute; // Set as active
-    
-    // 4. Reset UI
-    console.log("🔄 Switching to Route:", selectedRoute.name);
-    
-    // Clear the shops list first to show loading state
-    document.getElementById('shops-list').innerHTML = "<li style='padding:15px; text-align:center;'>Loading stops...</li>";
-    
-    // Load new shops
-    loadShops(selectedRoute.id);
-    
-    // Refresh Map if active
-    if(document.getElementById('map-view').classList.contains('hidden') === false) {
-        loadRouteOnMap();
-    }
-};
-
-
-
-
-
-
-
-// --- NEW: LOAD & MERGE SHOPS FROM ALL ROUTES ---
-async function loadCombinedShops(routesArray) {
-    const list = document.getElementById('shops-list');
-    list.innerHTML = "<li class='text-center py-4 text-slate-400'>Merging routes...</li>";
-
-    try {
-        let allShops = [];
-
-        // 1. Fetch Route Outlets for EACH Route (Parallel Fetch)
-        const routePromises = routesArray.map(async (route) => {
-            const q = query(collection(db, "route_outlets"), where("routeId", "==", route.id), orderBy("sequence", "asc"));
-            const snap = await getDocs(q);
-            
-            // Map snap to simple array
-            return snap.docs.map(d => ({
-                linkId: d.id,
-                outletId: d.data().outletId,
-                routeName: route.name, // Tag the shop with its Route Name
-                sequence: d.data().sequence
-            }));
-        });
-
-        const results = await Promise.all(routePromises);
-        // Flatten array of arrays
-        const flatLinks = results.flat();
-
-        if (flatLinks.length === 0) {
-            list.innerHTML = "<li class='text-center py-4'>No shops found in assigned routes.</li>";
-            return;
-        }
-
-        // 2. Fetch Actual Outlet Details (Parallel Fetch)
-        // Optimization: Use a Set to avoid fetching the same shop twice if it's in multiple routes (rare but possible)
-        const uniqueOutletIds = [...new Set(flatLinks.map(l => l.outletId))];
-        
-        const outletPromises = uniqueOutletIds.map(id => getDoc(doc(db, "outlets", id)));
-        const outletSnaps = await Promise.all(outletPromises);
-        
-        // Create Map for fast lookup: ID -> Data
-        const outletMap = {};
-        outletSnaps.forEach(snap => {
-            if(snap.exists()) outletMap[snap.id] = snap.data();
-        });
-
-        // 3. Build Final List
-        allShops = flatLinks.map(link => {
-            const data = outletMap[link.outletId];
-            if (!data) return null; // Skip deleted shops
-            return {
-                id: link.outletId,
-                name: data.shopName, // or link.outletName
-                routeName: link.routeName, // Useful for display
-                sequence: link.sequence,
-                lat: data.geo ? data.geo.lat : 0,
-                lng: data.geo ? data.geo.lng : 0,
-                fullData: data
-            };
-        }).filter(s => s !== null);
-
-        // 4. Update Cache (Unified List)
-        appCache.routeOutlets = allShops;
-
-        // 5. Render List & Map
-        // We need to fetch visited status first
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const visitQ = query(collection(db, "visits"), where("salesmanId", "==", auth.currentUser.uid), where("checkInTime", ">=", Timestamp.fromDate(today)));
-        const visitSnap = await getDocs(visitQ);
-        const visitedSet = new Set();
-        visitSnap.forEach(doc => visitedSet.add(doc.data().outletId));
-
-        renderCombinedShopsList(allShops, visitedSet);
-        
-        // If map is already open, reload markers
-        if(!document.getElementById('map-view').classList.contains('hidden')) {
-             loadRouteOnMap(); 
-        }
-
-    } catch (e) {
-        console.error("Merge Shops Error:", e);
-        list.innerHTML = "<li class='text-center text-red-500'>Error loading shops.</li>";
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function renderCombinedShopsList(shops, visitedSet) {
-    const list = document.getElementById('shops-list');
-    list.innerHTML = "";
-
-    // Sort Logic: 
-    // 1. Visited at bottom
-    // 2. Then by Route Name (Cluster shops by route)
-    // 3. Then by Sequence
-    shops.sort((a, b) => {
-        const aVisit = visitedSet.has(a.id) ? 1 : 0;
-        const bVisit = visitedSet.has(b.id) ? 1 : 0;
-        if (aVisit !== bVisit) return aVisit - bVisit;
-        
-        if (a.routeName !== b.routeName) return a.routeName.localeCompare(b.routeName);
-        
-        return (a.sequence || 999) - (b.sequence || 999);
-    });
-
-    shops.forEach(shop => {
-        const isVisited = visitedSet.has(shop.id);
-        const li = document.createElement('li');
-        
-        const bgStyle = isVisited ? "background:#f0fdf4; border:1px solid #86efac;" : "background:white; border:1px solid #e2e8f0;";
-        const checkMark = isVisited ? `<span style="color:green; font-weight:bold; font-size:12px;">✅ Done</span>` : "";
-
-        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:16px; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);`;
-        
-        li.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:start;">
-                <div>
-                    <!-- ROUTE BADGE -->
-                    <span class="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md mb-1 inline-block border border-indigo-100">${shop.routeName}</span>
-                    
-                    <h4 style="font-size:1rem; font-weight:700; color:${isVisited ? '#15803d' : '#1e293b'}">${shop.name}</h4>
-                    <div style="display:flex; gap:5px; align-items:center; margin-top:4px;">
-                        <span style="font-size:0.75rem; color:#64748b;">Seq: ${shop.sequence}</span>
-                        ${checkMark}
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display:flex; gap:8px; justify-content:flex-end; border-top:1px dashed #eee; margin-top:10px; padding-top:10px;">
-                <button class="btn-nav" style="background:#e0f2fe; color:#0284c7; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none;" title="Navigate">
-                    <span class="material-icons-round" style="font-size:18px;">near_me</span>
-                </button>
-                <button class="btn-collect" style="background:#ecfccb; color:#4d7c0f; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none;" title="Collect">
-                    <span class="material-icons-round" style="font-size:18px;">payments</span>
-                </button>
-                <button class="btn-phone-order" style="background:#fff7ed; color:#c2410c; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:none;" title="Phone Order">
-                    <span class="material-icons-round" style="font-size:18px;">call</span>
-                </button>
-                <button class="btn-open-map" style="background:${isVisited ? '#f1f5f9' : '#eff6ff'}; color:${isVisited ? '#64748b' : '#2563eb'}; padding:0 12px; height:36px; border-radius:10px; border:none; font-weight:bold; font-size:0.75rem;">
-                    ${isVisited ? 'View' : 'Visit'}
-                </button>
-            </div>
-        `;
-        
-        // Attach Listeners
-        li.querySelector('.btn-nav').onclick = () => openGoogleMapsNavigation(shop.lat, shop.lng);
-        li.querySelector('.btn-collect').onclick = () => openQuickCollection(shop.id, shop.name);
-        li.querySelector('.btn-phone-order').onclick = () => window.openOrderForm(shop.id, shop.name);
-        li.querySelector('.btn-open-map').onclick = () => {
-            if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
-            else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
-        };
-
-        list.appendChild(li);
-    });
-}
-
-
-
 // --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
-// --- UPDATED LOAD ROUTE (HANDLES MULTIPLE ROUTES) ---
 async function loadAssignedRoute(uid) {
-    const nameEl = document.getElementById('route-name');
-    const selectEl = document.getElementById('route-selector');
-    const listEl = document.getElementById('shops-list');
+    const routeNameEl = document.getElementById('route-name');
+    const shopsListEl = document.getElementById('shops-list');
 
     try {
-        console.log("🌐 Fetching Routes...");
-        
-        // 1. Fetch ALL routes for this salesman
-        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
-        const snap = await getDocs(q);
-
-        if (snap.empty) {
-            nameEl.innerText = "No Route Assigned";
-            nameEl.classList.remove('hidden');
-            selectEl.classList.add('hidden');
-            listEl.innerHTML = "<li style='padding:15px; color:orange; text-align:center;'>Contact Admin to assign a route.</li>";
+        // 1. Check Cache for Route Metadata
+        if (appCache.route) {
+            console.log("⚡ Loaded Route from Cache");
+            routeNameEl.innerText = appCache.route.name;
+            loadShops(appCache.route.id); // Pass ID to next function
             return;
         }
 
-        // 2. Prepare Data
-        const routes = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        appCache.allAssignedRoutes = routes; // Store all in cache
+        // 2. Network Fetch
+        console.log("🌐 Fetching Route from Firestore...");
+        const q = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        const routeSnap = await getDocs(q);
 
-        // 3. UI Logic
-        if (routes.length === 1) {
-            // SCENARIO A: Single Route (Standard)
-            const r = routes[0];
-            appCache.route = r; // Set active
-            
-            nameEl.innerText = r.name;
-            nameEl.classList.remove('hidden');
-            selectEl.classList.add('hidden');
-            
-            loadShops(r.id);
-        } else {
-            // SCENARIO B: Multiple Routes (Dropdown)
-            nameEl.classList.add('hidden'); // Hide text title
-            selectEl.classList.remove('hidden'); // Show dropdown
-            
-            // Populate Options
-            selectEl.innerHTML = "";
-            routes.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.id;
-                opt.textContent = r.name;
-                selectEl.appendChild(opt);
-            });
-
-            // Auto-select the first one (or the last one they used if we cached it, but let's keep it simple)
-            appCache.route = routes[0];
-            selectEl.value = routes[0].id;
-            
-            loadShops(routes[0].id);
+        if (routeSnap.empty) {
+            routeNameEl.innerText = "No Route Assigned";
+            shopsListEl.innerHTML = "<li style='padding:15px; color:orange;'>Contact Admin to assign a route.</li>";
+            return;
         }
+
+        const routeDoc = routeSnap.docs[0];
+        const routeData = routeDoc.data();
+        
+        // 3. Save to Cache
+        appCache.route = { id: routeDoc.id, ...routeData };
+
+        routeNameEl.innerText = routeData.name;
+        loadShops(routeDoc.id);
 
     } catch (error) {
         console.error("Load Route Error:", error);
-        nameEl.innerText = "Error Loading";
+        routeNameEl.innerText = "Error Loading Route";
     }
 }
-
-
-
-
-
-
-
-
-
 
 async function loadShops(routeId) {
     const list = document.getElementById('shops-list');
@@ -592,41 +329,84 @@ function renderShopsList(shops, visitedSet = new Set()) {
 
 let routeMapInstance = null; // Separate variable to avoid conflict with visit map
 
-// --- UPDATED: MAP LOADER (READS FROM CACHE) ---
 async function loadRouteOnMap() {
-    console.log("Loading Map...");
+    console.log("Loading Route Map...");
     
-    if (routeMapInstance) routeMapInstance.remove();
+    // 1. Initialize Map (Leaflet)
+    // We check if it exists to avoid "Map container is already initialized" error
+    if (routeMapInstance) {
+        routeMapInstance.remove();
+    }
+    
+    // Default center (will change later)
     routeMapInstance = L.map('routeMap').setView([20.5937, 78.9629], 5); 
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(routeMapInstance);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(routeMapInstance);
 
-    // 1. Check Cache
-    if (!appCache.routeOutlets || appCache.routeOutlets.length === 0) {
-        // If map is opened before list is loaded, trigger load
-        // But usually, list loads on init.
-        return; 
-    }
+    // 2. Get Current User ID
+    const uid = auth.currentUser.uid;
+    const markers = []; // To store marker objects for auto-zooming
 
-    const markers = [];
-    
-    // 2. Plot All Shops from Cache
-    appCache.routeOutlets.forEach(shop => {
-        if(shop.lat && shop.lng) {
+    try {
+        // 3. Fetch Assigned Route
+        const routeQ = query(collection(db, "routes"), where("assignedSalesmanId", "==", uid));
+        const routeSnap = await getDocs(routeQ);
+
+        if (routeSnap.empty) {
+            alert("No route assigned to you.");
+            return;
+        }
+
+        const routeId = routeSnap.docs[0].id;
+
+        // 4. Fetch Route Outlets (Sequence)
+        const roQ = query(collection(db, "route_outlets"), where("routeId", "==", routeId));
+        const roSnap = await getDocs(roQ);
+
+        if (roSnap.empty) return;
+
+        // 5. Loop through assigned outlets and fetch their REAL GPS data
+        // We use Promise.all to fetch all outlets in parallel (Faster than await in loop)
+        const outletPromises = roSnap.docs.map(async (docSnap) => {
+            const linkData = docSnap.data();
+            const outletDoc = await getDoc(doc(db, "outlets", linkData.outletId));
+            
+            if (outletDoc.exists()) {
+                const outData = outletDoc.data();
+                if (outData.geo && outData.geo.lat && outData.geo.lng) {
+                    return {
+                        name: outData.shopName,
+                        lat: outData.geo.lat,
+                        lng: outData.geo.lng,
+                        seq: linkData.sequence
+                    };
+                }
+            }
+            return null; // Skip if no geo or deleted
+        });
+
+        const validOutlets = (await Promise.all(outletPromises)).filter(o => o !== null);
+
+        // 6. Plot Markers
+        validOutlets.forEach(shop => {
             const marker = L.marker([shop.lat, shop.lng])
                 .addTo(routeMapInstance)
-                .bindPopup(`
-                    <b>${shop.name}</b><br>
-                    <span style="font-size:10px; color:gray;">${shop.routeName}</span>
-                `);
+                .bindPopup(`<b>${shop.seq}. ${shop.name}</b>`);
+            
             markers.push(marker);
-        }
-    });
+        });
 
-    // 3. Auto-Fit
-    if (markers.length > 0) {
-        const group = new L.featureGroup(markers);
-        routeMapInstance.fitBounds(group.getBounds().pad(0.1));
+        // 7. Auto-Fit Map to show all markers
+        if (markers.length > 0) {
+            const group = new L.featureGroup(markers);
+            routeMapInstance.fitBounds(group.getBounds().pad(0.1)); // pad(0.1) adds a little breathing room
+        }
+
+    } catch (error) {
+        console.error("Map Load Error:", error);
+        alert("Error loading map data.");
     }
 }
 
@@ -723,15 +503,9 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
 
 
 window.closeVisitPanel = function() {
-
-
-     if (currentVisitId) {
-        alert("⚠️ Active Visit!\n\nYou must 'End Visit' to calculate duration before going back.");
-        return;
-    }
+    // FIX: Removed the line referring to 'watchId'
     
-    
-    
+    // Switch Views
     document.getElementById('route-view').style.display = 'block';
     document.getElementById('visit-view').style.display = 'none';
 };
@@ -804,8 +578,6 @@ async function performVisitCheckIn(outletId, outletName, lat, lng) {
         currentVisitId = docRef.id;
         visitStartTime = new Date();
 
-history.pushState(null, null, window.location.href); 
-        
         btn.style.display = 'none';
         controls.style.display = 'block';
         startTimer();
@@ -868,13 +640,6 @@ async function performEndVisit() {
         });
 
         stopTimer();
-
-
-currentVisitId = null; // 1. Release the guard variable
-// 2. Clean up the history stack we pushed in CheckIn (optional but cleaner UI behavior)
-if(window.history.state === null) history.back(); 
-
-        
         alert(`✅ Visit Closed Successfully.\nDuration: ${duration} mins.`);
         closeVisitPanel();
 
@@ -1011,14 +776,7 @@ function deg2rad(deg) {
 
 
 window.switchView = function(viewName) {
-
-    if (currentVisitId) {
-        alert("⚠️ You have an active visit!\n\nPlease click 'End Visit' before switching tabs.");
-        return; // STOP execution
-    }
-   
-
-
+    // 1. Hide all views
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
     // 2. Show selected view
@@ -1030,23 +788,22 @@ window.switchView = function(viewName) {
     }
     if (viewName === 'map') {
         document.getElementById('map-view').classList.remove('hidden');
-        if(typeof loadRouteOnMap === 'function') loadRouteOnMap(); 
-        // Leaflet resize fix
-        setTimeout(() => { if(window.map) window.map.invalidateSize(); }, 100);
+        loadRouteOnMap(); // <--- New Function we will write below
     }
 
     // 3. Update Bottom Nav Styles
     document.querySelectorAll('.bottom-nav-item').forEach(el => {
-        el.classList.remove('active', 'text-indigo-600'); 
-        el.classList.add('text-slate-400');
+        el.classList.remove('active', 'text-blue-600'); 
+        el.classList.add('text-gray-400');
     });
 
     const activeBtn = document.getElementById('nav-' + viewName);
     if(activeBtn) {
-        activeBtn.classList.add('active', 'text-indigo-600');
-        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('active', 'text-blue-600');
+        activeBtn.classList.remove('text-gray-400');
     }
 };
+
 
 
 
