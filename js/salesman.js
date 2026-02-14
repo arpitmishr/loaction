@@ -1,7 +1,7 @@
 // 1. IMPORTS
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
-    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment, serverTimestamp, setDoc, deleteDoc, writeBatch
+    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment, serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -20,6 +20,19 @@ let timerInterval = null;
 let currentOrderOutlet = null; // Stores {id, name, status}
 let orderCart = [];
 let currentVisitTarget = null; 
+
+
+// --- NAVIGATION GUARD (PREVENT BACK BUTTON) ---
+window.addEventListener('popstate', (event) => {
+    // If a visit is currently active (currentVisitId is not null)
+    if (currentVisitId) {
+        // Push the state back so the URL doesn't change
+        history.pushState(null, null, window.location.href);
+        alert("⚠️ Action Required\n\nYou cannot leave this screen while a visit is in progress.\n\nPlease click 'End Visit' to finish.");
+    }
+});
+
+
 // --- CONFIGURATION ---
 const GEO_FENCE_RADIUS = 50; // ✅ SET TO 50 METERS
 
@@ -94,64 +107,6 @@ async function fetchCurrentGPS() {
 
 
 
-
-// --- APP LOCKING & NAVIGATION CONTROL ---
-function toggleAppLock(isLocked) {
-    const bottomNav = document.querySelector('nav');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const backBtn = document.querySelector('#visit-view button span.material-icons-round')?.parentElement; // Back arrow in visit header
-
-    if (isLocked) {
-        // 1. Disable Bottom Nav
-        if(bottomNav) bottomNav.style.pointerEvents = "none";
-        if(bottomNav) bottomNav.style.opacity = "0.5";
-        
-        // 2. Hide Logout
-        if(logoutBtn) logoutBtn.style.display = "none";
-        
-        // 3. Hide Back Arrow in Visit Panel
-        if(backBtn) backBtn.style.display = "none";
-
-        // 4. Force Stay on Page
-        history.pushState(null, null, location.href);
-        window.onpopstate = function () {
-            history.pushState(null, null, location.href);
-            alert("⚠️ You have an active visit. Please 'End Visit' to leave.");
-        };
-    } else {
-        // Unlock
-        if(bottomNav) bottomNav.style.pointerEvents = "auto";
-        if(bottomNav) bottomNav.style.opacity = "1";
-        if(logoutBtn) logoutBtn.style.display = "flex";
-        if(backBtn) backBtn.style.display = "flex";
-        window.onpopstate = null;
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
         window.location.href = 'index.html';
@@ -169,49 +124,9 @@ onAuthStateChanged(auth, async (user) => {
             return;
         }
 
-       // C. Initialize UI
+        // C. Initialize UI
         if (loader) loader.style.display = 'none';
         if (content) content.style.display = 'block';
-
-        // --- NEW: CHECK FOR EXISTING ACTIVE VISIT ---
-        console.log("🔒 Checking for active visits...");
-        const activeVisitRef = doc(db, "active_visits", user.uid);
-        const activeSnap = await getDoc(activeVisitRef);
-
-        if (activeSnap.exists()) {
-            const data = activeSnap.data();
-            console.log("⚠️ Found active visit:", data);
-            
-            // 1. Lock UI
-            toggleAppLock(true);
-            
-            // 2. Restore State
-            currentVisitId = user.uid; // Using UID as temp ID for session context
-            visitStartTime = data.startTime.toDate(); // Restore timer start
-            
-            // 3. Force Open Panel
-            // Note: We might not have shop name/lat/lng if not in route cache yet, 
-            // but we usually have route data loaded quickly.
-            // For robustness, we pass data from the active_visit doc if available, or fetch outlet.
-            
-            // Fetch outlet name for UI display
-            let outletName = "Resuming Visit...";
-            try {
-                const outletDoc = await getDoc(doc(db, "outlets", data.outletId));
-                if(outletDoc.exists()) outletName = outletDoc.data().shopName;
-            } catch(e) { console.error(e); }
-
-            // Open Panel
-            openVisitPanel(data.outletId, outletName, data.startLat, data.startLng);
-            
-            // Adjust UI to "In Progress" state immediately
-            document.getElementById('btn-geo-checkin').style.display = 'none';
-            document.getElementById('in-shop-controls').style.display = 'block';
-            startTimer();
-        } else {
-            // No active visit, ensure unlocked
-            toggleAppLock(false);
-        }
 
         // D. Load Data
         checkTodayAttendance(user);
@@ -601,9 +516,15 @@ window.openVisitPanel = async function(outletId, name, shopLat, shopLng) {
 
 
 window.closeVisitPanel = function() {
-    // FIX: Removed the line referring to 'watchId'
+
+
+     if (currentVisitId) {
+        alert("⚠️ Active Visit!\n\nYou must 'End Visit' to calculate duration before going back.");
+        return;
+    }
     
-    // Switch Views
+    
+    
     document.getElementById('route-view').style.display = 'block';
     document.getElementById('visit-view').style.display = 'none';
 };
@@ -654,49 +575,30 @@ function startGeoFencing(targetLat, targetLng, outletId, outletName) {
 async function performVisitCheckIn(outletId, outletName, lat, lng) {
     const btn = document.getElementById('btn-geo-checkin');
     const controls = document.getElementById('in-shop-controls');
-    const uid = auth.currentUser.uid;
     
     try {
-        btn.innerText = "Checking constraints...";
+        btn.innerText = "Saving...";
         btn.disabled = true;
         
-        // 1. CHECK IF ACTIVE VISIT EXISTS
-        const activeRef = doc(db, "active_visits", uid);
-        const activeSnap = await getDoc(activeRef);
-
-        if (activeSnap.exists()) {
-            alert("⛔ You already have an active visit! \n\nPlease refresh the app to resume it.");
-            btn.disabled = false;
-            btn.innerText = "Retry";
-            return;
-        }
-
-        btn.innerText = "Starting Visit...";
-
         const routeName = appCache.route ? appCache.route.name : (document.getElementById('route-name')?.innerText || "Unknown");
-        const routeId = appCache.route ? appCache.route.id : "unknown";
 
-        // 2. CREATE ACTIVE VISIT DOCUMENT (salesmanId as Doc ID)
-        // Note: We are NOT writing to 'visits' collection yet.
-        const visitData = {
+        // Save Visit
+        const docRef = await addDoc(collection(db, "visits"), {
+            salesmanId: auth.currentUser.uid,
+            salesmanName: appCache.user?.fullName || auth.currentUser.email,
             outletId: outletId,
-            routeId: routeId,
-            startTime: serverTimestamp(),
-            startLat: lat,
-            startLng: lng,
-            salesmanName: appCache.user?.fullName || auth.currentUser.email
-        };
+            outletName: outletName,
+            routeName: routeName,
+            checkInTime: Timestamp.now(),
+            location: new GeoPoint(lat, lng), // Use passed coords
+            status: "in-progress"
+        });
 
-        await setDoc(activeRef, visitData);
-
-        // 3. UPDATE LOCAL STATE
-        currentVisitId = uid; // We use UID to track the active session state locally
+        currentVisitId = docRef.id;
         visitStartTime = new Date();
 
-        // 4. LOCK UI
-        toggleAppLock(true);
-
-        // 5. UPDATE UI
+history.pushState(null, null, window.location.href); 
+        
         btn.style.display = 'none';
         controls.style.display = 'block';
         startTimer();
@@ -731,79 +633,67 @@ async function performEndVisit() {
         // 2. VALIDATION: Check if inside 50m Fence
         if (currentVisitTarget) {
             const dist = getDistanceFromLatLonInM(loc.lat, loc.lng, currentVisitTarget.lat, currentVisitTarget.lng);
+            
+            // Allow a small buffer (e.g. GPS inaccuracy), but strictly enforce logic
             if (dist > GEO_FENCE_RADIUS) {
-                alert(`🚫 OUT OF ZONE!\n\nYou are ${Math.round(dist)} meters away.\nMove closer to end visit.`);
+                // ALERT AND BLOCK
+                alert(`🚫 OUT OF ZONE!\n\nYou are ${Math.round(dist)} meters away from the shop.\n\nPlease move back within ${GEO_FENCE_RADIUS} meters to close the visit.`);
+                
+                // Reset button and STOP
                 btn.innerText = originalText;
                 btn.disabled = false;
                 return; 
             }
         }
 
-        // 3. PREPARE BATCH WRITE
-        btn.innerText = "Saving...";
-        const batch = writeBatch(db);
-        const uid = auth.currentUser.uid;
-
-        // A. Get Data for the Permanent Log
+        // 3. If validation passes, calculate duration
         const endTime = new Date();
         const duration = Math.round((endTime - visitStartTime) / 1000 / 60); // Minutes
-        
-        // Need to retrieve outletId/Name from local scope or UI since we are converting active to permanent
-        const outletName = document.getElementById('visit-shop-name').innerText;
-        // In performVisitCheckIn we set currentOrderOutlet or passed variables. 
-        // We can grab outletId from the active_visit doc if we want to be 100% safe, 
-        // but for minimal reads, we assume the UI context (currentOrderOutlet) or local vars are correct.
-        // Let's use a safe read to ensure data integrity for the permanent log.
-        const activeSnap = await getDoc(doc(db, "active_visits", uid));
-        if(!activeSnap.exists()) throw new Error("Active visit session lost.");
-        const activeData = activeSnap.data();
 
-        // B. Create Document in 'visits' (Permanent History)
-        const visitLogRef = doc(collection(db, "visits")); // Auto-ID
-        batch.set(visitLogRef, {
-            salesmanId: uid,
-            salesmanName: activeData.salesmanName,
-            outletId: activeData.outletId,
-            outletName: outletName, // or fetch, but UI text is safe enough here
-            routeName: appCache.route ? appCache.route.name : "Unknown",
-            checkInTime: activeData.startTime,
-            checkOutTime: serverTimestamp(),
-            checkInLocation: new GeoPoint(activeData.startLat, activeData.startLng),
+        // 4. Update Firestore
+        // ... inside try block ...
+
+        await updateDoc(doc(db, "visits", currentVisitId), {
+            checkOutTime: Timestamp.now(),
             checkOutLocation: new GeoPoint(loc.lat, loc.lng),
             status: "completed",
             durationMinutes: duration
         });
 
-        // C. Update Outlet Last Visit Date
-        const outletRef = doc(db, "outlets", activeData.outletId);
-        batch.update(outletRef, {
-            lastVisitDate: serverTimestamp()
-        });
-
-        // D. Delete Active Visit Lock
-        const activeRef = doc(db, "active_visits", uid);
-        batch.delete(activeRef);
-
-        // 4. COMMIT BATCH
-        await batch.commit();
-
-        // 5. CLEANUP LOCAL STATE
         stopTimer();
-        toggleAppLock(false); // Unlock UI
+
+
+currentVisitId = null; // 1. Release the guard variable
+// 2. Clean up the history stack we pushed in CheckIn (optional but cleaner UI behavior)
+if(window.history.state === null) history.back(); 
+
+        
         alert(`✅ Visit Closed Successfully.\nDuration: ${duration} mins.`);
         closeVisitPanel();
 
-        // Refresh Shop List Green Status
-        if (appCache.route) loadShops(appCache.route.id);
+        // NEW: REFRESH THE SHOP LIST TO SHOW GREEN COLOR
+        if (appCache.route) {
+            loadShops(appCache.route.id);
+        }
+
+      
 
     } catch (error) {
         console.error("End Visit Error:", error);
-        alert(`⚠️ Error: ${error.message}`);
+        
+        // Detailed Error Messages
+        let msg = "Error ending visit.";
+        if (error.code === 1) msg = "GPS Permission Denied. Enable Location.";
+        else if (error.code === 2 || error.code === 3) msg = "GPS Signal Weak/Timeout. Move to open area.";
+        else if (error.message.includes("network")) msg = "Network Error. Check Internet.";
+        
+        alert(`⚠️ ${msg}\n\nTechnical details: ${error.message}`);
     } finally {
         btn.innerText = "End Visit";
         btn.disabled = false;
     }
 }
+
 
 
 
@@ -914,7 +804,14 @@ function deg2rad(deg) {
 
 
 window.switchView = function(viewName) {
-    // 1. Hide all views
+
+    if (currentVisitId) {
+        alert("⚠️ You have an active visit!\n\nPlease click 'End Visit' before switching tabs.");
+        return; // STOP execution
+    }
+   
+
+
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
     // 2. Show selected view
@@ -926,22 +823,23 @@ window.switchView = function(viewName) {
     }
     if (viewName === 'map') {
         document.getElementById('map-view').classList.remove('hidden');
-        loadRouteOnMap(); // <--- New Function we will write below
+        if(typeof loadRouteOnMap === 'function') loadRouteOnMap(); 
+        // Leaflet resize fix
+        setTimeout(() => { if(window.map) window.map.invalidateSize(); }, 100);
     }
 
     // 3. Update Bottom Nav Styles
     document.querySelectorAll('.bottom-nav-item').forEach(el => {
-        el.classList.remove('active', 'text-blue-600'); 
-        el.classList.add('text-gray-400');
+        el.classList.remove('active', 'text-indigo-600'); 
+        el.classList.add('text-slate-400');
     });
 
     const activeBtn = document.getElementById('nav-' + viewName);
     if(activeBtn) {
-        activeBtn.classList.add('active', 'text-blue-600');
-        activeBtn.classList.remove('text-gray-400');
+        activeBtn.classList.add('active', 'text-indigo-600');
+        activeBtn.classList.remove('text-slate-400');
     }
 };
-
 
 
 
