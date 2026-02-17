@@ -1762,3 +1762,107 @@ async function openOutletMapDetails(outletId, name, lat, lng) {
         alert("Error loading outlet history. Check Firestore Indexes.");
     }
 }
+
+
+
+
+
+
+// --- REFRESH LOGIC ---
+
+/**
+ * Global function to refresh all dashboard data without reloading the page
+ */
+async function refreshDashboardData() {
+    const refreshBtn = document.getElementById('headerRefreshBtn');
+    const spinner = refreshBtn?.querySelector('span');
+    
+    // Add spinning animation to button
+    if (spinner) spinner.classList.add('animate-spin');
+    
+    console.log("🔄 Refreshing salesman data...");
+    
+    try {
+        const user = auth.currentUser;
+        if (user) {
+            // Re-run all primary data fetchers
+            await Promise.all([
+                checkTodayAttendance(user),
+                loadAssignedRoute(user.uid),
+                loadDailyTarget()
+            ]);
+            console.log("✅ Data refreshed successfully");
+        }
+    } catch (error) {
+        console.error("Refresh failed:", error);
+    } finally {
+        // Remove spinning animation
+        if (spinner) {
+            setTimeout(() => {
+                spinner.classList.remove('animate-spin');
+            }, 500);
+        }
+    }
+}
+
+// Click listener for the header button
+document.getElementById('headerRefreshBtn')?.addEventListener('click', refreshDashboardData);
+
+
+// --- SWIPE DOWN GESTURE (PULL TO REFRESH) ---
+
+let touchStart = 0;
+let pullDistance = 0;
+const PULL_THRESHOLD = 80; // Distance in px to trigger refresh
+const indicator = document.getElementById('pull-indicator');
+const spinnerSvg = document.getElementById('pull-spinner');
+
+window.addEventListener('touchstart', (e) => {
+    // Only track pull if we are at the top of the page
+    if (window.scrollY === 0) {
+        touchStart = e.touches[0].pageY;
+    } else {
+        touchStart = 0;
+    }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+    if (touchStart === 0) return;
+
+    const touchCurrent = e.touches[0].pageY;
+    pullDistance = touchCurrent - touchStart;
+
+    if (pullDistance > 0 && window.scrollY === 0) {
+        // Prevent default browser refresh only if we are handling it
+        if (pullDistance > 10) {
+            indicator.style.opacity = Math.min(pullDistance / PULL_THRESHOLD, 1);
+            indicator.style.transform = `translateY(${Math.min(pullDistance / 2, 50)}px)`;
+            
+            // Rotate the spinner icon based on pull distance
+            spinnerSvg.style.transform = `rotate(${pullDistance * 2}deg)`;
+        }
+    }
+}, { passive: true });
+
+window.addEventListener('touchend', async () => {
+    if (pullDistance >= PULL_THRESHOLD) {
+        // Trigger the refresh action
+        indicator.style.opacity = "1";
+        spinnerSvg.classList.add('animate-spin');
+        
+        await refreshDashboardData();
+        
+        // Visual delay to show completed
+        setTimeout(resetPullUI, 600);
+    } else {
+        resetPullUI();
+    }
+    touchStart = 0;
+    pullDistance = 0;
+});
+
+function resetPullUI() {
+    indicator.style.opacity = "0";
+    indicator.style.transform = `translateY(0px)`;
+    spinnerSvg.classList.remove('animate-spin');
+}
