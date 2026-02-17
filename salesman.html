@@ -87,21 +87,40 @@
     <!-- MAIN APP CONTAINER -->
     <div id="content" style="display:none;" class="max-w-md mx-auto min-h-screen bg-[#f1f5f9] relative shadow-2xl overflow-hidden">
         
-        <!-- HEADER -->
-        <header class="glass sticky top-0 z-40 px-5 py-4 flex justify-between items-center shadow-sm">
-            <div>
-                <h1 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2 tracking-tight">
-                    <span class="bg-indigo-600 text-white rounded-lg p-1 text-sm shadow-glow">
-                        <span class="material-icons-round text-base">bolt</span>
-                    </span>
-                    Sales App
-                </h1>
-                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider ml-1">Daily Dashboard</p>
-            </div>
-            <button id="logoutBtn" class="bg-red-50 text-red-500 px-4 py-2 rounded-full text-xs font-bold border border-red-100 hover:bg-red-100 active:bg-red-200 transition flex items-center gap-1">
-                <span class="material-icons-round text-sm">logout</span> Logout
-            </button>
-        </header>
+<!-- Search for the <header> tag and replace its content with this -->
+<header class="glass sticky top-0 z-40 px-5 py-4 flex justify-between items-center shadow-sm">
+    <div>
+        <h1 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2 tracking-tight">
+            <span class="bg-indigo-600 text-white rounded-lg p-1 text-sm shadow-glow">
+                <span class="material-icons-round text-base">bolt</span>
+            </span>
+            Sales App
+        </h1>
+        <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider ml-1">Daily Dashboard</p>
+    </div>
+    
+    <!-- NEW ACTION GROUP -->
+    <div class="flex items-center gap-2">
+        <!-- REFRESH BUTTON -->
+        <button id="headerRefreshBtn" class="bg-indigo-50 text-indigo-600 p-2 rounded-full hover:bg-indigo-100 active:scale-90 transition-transform">
+            <span class="material-icons-round text-xl">refresh</span>
+        </button>
+
+        <button id="logoutBtn" class="bg-red-50 text-red-500 px-4 py-2 rounded-full text-xs font-bold border border-red-100 hover:bg-red-100 active:bg-red-200 transition flex items-center gap-1">
+            <span class="material-icons-round text-sm">logout</span> Logout
+        </button>
+    </div>
+</header>
+
+<!-- Add this Pull-to-Refresh Indicator right below the opening <body> or at the top of #content -->
+<div id="pull-indicator" class="fixed top-0 left-0 w-full flex justify-center pt-4 opacity-0 pointer-events-none z-[100] transition-opacity">
+    <div class="bg-white shadow-xl rounded-full p-2 border border-slate-100">
+        <svg id="pull-spinner" class="w-6 h-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+</div>
 
         <!-- CONTENT AREA -->
         <main class="p-5 space-y-6">
