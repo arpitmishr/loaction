@@ -1809,60 +1809,17 @@ async function refreshDashboardData() {
 document.getElementById('headerRefreshBtn')?.addEventListener('click', refreshDashboardData);
 
 
-// --- SWIPE DOWN GESTURE (PULL TO REFRESH) ---
+/* DELETE EVERYTHING BELOW FROM salesman.js */
 
 let touchStart = 0;
 let pullDistance = 0;
-const PULL_THRESHOLD = 80; // Distance in px to trigger refresh
-const indicator = document.getElementById('pull-indicator');
-const spinnerSvg = document.getElementById('pull-spinner');
+const PULL_THRESHOLD = 80;
+// ... delete all variables related to pull ...
 
-window.addEventListener('touchstart', (e) => {
-    // Only track pull if we are at the top of the page
-    if (window.scrollY === 0) {
-        touchStart = e.touches[0].pageY;
-    } else {
-        touchStart = 0;
-    }
-}, { passive: true });
+window.addEventListener('touchstart', (e) => { ... });
 
-window.addEventListener('touchmove', (e) => {
-    if (touchStart === 0) return;
+window.addEventListener('touchmove', (e) => { ... });
 
-    const touchCurrent = e.touches[0].pageY;
-    pullDistance = touchCurrent - touchStart;
+window.addEventListener('touchend', async () => { ... });
 
-    if (pullDistance > 0 && window.scrollY === 0) {
-        // Prevent default browser refresh only if we are handling it
-        if (pullDistance > 10) {
-            indicator.style.opacity = Math.min(pullDistance / PULL_THRESHOLD, 1);
-            indicator.style.transform = `translateY(${Math.min(pullDistance / 2, 50)}px)`;
-            
-            // Rotate the spinner icon based on pull distance
-            spinnerSvg.style.transform = `rotate(${pullDistance * 2}deg)`;
-        }
-    }
-}, { passive: true });
-
-window.addEventListener('touchend', async () => {
-    if (pullDistance >= PULL_THRESHOLD) {
-        // Trigger the refresh action
-        indicator.style.opacity = "1";
-        spinnerSvg.classList.add('animate-spin');
-        
-        await refreshDashboardData();
-        
-        // Visual delay to show completed
-        setTimeout(resetPullUI, 600);
-    } else {
-        resetPullUI();
-    }
-    touchStart = 0;
-    pullDistance = 0;
-});
-
-function resetPullUI() {
-    indicator.style.opacity = "0";
-    indicator.style.transform = `translateY(0px)`;
-    spinnerSvg.classList.remove('animate-spin');
-}
+function resetPullUI() { ... }
