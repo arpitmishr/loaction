@@ -1022,10 +1022,13 @@ window.removeFromCart = function(index) {
 window.submitOrder = async function() {
     const isPhone = document.getElementById('isPhoneOrder').checked;
     const applyTax = document.getElementById('applyGst').checked;
+    const dueDateVal = document.getElementById('orderDueDate').value; // NEW
     const btn = document.getElementById('btn-submit-order');
 
     // Validation
     if (orderCart.length === 0) return alert("Cart is empty!");
+    if (!dueDateVal) return alert("⚠️ Please select a Delivery Due Date."); // NEW VALIDATION
+    
     if (!isPhone && !currentVisitId) {
         alert("❌ Geo-Fence Error: You must be Checked-In.");
         return;
@@ -1037,17 +1040,16 @@ window.submitOrder = async function() {
     btn.innerText = "Processing...";
 
     try {
-
-
-// In salesman.js inside performEndVisit and submitOrder
-if (appCache.routes) {
-    appCache.routes.forEach(async (r) => {
-        await updateDoc(doc(db, "routes", r.id), { 
-            lastVisitDate: new Date().toLocaleDateString() 
-        });
-    });
-}
-
+        // Update route last visit date
+        if (appCache.routes) {
+            appCache.routes.forEach(async (r) => {
+                try {
+                    await updateDoc(doc(db, "routes", r.id), { 
+                        lastVisitDate: new Date().toLocaleDateString() 
+                    });
+                } catch(e) { console.warn("Route update silent fail"); }
+            });
+        }
         
         // 1. Calculate Financials
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
@@ -1057,11 +1059,12 @@ if (appCache.routes) {
         // 2. Prepare Order Data (DENORMALIZED)
         const orderData = {
             salesmanId: auth.currentUser.uid,
-            salesmanName: appCache.user?.fullName || auth.currentUser.email, // Store Name
+            salesmanName: appCache.user?.fullName || auth.currentUser.email,
             outletId: currentOrderOutlet.id,
-            outletName: currentOrderOutlet.name, // Store Name
+            outletName: currentOrderOutlet.name,
             visitId: isPhone ? null : currentVisitId,
             orderDate: Timestamp.now(),
+            deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)), // NEW FIELD
             orderType: isPhone ? "Phone Call" : "Physical Visit",
             isGstApplied: applyTax,
             items: orderCart,
@@ -1076,8 +1079,7 @@ if (appCache.routes) {
         // 3. Save to 'orders' Collection
         await addDoc(collection(db, "orders"), orderData);
 
-        // 4. CRITICAL: Update Outlet Balance (Credit in Market)
-        // This adds the order amount to the shop's current debt
+        // 4. Update Outlet Balance
         const outletRef = doc(db, "outlets", currentOrderOutlet.id);
         await updateDoc(outletRef, {
             currentBalance: increment(total),
@@ -1088,6 +1090,7 @@ if (appCache.routes) {
         
         // 5. Cleanup UI
         document.getElementById('order-view').style.display = 'none';
+        document.getElementById('orderDueDate').value = ""; // Reset Date
         
         if(currentVisitId) {
             document.getElementById('visit-view').style.display = 'block';
