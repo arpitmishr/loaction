@@ -2208,3 +2208,123 @@ window.changeRouteSalesman = async function(routeId, newSalesmanId) {
         loadRoutes();
     } catch (e) { alert("Error: " + e.message); }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      PENDING DELIVERY LOGIC
+// ==========================================
+
+window.loadPendingDeliveries = async function() {
+    const tbody = document.getElementById('deliveries-table-body');
+    const totalEl = document.getElementById('delivery-total-count');
+    const upcomingEl = document.getElementById('delivery-upcoming-count');
+
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center italic">Loading pending orders...</td></tr>';
+
+    try {
+        // Fetch all orders sorted by Due Date
+        // Note: In a real app, you might filter where status != 'delivered'
+        const q = query(
+            collection(db, "orders"), 
+            orderBy("deliveryDueDate", "asc"),
+            limit(100)
+        );
+        
+        const snap = await getDocs(q);
+
+        tbody.innerHTML = "";
+        
+        if (snap.empty) {
+            tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400">No pending deliveries found.</td></tr>';
+            totalEl.innerText = "0";
+            upcomingEl.innerText = "0";
+            return;
+        }
+
+        let totalPending = 0;
+        let upcomingCount = 0;
+        const now = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(now.getDate() + 7);
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            
+            // Format Due Date
+            let dueDateObj = data.deliveryDueDate ? data.deliveryDueDate.toDate() : null;
+            let dueStr = "N/A";
+            let dateClass = "text-slate-600";
+            let daysDiff = 0;
+
+            if (dueDateObj) {
+                dueStr = dueDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                
+                // Calculate Urgency
+                const diffTime = dueDateObj - now;
+                daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                if (daysDiff < 0) {
+                    dateClass = "text-red-600 font-bold"; // Overdue
+                    dueStr += " (Overdue)";
+                } else if (daysDiff <= 2) {
+                    dateClass = "text-orange-500 font-bold"; // Urgent
+                } else {
+                    dateClass = "text-green-600 font-bold"; // Safe
+                }
+
+                if (dueDateObj <= nextWeek && dueDateObj >= now) upcomingCount++;
+            }
+
+            totalPending++;
+
+            // Items Summary
+            const itemCount = data.items ? data.items.length : 0;
+            const totalAmt = data.financials ? data.financials.totalAmount : 0;
+            const itemNames = data.items ? data.items.map(i => i.name).slice(0, 2).join(", ") + (itemCount > 2 ? "..." : "") : "";
+
+            const row = `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="p-4">
+                        <div class="${dateClass}">${dueStr}</div>
+                        <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-bold text-slate-700">${data.outletName}</div>
+                        <div class="text-xs text-slate-500">Salesman: ${data.salesmanName}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
+                        <div class="text-xs text-slate-500">${itemCount} Items (${itemNames})</div>
+                    </td>
+                    <td class="p-4 text-right">
+                         <span class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending</span>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        // Update Stats
+        totalEl.innerText = totalPending;
+        upcomingEl.innerText = upcomingCount;
+
+    } catch (error) {
+        console.error("Deliveries Error:", error);
+        tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-red-400">Error loading data (Check Console). <br> Likely missing Index on 'deliveryDueDate'.</td></tr>`;
+    }
+};
