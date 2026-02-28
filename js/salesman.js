@@ -1022,12 +1022,12 @@ window.removeFromCart = function(index) {
 window.submitOrder = async function() {
     const isPhone = document.getElementById('isPhoneOrder').checked;
     const applyTax = document.getElementById('applyGst').checked;
-    const dueDateVal = document.getElementById('orderDueDate').value; // NEW
+    const dueDateVal = document.getElementById('orderDueDate').value;
     const btn = document.getElementById('btn-submit-order');
 
     // Validation
     if (orderCart.length === 0) return alert("Cart is empty!");
-    if (!dueDateVal) return alert("⚠️ Please select a Delivery Due Date."); // NEW VALIDATION
+    if (!dueDateVal) return alert("⚠️ Please select a Delivery Due Date.");
     
     if (!isPhone && !currentVisitId) {
         alert("❌ Geo-Fence Error: You must be Checked-In.");
@@ -1040,6 +1040,10 @@ window.submitOrder = async function() {
     btn.innerText = "Processing...";
 
     try {
+        // CAPTURE ROUTE NAME (From UI or Default)
+        // This grabs the route name displayed on the dashboard
+        const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned/Phone";
+
         // Update route last visit date
         if (appCache.routes) {
             appCache.routes.forEach(async (r) => {
@@ -1051,20 +1055,21 @@ window.submitOrder = async function() {
             });
         }
         
-        // 1. Calculate Financials
+        // Calculate Financials
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
         const tax = applyTax ? (subtotal * 0.05) : 0;
         const total = subtotal + tax;
 
-        // 2. Prepare Order Data (DENORMALIZED)
+        // Prepare Order Data
         const orderData = {
             salesmanId: auth.currentUser.uid,
             salesmanName: appCache.user?.fullName || auth.currentUser.email,
             outletId: currentOrderOutlet.id,
             outletName: currentOrderOutlet.name,
+            routeName: currentRouteName, // <--- NEW FIELD ADDED HERE
             visitId: isPhone ? null : currentVisitId,
             orderDate: Timestamp.now(),
-            deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)), // NEW FIELD
+            deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)),
             orderType: isPhone ? "Phone Call" : "Physical Visit",
             isGstApplied: applyTax,
             items: orderCart,
@@ -1076,10 +1081,10 @@ window.submitOrder = async function() {
             status: "pending"
         };
 
-        // 3. Save to 'orders' Collection
+        // Save to 'orders' Collection
         await addDoc(collection(db, "orders"), orderData);
 
-        // 4. Update Outlet Balance
+        // Update Outlet Balance
         const outletRef = doc(db, "outlets", currentOrderOutlet.id);
         await updateDoc(outletRef, {
             currentBalance: increment(total),
@@ -1088,9 +1093,9 @@ window.submitOrder = async function() {
 
         alert("✅ Order Placed Successfully!");
         
-        // 5. Cleanup UI
+        // Cleanup UI
         document.getElementById('order-view').style.display = 'none';
-        document.getElementById('orderDueDate').value = ""; // Reset Date
+        document.getElementById('orderDueDate').value = "";
         
         if(currentVisitId) {
             document.getElementById('visit-view').style.display = 'block';
