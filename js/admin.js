@@ -2298,25 +2298,31 @@ window.loadPendingDeliveries = async function() {
             const itemNames = data.items ? data.items.map(i => i.name).slice(0, 2).join(", ") + (itemCount > 2 ? "..." : "") : "";
 
             const row = `
-                <tr class="hover:bg-slate-50 transition">
-                    <td class="p-4">
-                        <div class="${dateClass}">${dueStr}</div>
-                        <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
-                    </td>
-                    <td class="p-4">
-                        <div class="font-bold text-slate-700">${data.outletName}</div>
-                        <div class="text-xs text-slate-500">Salesman: ${data.salesmanName}</div>
-                    </td>
-                    <td class="p-4">
-                        <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
-                        <div class="text-xs text-slate-500">${itemCount} Items (${itemNames})</div>
-                    </td>
-                    <td class="p-4 text-right">
-                         <span class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending</span>
-                    </td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
+    <tr class="hover:bg-slate-50 transition border-b border-slate-50">
+        <td class="p-4">
+            <div class="${dateClass}">${dueStr}</div>
+            <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
+        </td>
+        <!-- NEW ROUTE COLUMN -->
+        <td class="p-4">
+            <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
+                ${data.routeName || 'N/A'}
+            </span>
+        </td>
+        <td class="p-4">
+            <div class="font-bold text-slate-700">${data.outletName}</div>
+            <div class="text-xs text-slate-500">Salesman: ${data.salesmanName}</div>
+        </td>
+        <td class="p-4">
+            <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
+            <div class="text-xs text-slate-500">${itemCount} Items (${itemNames})</div>
+        </td>
+        <td class="p-4 text-right">
+             <span class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending</span>
+        </td>
+    </tr>
+`;
+tbody.innerHTML += row;
         });
 
         // Update Stats
