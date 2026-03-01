@@ -2234,11 +2234,10 @@ window.loadPendingDeliveries = async function() {
 
     if (!tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center italic">Loading pending orders...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center italic">Loading pending orders...</td></tr>';
 
     try {
-        // Fetch all orders sorted by Due Date
-        // Note: In a real app, you might filter where status != 'delivered'
+        // Fetch orders sorted by Due Date
         const q = query(
             collection(db, "orders"), 
             orderBy("deliveryDueDate", "asc"),
@@ -2250,7 +2249,7 @@ window.loadPendingDeliveries = async function() {
         tbody.innerHTML = "";
         
         if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400">No pending deliveries found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">No pending deliveries found.</td></tr>';
             totalEl.innerText = "0";
             upcomingEl.innerText = "0";
             return;
@@ -2258,25 +2257,34 @@ window.loadPendingDeliveries = async function() {
 
         let totalPending = 0;
         let upcomingCount = 0;
+        
+        // Date Logic
         const now = new Date();
+        now.setHours(0,0,0,0); // Normalize today to midnight
+        
         const nextWeek = new Date();
         nextWeek.setDate(now.getDate() + 7);
+        nextWeek.setHours(23,59,59,999); // End of 7th day
 
-        snap.forEach(doc => {
-            const data = doc.data();
+        snap.forEach(docSnap => {
+            const data = docSnap.data();
+            const orderId = docSnap.id;
             
-            // Format Due Date
+            // 1. Calculate Due Date & Status
             let dueDateObj = data.deliveryDueDate ? data.deliveryDueDate.toDate() : null;
             let dueStr = "N/A";
             let dateClass = "text-slate-600";
-            let daysDiff = 0;
-
+            
             if (dueDateObj) {
+                // Normalize due date for accurate comparison
+                const checkDate = new Date(dueDateObj);
+                checkDate.setHours(0,0,0,0);
+
                 dueStr = dueDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
                 
-                // Calculate Urgency
-                const diffTime = dueDateObj - now;
-                daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                // Urgency Color Logic
+                const diffTime = checkDate - now;
+                const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
                 
                 if (daysDiff < 0) {
                     dateClass = "text-red-600 font-bold"; // Overdue
@@ -2287,50 +2295,112 @@ window.loadPendingDeliveries = async function() {
                     dateClass = "text-green-600 font-bold"; // Safe
                 }
 
-                if (dueDateObj <= nextWeek && dueDateObj >= now) upcomingCount++;
+                // 2. Count for 7-Day Card
+                // Logic: If date is today or future AND within next 7 days
+                if (checkDate >= now && checkDate <= nextWeek) {
+                    upcomingCount++;
+                }
             }
 
             totalPending++;
 
-            // Items Summary
-            const itemCount = data.items ? data.items.length : 0;
-            const totalAmt = data.financials ? data.financials.totalAmount : 0;
-            const itemNames = data.items ? data.items.map(i => i.name).slice(0, 2).join(", ") + (itemCount > 2 ? "..." : "") : "";
+            // 3. Calculate Total Qty
+            let totalQty = 0;
+            if (data.items && Array.isArray(data.items)) {
+                totalQty = data.items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+            }
 
+            // 4. Financials & Items String
+            const totalAmt = data.financials ? data.financials.totalAmount : 0;
+            const itemCount = data.items ? data.items.length : 0;
+            const itemNames = data.items ? data.items.map(i => i.name).slice(0, 1).join(", ") + (itemCount > 1 ? "..." : "") : "";
+
+            // 5. Render Row
             const row = `
-    <tr class="hover:bg-slate-50 transition border-b border-slate-50">
-        <td class="p-4">
-            <div class="${dateClass}">${dueStr}</div>
-            <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
-        </td>
-        <!-- NEW ROUTE COLUMN -->
-        <td class="p-4">
-            <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
-                ${data.routeName || 'N/A'}
-            </span>
-        </td>
-        <td class="p-4">
-            <div class="font-bold text-slate-700">${data.outletName}</div>
-            <div class="text-xs text-slate-500">Salesman: ${data.salesmanName}</div>
-        </td>
-        <td class="p-4">
-            <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
-            <div class="text-xs text-slate-500">${itemCount} Items (${itemNames})</div>
-        </td>
-        <td class="p-4 text-right">
-             <span class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending</span>
-        </td>
-    </tr>
-`;
-tbody.innerHTML += row;
+                <tr class="hover:bg-slate-50 transition border-b border-slate-50 group">
+                    <td class="p-4">
+                        <div class="${dateClass} text-sm">${dueStr}</div>
+                        <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
+                    </td>
+                    <td class="p-4">
+                        <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
+                            ${data.routeName || 'N/A'}
+                        </span>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-bold text-slate-700 text-sm">${data.outletName}</div>
+                        <div class="text-xs text-slate-500">By: ${data.salesmanName}</div>
+                    </td>
+                    <!-- NEW QTY COLUMN -->
+                    <td class="p-4 text-center">
+                        <span class="bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg text-sm">${totalQty}</span>
+                    </td>
+                    <td class="p-4">
+                        <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
+                        <div class="text-xs text-slate-500 truncate max-w-[120px]" title="${data.items?.map(i=>i.name).join(', ')}">
+                            ${itemCount} Types (${itemNames})
+                        </div>
+                    </td>
+                    <!-- ACTION COLUMN WITH DELETE -->
+                    <td class="p-4 text-right">
+                        <button onclick="deleteOrder('${orderId}', ${totalAmt}, '${data.outletId}', '${data.outletName}')" 
+                                class="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors" 
+                                title="Delete Order (Reverses Balance)">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                             </svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
         });
 
-        // Update Stats
+        // Update Stats Cards
         totalEl.innerText = totalPending;
         upcomingEl.innerText = upcomingCount;
 
     } catch (error) {
         console.error("Deliveries Error:", error);
-        tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-red-400">Error loading data (Check Console). <br> Likely missing Index on 'deliveryDueDate'.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-red-400">Error loading data.</td></tr>`;
+    }
+};
+
+
+
+
+
+
+// --- DELETE ORDER FUNCTION ---
+window.deleteOrder = async function(orderId, amount, outletId, outletName) {
+    if(!confirm(`⚠️ PERMANENT DELETE WARNING\n\nAre you sure you want to delete the order for "${outletName}"?\n\nAmount: ₹${amount}\n\nThis will:\n1. Remove the order permanently.\n2. DEDUCT ₹${amount} from the shop's outstanding balance.`)) {
+        return;
+    }
+
+    try {
+        // 1. Reference the Order and the Outlet
+        const orderRef = doc(db, "orders", orderId);
+        const outletRef = doc(db, "outlets", outletId);
+
+        // 2. Perform updates (Delete Order + Reverse Balance)
+        // We use 'increment(-amount)' to subtract the order value from the debt
+        const batch = writeBatch(db);
+        
+        batch.delete(orderRef);
+        batch.update(outletRef, { 
+            currentBalance: increment(-amount) // Reverses the charge
+        });
+
+        await batch.commit();
+
+        alert("✅ Order deleted and shop balance adjusted.");
+        
+        // 3. Refresh the table and stats
+        loadPendingDeliveries();
+        loadDashboardStats(); // To update the total credit card on dashboard
+        
+    } catch (error) {
+        console.error("Delete Order Error:", error);
+        alert("Failed to delete: " + error.message);
     }
 };
