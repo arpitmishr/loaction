@@ -1460,6 +1460,7 @@ window.toggleCreditFields = function() {
 
 // --- REPLACE EXISTING submitNewShop FUNCTION ---
 
+// --- SUBMIT NEW SHOP (With Duplicate Prevention) ---
 async function submitNewShop() {
     const btn = document.getElementById('btnSaveShop');
     
@@ -1475,19 +1476,64 @@ async function submitNewShop() {
     const creditDays = storeType === 'Credit' ? Number(document.getElementById('newCreditDays').value) : 0;
     const creditLimit = storeType === 'Credit' ? Number(document.getElementById('newCreditLimit').value) : 0;
 
-    const lat = document.getElementById('newShopLat').value;
-    const lng = document.getElementById('newShopLng').value;
+    const lat = parseFloat(document.getElementById('newShopLat').value);
+    const lng = parseFloat(document.getElementById('newShopLng').value);
 
-    if(!lat || !lng) {
-        alert("⚠️ GPS Location is required. Please click 'Capture'.");
+    // --- VALIDATION START ---
+    if(!name || !owner || !phone || !address) {
+        alert("Please fill all required fields (Name, Owner, Phone, Address).");
         return;
     }
 
+    if(!lat || !lng || isNaN(lat)) {
+        alert("⚠️ GPS Location is required. Please click 'Capture'.");
+        return;
+    }
+    // --- VALIDATION END ---
+
     try {
         btn.disabled = true;
+        btn.innerText = "Checking Duplicates...";
+
+        // --- CHECK 1: DUPLICATE PHONE NUMBER (Server-Side) ---
+        // We query Firestore to see if this phone number exists anywhere
+        const phoneQ = query(collection(db, "outlets"), where("contactPhone", "==", phone));
+        const phoneSnap = await getDocs(phoneQ);
+
+        if (!phoneSnap.empty) {
+            const existing = phoneSnap.docs[0].data();
+            alert(`⛔ DUPLICATE FOUND!\n\nA shop named "${existing.shopName}" is already registered with this phone number (${phone}).\n\nYou cannot create it again.`);
+            btn.disabled = false;
+            btn.innerText = "Save Shop";
+            return; // STOP execution
+        }
+
+        // --- CHECK 2: PROXIMITY CHECK (Client-Side) ---
+        // Check if we are physically too close to another shop in the current route list
+        if (globalAllShops && globalAllShops.length > 0) {
+            const DUPLICATE_RADIUS_METERS = 20; // 20 meters threshold
+            
+            const nearbyShop = globalAllShops.find(shop => {
+                // Skip if coordinates are 0,0
+                if (shop.lat === 0 && shop.lng === 0) return false;
+                
+                const dist = getDistanceFromLatLonInM(lat, lng, shop.lat, shop.lng);
+                return dist < DUPLICATE_RADIUS_METERS;
+            });
+
+            if (nearbyShop) {
+                const proceed = confirm(`⚠️ POSSIBLE DUPLICATE LOCATION\n\nYou are just a few meters away from existing shop: "${nearbyShop.name}".\n\nAre you sure this is a different shop?`);
+                if (!proceed) {
+                    btn.disabled = false;
+                    btn.innerText = "Save Shop";
+                    return; // STOP execution
+                }
+            }
+        }
+
+        // --- IF CHECKS PASS, SAVE DATA ---
         btn.innerText = "Saving...";
 
-        // 2. Construct Data Object
         const shopData = {
             shopName: name,
             ownerName: owner,
@@ -1499,7 +1545,7 @@ async function submitNewShop() {
             creditDays: creditDays,
             creditLimit: creditLimit,
             currentBalance: 0,
-            geo: { lat: parseFloat(lat), lng: parseFloat(lng) },
+            geo: { lat: lat, lng: lng },
             createdBySalesman: auth.currentUser.uid,
             createdAt: serverTimestamp(),
             status: 'active'
@@ -1508,37 +1554,46 @@ async function submitNewShop() {
         // 3. Save to 'outlets' Collection
         const docRef = await addDoc(collection(db, "outlets"), shopData);
 
-        // --- THE FIX: LINK TO CURRENT ROUTE ---
-        // We must add an entry to 'route_outlets' so it loads on refresh
-        if (appCache.route && appCache.route.id) {
+        // 4. Link to Current Route (if active)
+        if (appCache.routes && appCache.routes.length > 0) {
+            // Link to the FIRST active route found (or logic could be specific route)
+            const targetRouteId = appCache.routes[0].id;
+            
             await addDoc(collection(db, "route_outlets"), {
-                routeId: appCache.route.id,
+                routeId: targetRouteId,
                 outletId: docRef.id,
-                outletName: name, // Denormalized for faster loading
-                sequence: 0 // 0 puts it at the top as "New"
+                outletName: name,
+                sequence: 0 // Top of list
             });
-            console.log("✅ Linked new shop to Route:", appCache.route.id);
-        } else {
-            console.warn("⚠️ No active route found in cache. Shop saved but not linked to route.");
         }
-        // --------------------------------------
 
-        // 4. Update UI Locally (Immediate Feedback)
+        // 5. Update UI Locally (Immediate Feedback)
         const newLocalShop = {
             id: docRef.id,
             name: name,
             sequence: 0, 
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-            fullData: shopData
+            lat: lat,
+            lng: lng,
+            createdAt: Date.now(), // Ensure it sorts to top
+            isVisited: false
         };
 
-        if (!appCache.routeOutlets) appCache.routeOutlets = [];
-        appCache.routeOutlets.push(newLocalShop);
-
-        renderShopsList(appCache.routeOutlets);
+        // Add to global list and resort
+        if (!globalAllShops) globalAllShops = [];
+        globalAllShops.unshift(newLocalShop); // Add to front
         
-        alert("✅ Shop Added! It is now permanently in your route.");
+        // Re-Sort to ensure logic holds (Unvisited + Latest)
+        globalAllShops.sort((a, b) => {
+            if (a.isVisited !== b.isVisited) return a.isVisited ? 1 : -1;
+            return b.createdAt - a.createdAt;
+        });
+
+        // Reset Display Count and Reload
+        globalDisplayedCount = 0;
+        document.getElementById('shops-list').innerHTML = "";
+        loadMoreShops();
+        
+        alert("✅ Shop Added Successfully!");
         document.getElementById('addShopModal').classList.add('hidden');
 
     } catch (e) {
@@ -1549,7 +1604,6 @@ async function submitNewShop() {
         btn.innerText = "Save Shop";
     }
 }
-
 
 
 
