@@ -1045,6 +1045,60 @@
     </div>
 </div>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- EXPORT SETTINGS MODAL -->
+<div id="exportModal" class="hidden fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl transform transition-all">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <span class="bg-green-100 text-green-600 p-1.5 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </span>
+                Export Data
+            </h3>
+            <button onclick="document.getElementById('exportModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        
+        <div class="space-y-4">
+            <p class="text-xs text-slate-500">Select the <strong>Order Taken Date</strong> range to filter pending deliveries.</p>
+            
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">From Date</label>
+                <input type="date" id="exportStartDate" class="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase">To Date</label>
+                <input type="date" id="exportEndDate" class="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+
+            <button onclick="generateDeliveryExcel()" id="btnGenerateExcel" class="w-full bg-slate-800 text-white py-3.5 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-900 transition-all flex items-center justify-center gap-2">
+                <span>Download .CSV File</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
     
 
     
