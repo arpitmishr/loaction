@@ -2411,3 +2411,168 @@ window.deleteOrder = async function(orderId, amount, outletId, outletName) {
         alert("Failed to delete: " + error.message);
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      EXPORT TO EXCEL (CSV) LOGIC
+// ==========================================
+
+// 1. Open Modal and Set Default Dates
+window.openExportModal = function() {
+    document.getElementById('exportModal').classList.remove('hidden');
+    
+    // Set Default: First day of month to Today
+    const date = new Date();
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+    
+    // Format YYYY-MM-DD
+    const formatDate = (d) => {
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    };
+
+    document.getElementById('exportEndDate').value = formatDate(date);
+    document.getElementById('exportStartDate').value = formatDate(firstDay);
+};
+
+// 2. Generate and Download Logic
+window.generateDeliveryExcel = async function() {
+    const startStr = document.getElementById('exportStartDate').value;
+    const endStr = document.getElementById('exportEndDate').value;
+    const btn = document.getElementById('btnGenerateExcel');
+
+    if(!startStr || !endStr) return alert("Please select a valid date range.");
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...`;
+
+        // 1. Fetch Orders in Date Range (Pending Only or All?)
+        // Assuming "Pending Deliveries" context, we might filter by status != 'delivered'
+        // OR simply export all orders taken in that period.
+        // Let's filter for active orders (pending) as per "Pending Deliveries" requirement.
+        
+        const startTs = Timestamp.fromDate(new Date(startStr + "T00:00:00"));
+        const endTs = Timestamp.fromDate(new Date(endStr + "T23:59:59"));
+
+        const q = query(
+            collection(db, "orders"),
+            where("orderDate", ">=", startTs),
+            where("orderDate", "<=", endTs),
+            where("status", "==", "pending") // Only Pending Deliveries
+        );
+
+        const snap = await getDocs(q);
+
+        if(snap.empty) {
+            alert("No pending deliveries found in this date range.");
+            btn.disabled = false;
+            btn.innerText = "Download .CSV File";
+            return;
+        }
+
+        // 2. Prepare Data & Fetch Missing Outlet Info (Address, Contact)
+        let csvContent = "data:text/csv;charset=utf-8,";
+        // BOM for Excel to read UTF-8 correctly
+        csvContent += "\ufeff"; 
+        
+        // Headers
+        csvContent += "Order Date,Outlet Name,Auth Person,Contact Number,Full Address,Product Details,Total Qty,Total Amount,Route,Salesman\n";
+
+        // We need to fetch Outlet details for Address/Contact Person
+        // Using Promise.all to fetch them in parallel for speed
+        const orders = [];
+        const outletIds = new Set();
+        
+        snap.forEach(doc => {
+            const d = doc.data();
+            orders.push(d);
+            if(d.outletId) outletIds.add(d.outletId);
+        });
+
+        // Fetch all unique outlets involved
+        const outletMap = {};
+        const outletPromises = Array.from(outletIds).map(id => getDoc(doc(db, "outlets", id)));
+        const outletSnaps = await Promise.all(outletPromises);
+        
+        outletSnaps.forEach(oSnap => {
+            if(oSnap.exists()) {
+                outletMap[oSnap.id] = oSnap.data();
+            }
+        });
+
+        // 3. Build Rows
+        orders.forEach(order => {
+            const outlet = outletMap[order.outletId] || {};
+            
+            // A. Format Date
+            const dateObj = order.orderDate.toDate();
+            const dateStr = dateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY
+
+            // B. Outlet Info
+            const outletName = escapeCsv(order.outletName);
+            const authPerson = escapeCsv(outlet.contactPerson || outlet.ownerName || "N/A");
+            const authNumber = escapeCsv(outlet.contactPhone || "N/A");
+            const fullAddress = escapeCsv(outlet.address || "Address Not Recorded");
+
+            // C. Product Details & Qty
+            let productDetails = "";
+            let totalQty = 0;
+            
+            if(order.items && Array.isArray(order.items)) {
+                // Format: "Maggi (10) | Coke (5)"
+                productDetails = order.items.map(i => `${i.name} (${i.qty})`).join(" | ");
+                totalQty = order.items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0);
+            }
+            productDetails = escapeCsv(productDetails);
+
+            // D. Other Info
+            const amount = (order.financials?.totalAmount || 0).toFixed(2);
+            const route = escapeCsv(order.routeName || "N/A");
+            const salesman = escapeCsv(order.salesmanName);
+
+            // Append Line
+            csvContent += `${dateStr},${outletName},${authPerson},${authNumber},${fullAddress},${productDetails},${totalQty},${amount},${route},${salesman}\n`;
+        });
+
+        // 4. Trigger Download
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Pending_Deliveries_${startStr}_to_${endStr}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        document.getElementById('exportModal').classList.add('hidden');
+
+    } catch (error) {
+        console.error("Export Error:", error);
+        alert("Failed to export: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Download .CSV File";
+    }
+};
+
+// Helper to handle commas and quotes in CSV
+function escapeCsv(str) {
+    if (str == null) return "";
+    str = String(str).replace(/"/g, '""'); // Escape double quotes
+    if (str.search(/("|,|\n)/g) >= 0) {
+        str = `"${str}"`; // Wrap in quotes if it contains comma, quote or newline
+    }
+    return str;
+}
