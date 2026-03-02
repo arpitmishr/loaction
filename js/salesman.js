@@ -161,13 +161,19 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 // --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
 
-// Updated: Fetches ALL routes assigned to salesman (ignoring Sleep ones)
+// --- 3. ROUTE & SHOP LIST LOGIC (CACHED) ---
+
+// --- GLOBAL PAGINATION VARIABLES ---
+let globalAllShops = [];
+let globalDisplayedCount = 0;
+const SHOPS_PER_BATCH = 7; // Load 7 at a time
+
+// Updated: Fetches ALL routes assigned to salesman
 async function loadAssignedRoute(uid) {
     const routeNameEl = document.getElementById('route-name');
     const shopsListEl = document.getElementById('shops-list');
 
     try {
-        // Query for routes assigned to this UID that are NOT in sleep mode
         const q = query(
             collection(db, "routes"), 
             where("assignedSalesmanId", "==", uid),
@@ -192,16 +198,28 @@ async function loadAssignedRoute(uid) {
     } catch (error) { console.error(error); }
 }
 
-// Merges shops and determines if they were visited TODAY
+// --- LOAD & MERGE SHOPS (OPTIMIZED) ---
 async function loadAllAssignedShops(routes) {
     const routeIds = routes.map(r => r.id);
+    const list = document.getElementById('shops-list');
     
+    // UI: Show Skeleton/Loading
+    list.innerHTML = `
+        <li class="animate-pulse bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
+            <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div class="h-3 bg-slate-200 rounded w-1/2"></div>
+        </li>
+        <li class="animate-pulse bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2 opacity-50">
+            <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div class="h-3 bg-slate-200 rounded w-1/2"></div>
+        </li>
+    `;
+
     try {
-        // 1. Get Activity Set (Visited or Ordered Today)
+        // 1. Get Activity Set (Visited Today)
         const todayStr = getTodayDateString(); 
         const activitySet = new Set();
 
-        // Check Visits Today
         const vQ = query(collection(db, "visits"), where("salesmanId", "==", auth.currentUser.uid), where("status", "==", "completed"));
         const vSnap = await getDocs(vQ);
         vSnap.forEach(d => {
@@ -209,110 +227,180 @@ async function loadAllAssignedShops(routes) {
             if(date === todayStr) activitySet.add(d.data().outletId);
         });
 
-        // 2. Fetch all shops for these routes
+        // 2. Fetch all route_outlets IDs (Lightweight)
         let allRouteOutlets = [];
-        for (const rId of routeIds) {
-            const q = query(collection(db, "route_outlets"), where("routeId", "==", rId));
-            const snap = await getDocs(q);
+        const routePromises = routeIds.map(rId => 
+            getDocs(query(collection(db, "route_outlets"), where("routeId", "==", rId)))
+        );
+        const routeSnaps = await Promise.all(routePromises);
+        
+        routeSnaps.forEach(snap => {
             snap.forEach(d => allRouteOutlets.push(d.data()));
-        }
+        });
 
         const uniqueOutletIds = [...new Set(allRouteOutlets.map(item => item.outletId))];
-        const mergedShops = [];
 
-        for (const oId of uniqueOutletIds) {
-            const outletDoc = await getDoc(doc(db, "outlets", oId));
-            if (outletDoc.exists()) {
-                const data = outletDoc.data();
+        if(uniqueOutletIds.length === 0) {
+             list.innerHTML = `<li class="text-center text-slate-400 py-10">No shops in this route.</li>`;
+             return;
+        }
+
+        // 3. LIGHTNING FAST: Fetch Outlet Details in Parallel (Promise.all)
+        const outletPromises = uniqueOutletIds.map(oId => getDoc(doc(db, "outlets", oId)));
+        const outletSnaps = await Promise.all(outletPromises);
+
+        let mergedShops = [];
+        outletSnaps.forEach(snap => {
+            if (snap.exists()) {
+                const data = snap.data();
                 mergedShops.push({
-                    id: oId,
+                    id: snap.id,
                     name: data.shopName,
                     lat: data.geo?.lat || 0,
                     lng: data.geo?.lng || 0,
-                    isVisited: activitySet.has(oId)
+                    sequence: data.sequence || 0,
+                    // Fix: Ensure createdAt exists, default to 0 if missing
+                    createdAt: data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : 0) : 0, 
+                    isVisited: activitySet.has(snap.id)
                 });
             }
-        }
+        });
 
-        appCache.routeOutlets = mergedShops; 
-        renderShopsList(mergedShops, activitySet);
+        // 4. SMART SORTING: 
+        // Priority 1: Unvisited First
+        // Priority 2: Latest Added First (createdAt desc)
+        mergedShops.sort((a, b) => {
+            // Put Unvisited before Visited
+            if (a.isVisited !== b.isVisited) return a.isVisited ? 1 : -1;
+            
+            // Put Latest Created Shops on Top
+            return b.createdAt - a.createdAt;
+        });
 
-    } catch (error) { console.error(error); }
+        // 5. Store in Global & Init Pagination
+        appCache.routeOutlets = mergedShops; // Update Cache
+        globalAllShops = mergedShops;
+        globalDisplayedCount = 0;
+        
+        // Clear list and Load First Batch
+        list.innerHTML = "";
+        loadMoreShops(); // Renders the first 7
+
+    } catch (error) { 
+        console.error("Shop Load Error:", error);
+        list.innerHTML = `<li class="text-center text-red-400 py-4">Error loading data. Pull to refresh.</li>`;
+    }
 }
 
-
-
-
-// --- UPDATED RENDER LIST WITH NAVIGATION BUTTON ---
-function renderShopsList(shops, visitedSet = new Set()) {
+// --- PAGINATION RENDER FUNCTION ---
+window.loadMoreShops = function() {
     const list = document.getElementById('shops-list');
-    list.innerHTML = "";
+    const loadMoreBtnId = "btn-load-more-container";
+    
+    // Remove existing Load More button if it exists
+    const existingBtn = document.getElementById(loadMoreBtnId);
+    if(existingBtn) existingBtn.remove();
 
-    // Sort: Visited at bottom, then by sequence
-    shops.sort((a, b) => {
-        const aVisit = visitedSet.has(a.id) ? 1 : 0;
-        const bVisit = visitedSet.has(b.id) ? 1 : 0;
-        if (aVisit !== bVisit) return aVisit - bVisit;
-        return (a.sequence || 999) - (b.sequence || 999);
-    });
+    // Calculate Slice
+    const nextBatch = globalAllShops.slice(globalDisplayedCount, globalDisplayedCount + SHOPS_PER_BATCH);
+    
+    if (nextBatch.length === 0 && globalDisplayedCount === 0) {
+        list.innerHTML = `<li class="text-center text-slate-400 py-10">No shops assigned to this route.</li>`;
+        return;
+    }
 
-    shops.forEach(shop => {
-        const isVisited = visitedSet.has(shop.id);
-        const li = document.createElement('li');
-        
-        const bgStyle = isVisited ? "background:#f0fdf4; border:1px solid #86efac;" : "background:white; border:1px solid #ddd;";
-        const checkMark = isVisited ? `<span style="color:green; font-weight:bold; font-size:12px;">✅ Visited</span>` : "";
-
-        li.style.cssText = `${bgStyle} margin:10px 0; padding:15px; border-radius:16px; display:flex; flex-direction:column; gap:10px; transition: background 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.02);`;
-        
-        li.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <strong style="font-size:1rem; color:${isVisited ? '#15803d' : '#1e293b'}">${shop.name}</strong><br>
-                    <div style="display:flex; gap:5px; align-items:center; margin-top:2px;">
-                        <span style="font-size:0.7rem; background:#f1f5f9; color:#64748b; padding:2px 6px; border-radius:4px;">Seq: ${shop.sequence || 'New'}</span>
-                        ${checkMark}
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display:flex; gap:8px; justify-content:flex-end; border-top:1px dashed #eee; padding-top:10px;">
-                <!-- NAVIGATION BUTTON (NEW) -->
-                <button class="btn-nav" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Navigate">
-                    <span class="material-icons-round" style="font-size:18px;">near_me</span>
-                </button>
-
-                <!-- COLLECTION BUTTON -->
-                <button class="btn-collect" style="background:#ecfccb; color:#4d7c0f; border:1px solid #d9f99d; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Collect Payment">
-                    <span class="material-icons-round" style="font-size:18px;">payments</span>
-                </button>
-
-                <!-- PHONE ORDER -->
-                <button class="btn-phone-order" style="background:#fff7ed; color:#c2410c; border:1px solid #ffedd5; width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Phone Order">
-                    <span class="material-icons-round" style="font-size:18px;">call</span>
-                </button>
-
-                <!-- VISIT BUTTON -->
-                <button class="btn-open-map" style="background:${isVisited ? '#f1f5f9' : '#eff6ff'}; color:${isVisited ? '#64748b' : '#2563eb'}; border:1px solid ${isVisited ? '#e2e8f0' : '#bfdbfe'}; padding:0 12px; height:36px; border-radius:10px; cursor:pointer; font-weight:bold; font-size:0.75rem;">
-                    ${isVisited ? 'View' : 'Visit'}
-                </button>
-            </div>
-        `;
-        
-        // Attach Listeners
-        li.querySelector('.btn-nav').onclick = () => openGoogleMapsNavigation(shop.lat, shop.lng);
-        li.querySelector('.btn-collect').onclick = () => openQuickCollection(shop.id, shop.name);
-        li.querySelector('.btn-phone-order').onclick = () => window.openOrderForm(shop.id, shop.name);
-        li.querySelector('.btn-open-map').onclick = () => {
-            if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
-            else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
-        };
-
+    // Render Batch
+    nextBatch.forEach(shop => {
+        const li = createShopListItem(shop);
         list.appendChild(li);
     });
+
+    // Update Counter
+    globalDisplayedCount += nextBatch.length;
+
+    // Check if more items exist
+    if (globalDisplayedCount < globalAllShops.length) {
+        const remaining = globalAllShops.length - globalDisplayedCount;
+        
+        const btnContainer = document.createElement('div');
+        btnContainer.id = loadMoreBtnId;
+        btnContainer.className = "py-4 flex justify-center pb-24"; // Extra padding at bottom
+        btnContainer.innerHTML = `
+            <button onclick="loadMoreShops()" class="bg-white text-indigo-600 font-bold py-3 px-8 rounded-full shadow-lg border border-indigo-100 hover:bg-indigo-50 active:scale-95 transition flex items-center gap-2 text-sm">
+                <span>Load More Shops (${remaining})</span>
+                <span class="material-icons-round text-sm">expand_more</span>
+            </button>
+        `;
+        list.appendChild(btnContainer);
+    } else if (globalDisplayedCount > 0) {
+        // End of list indicator
+        const endMsg = document.createElement('div');
+        endMsg.className = "text-center text-[10px] text-slate-300 uppercase font-bold tracking-widest py-6 pb-24";
+        endMsg.innerText = "End of Route";
+        list.appendChild(endMsg);
+    }
+};
+
+// --- HELPER: CREATE ITEM HTML ---
+function createShopListItem(shop) {
+    const li = document.createElement('li');
+    const isVisited = shop.isVisited;
+    
+    // Visited: Greenish background, dim opacity. Unvisited: White, pop-out shadow.
+    const bgStyle = isVisited 
+        ? "background:#f0fdf4; border:1px solid #bbf7d0; opacity:0.8;" 
+        : "background:white; border:1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);";
+    
+    const checkMark = isVisited 
+        ? `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><span class="material-icons-round text-[10px]">check</span> Done</span>` 
+        : `<span class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-full">Pending</span>`;
+
+    li.className = "rounded-2xl p-4 transition-all mb-3 relative overflow-hidden group";
+    li.style.cssText = bgStyle;
+    
+    li.innerHTML = `
+        <div class="flex justify-between items-start">
+            <div>
+                <h4 class="font-bold text-slate-800 text-[15px] leading-tight mb-1">${shop.name}</h4>
+                <div class="flex gap-2 items-center">
+                    ${checkMark}
+                    <span class="text-[10px] text-slate-400 font-mono">ID: ${shop.id.substr(0,4)}</span>
+                </div>
+            </div>
+            <!-- Quick GPS Nav Button (Top Right) -->
+             <button class="btn-nav bg-blue-50 text-blue-600 w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition" title="Navigate">
+                <span class="material-icons-round text-sm">near_me</span>
+            </button>
+        </div>
+        
+        <!-- Action Bar -->
+        <div class="flex gap-2 mt-4 pt-3 border-t border-dashed border-slate-100">
+            <button class="btn-open-map flex-1 bg-slate-800 text-white py-2 rounded-xl text-xs font-bold shadow hover:bg-slate-900 active:scale-95 transition flex items-center justify-center gap-1">
+                ${isVisited ? 'View Details' : 'Start Visit'} 
+                <span class="material-icons-round text-[14px]">arrow_forward</span>
+            </button>
+            
+            <button class="btn-collect flex-1 bg-emerald-50 text-emerald-700 border border-emerald-100 py-2 rounded-xl text-xs font-bold hover:bg-emerald-100 active:scale-95 transition">
+                Collect
+            </button>
+
+            <button class="btn-phone-order w-10 bg-orange-50 text-orange-600 border border-orange-100 py-2 rounded-xl flex items-center justify-center hover:bg-orange-100 active:scale-95 transition">
+                <span class="material-icons-round text-sm">call</span>
+            </button>
+        </div>
+    `;
+    
+    // Attach Listeners
+    li.querySelector('.btn-nav').onclick = (e) => { e.stopPropagation(); openGoogleMapsNavigation(shop.lat, shop.lng); };
+    li.querySelector('.btn-collect').onclick = (e) => { e.stopPropagation(); openQuickCollection(shop.id, shop.name); };
+    li.querySelector('.btn-phone-order').onclick = (e) => { e.stopPropagation(); window.openOrderForm(shop.id, shop.name); };
+    li.querySelector('.btn-open-map').onclick = () => {
+        if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
+        else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
+    };
+
+    return li;
 }
-
-
 
 
 
