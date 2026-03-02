@@ -635,52 +635,25 @@ window.toggleOutletStatus = async function(id, newStatus) {
 //      ROUTE MANAGEMENT LOGIC
 // ==========================================
 
-// Call this inside your main onAuthStateChanged/init block
-// Example: 
-// loadRoutes();
-// populateSalesmanDropdown(); 
-// populateAllOutletsDropdown();
-
-// 1. Populate Salesman Dropdown
-async function populateAllOutletsDropdown() {
-    const select = document.getElementById('allOutletsDropdown');
+// 1. Populate Salesman Dropdown (Fixed: Was duplicate of Outlets before)
+async function populateSalesmanDropdown() {
+    const select = document.getElementById('routeSalesmanSelect');
     if (!select) return;
-
+    
     try {
-        // Fetch all outlets
-        const snap = await getDocs(collection(db, "outlets"));
+        const q = query(collection(db, "users"), where("role", "==", "salesman"));
+        const snap = await getDocs(q);
         
-        // Reset dropdown
-        select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        select.innerHTML = '<option value="">Assign Salesman</option>';
         
-        // Convert to array to sort them alphabetically by Shop Name for easier finding
-        let outlets = [];
         snap.forEach(doc => {
-            outlets.push({ id: doc.id, ...doc.data() });
-        });
-
-        // Optional: Sort by Shop Name
-        outlets.sort((a, b) => a.shopName.localeCompare(b.shopName));
-
-        outlets.forEach(d => {
+            const d = doc.data();
             const option = document.createElement('option');
-            option.value = d.id;
-            
-            // Format: Shop Name (Phone) {Full Address}
-            // We use a fallback "No Address" if the field is empty
-            const addressDisplay = d.address ? `{${d.address}}` : "{No Address Recorded}";
-            const phoneDisplay = d.contactPhone ? `(${d.contactPhone})` : "";
-            
-            option.textContent = `${d.shopName} ${phoneDisplay} ${addressDisplay}`;
-            
-            // Store name in dataset to avoid extra fetching later
-            option.dataset.name = d.shopName; 
+            option.value = doc.id; // UID
+            option.textContent = d.fullName || d.email;
             select.appendChild(option);
         });
-    } catch (e) { 
-        console.error("Error loading outlets for dropdown:", e); 
-        select.innerHTML = '<option value="">Error loading data</option>';
-    }
+    } catch (e) { console.error("Error loading salesmen:", e); }
 }
 
 // 2. Create Route
@@ -700,7 +673,8 @@ if (createRouteForm) {
                 name: name,
                 assignedSalesmanId: salesmanId,
                 createdAt: serverTimestamp(),
-                active: true
+                active: true,
+                status: 'active'
             });
             alert("Route Created!");
             document.getElementById('routeNameInput').value = "";
@@ -768,11 +742,9 @@ async function loadRoutes() {
     } catch (e) { console.error(e); }
 }
 
-
 function generateSalesmanOptions(currentId) {
-    // This assumes you have global salesman data or we fetch it
     let options = `<option value="">Unassigned</option>`;
-    const select = document.getElementById('routeSalesmanSelect'); // borrowing from your existing dropdown
+    const select = document.getElementById('routeSalesmanSelect'); 
     if(select) {
         Array.from(select.options).forEach(opt => {
             if(!opt.value) return;
@@ -782,27 +754,44 @@ function generateSalesmanOptions(currentId) {
     return options;
 }
 
-
-
-
-// 4. Populate All Outlets (for adding to route)
+// 4. Populate All Outlets (UPDATED: With Address & Sorting)
 async function populateAllOutletsDropdown() {
     const select = document.getElementById('allOutletsDropdown');
     if (!select) return;
 
     try {
         const snap = await getDocs(collection(db, "outlets"));
+        
+        // Reset dropdown
         select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        
+        // Convert to array to sort
+        let outlets = [];
         snap.forEach(doc => {
-            const d = doc.data();
+            outlets.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort alphabetically by Shop Name
+        outlets.sort((a, b) => a.shopName.localeCompare(b.shopName));
+
+        outlets.forEach(d => {
             const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = `${d.shopName} (${d.contactPhone})`;
-            // Store name in dataset to avoid extra fetching later
+            option.value = d.id;
+            
+            // Format: Shop Name (Phone) {Full Address}
+            const phoneDisplay = d.contactPhone ? `(${d.contactPhone})` : "";
+            const addressDisplay = d.address ? `{${d.address}}` : "{No Address}";
+            
+            option.textContent = `${d.shopName} ${phoneDisplay} ${addressDisplay}`;
+            
+            // Store name in dataset
             option.dataset.name = d.shopName; 
             select.appendChild(option);
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Error loading outlets for dropdown:", e); 
+        select.innerHTML = '<option value="">Error loading data</option>';
+    }
 }
 
 // 5. Select Route (Setup UI)
@@ -886,17 +875,14 @@ window.removeOutletFromRoute = async function(docId) {
     if(!confirm("Remove from route?")) return;
     try {
         await deleteDoc(doc(db, "route_outlets", docId));
-        // Note: Real apps should re-calculate sequences here, 
-        // but for simplicity we skip re-indexing remaining items.
         loadRouteOutlets(document.getElementById('selectedRouteId').value);
     } catch (e) { console.error(e); }
 };
 
 // 9. Reorder (Swap) Logic
 window.changeSequence = async function(docId, direction, currentSeq) {
-    // direction: -1 (Up), 1 (Down)
     const newSeq = currentSeq + direction;
-    if (newSeq < 1) return; // Can't go below 1
+    if (newSeq < 1) return; 
 
     const routeId = document.getElementById('selectedRouteId').value;
 
@@ -922,7 +908,6 @@ window.changeSequence = async function(docId, direction, currentSeq) {
 
     } catch (e) {
         console.error("Reorder error:", e);
-        // This query requires a composite index: routeId ASC, sequence ASC
         if(e.message.includes("index")) alert("Index missing. Check console.");
     }
 };
