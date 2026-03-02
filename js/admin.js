@@ -642,23 +642,45 @@ window.toggleOutletStatus = async function(id, newStatus) {
 // populateAllOutletsDropdown();
 
 // 1. Populate Salesman Dropdown
-async function populateSalesmanDropdown() {
-    const select = document.getElementById('routeSalesmanSelect');
+async function populateAllOutletsDropdown() {
+    const select = document.getElementById('allOutletsDropdown');
     if (!select) return;
-    
+
     try {
-        const q = query(collection(db, "users"), where("role", "==", "salesman"));
-        const snap = await getDocs(q);
-        select.innerHTML = '<option value="">Select Salesman</option>';
+        // Fetch all outlets
+        const snap = await getDocs(collection(db, "outlets"));
         
+        // Reset dropdown
+        select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        
+        // Convert to array to sort them alphabetically by Shop Name for easier finding
+        let outlets = [];
         snap.forEach(doc => {
-            const d = doc.data();
+            outlets.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Optional: Sort by Shop Name
+        outlets.sort((a, b) => a.shopName.localeCompare(b.shopName));
+
+        outlets.forEach(d => {
             const option = document.createElement('option');
-            option.value = doc.id; // UID
-            option.textContent = d.fullName || d.email;
+            option.value = d.id;
+            
+            // Format: Shop Name (Phone) {Full Address}
+            // We use a fallback "No Address" if the field is empty
+            const addressDisplay = d.address ? `{${d.address}}` : "{No Address Recorded}";
+            const phoneDisplay = d.contactPhone ? `(${d.contactPhone})` : "";
+            
+            option.textContent = `${d.shopName} ${phoneDisplay} ${addressDisplay}`;
+            
+            // Store name in dataset to avoid extra fetching later
+            option.dataset.name = d.shopName; 
             select.appendChild(option);
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Error loading outlets for dropdown:", e); 
+        select.innerHTML = '<option value="">Error loading data</option>';
+    }
 }
 
 // 2. Create Route
