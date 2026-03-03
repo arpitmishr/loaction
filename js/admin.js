@@ -2739,19 +2739,22 @@ function escapeCsv(str) {
 
 
 // ==========================================
-//      INVOICE GENERATION LOGIC (FIXED)
+//      INVOICE GENERATION LOGIC (OVERLAY FIX)
 // ==========================================
 
 window.generateInvoice = async function(orderId) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     
-    try {
-        // 1. Loading State
-        btn.disabled = true;
-        btn.innerHTML = `Gen...`;
+    // 1. Create a variable to hold the container so we can remove it later
+    let overlayContainer = null;
 
-        // 2. Fetch Data
+    try {
+        // UI Feedback
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
+
+        // 2. Fetch Data (Order + Outlet)
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2759,235 +2762,243 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 3. Prepare Variables
+        // 3. Prepare Data Variables
         const invNo = orderId.slice(0, 6).toUpperCase(); 
-        const invDate = order.orderDate.toDate().toLocaleDateString('en-GB'); // DD-MM-YYYY
+        const invDate = order.orderDate.toDate().toLocaleDateString('en-GB'); // DD/MM/YYYY
         const supplyDate = order.deliveryDueDate ? order.deliveryDueDate.toDate().toLocaleDateString('en-GB') : invDate;
         const route = order.routeName || "N/A";
-        const vehicle = "N/A"; 
+        const vehicle = "N/A"; // Placeholder
 
-        const custName = order.outletName;
-        const custAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, " ") : "N/A";
+        const custName = order.outletName || "Unknown";
+        // Clean address to remove line breaks that might break layout
+        const custAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") : "N/A";
         const custPhone = outlet.contactPhone || "N/A";
         const custGst = outlet.gstNumber || "N/A";
 
-        const subtotal = order.financials.subtotal;
-        const totalTax = order.financials.tax;
-        const grandTotal = order.financials.totalAmount;
+        // Financials
+        const subtotal = order.financials?.subtotal || 0;
+        const totalTax = order.financials?.tax || 0;
+        const grandTotal = order.financials?.totalAmount || 0;
         const cgst = totalTax / 2;
         const sgst = totalTax / 2;
 
-        // 4. Create Temporary Container (At Top of Page, Behind Content)
-        // We remove any existing container first to be clean
-        const existingContainer = document.getElementById('temp-invoice-container');
-        if (existingContainer) document.body.removeChild(existingContainer);
-
-        const container = document.createElement('div');
-        container.id = 'temp-invoice-container';
+        // 4. Create Full Screen Overlay Container
+        // This sits ON TOP of everything to ensure html2canvas can see it
+        overlayContainer = document.createElement('div');
+        overlayContainer.id = 'invoice-overlay';
         
-        // STYLE FIX: Position at 0,0 but behind everything. 
-        // Force A4 landscape width (approx 297mm)
-        container.style.cssText = `
-            position: absolute;
+        // CSS to force it to be visible and A4 Landscape width
+        overlayContainer.style.cssText = `
+            position: fixed;
             top: 0;
             left: 0;
-            width: 297mm;
-            background: #fff;
-            z-index: -9999;
-            padding: 10px;
-            color: black;
-            font-family: Arial, sans-serif;
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            z-index: 999999; /* Highest priority */
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 20px;
         `;
-        document.body.appendChild(container);
+        document.body.appendChild(overlayContainer);
 
-        // 5. CSS Styles (Inlined for reliability)
-        const styles = `
+        // 5. CSS Content (The Invoice Design)
+        // We use specific widths (290mm total) to fit A4 Landscape
+        const css = `
             <style>
-                .inv-wrapper { display: flex; justify-content: space-between; width: 100%; padding: 10px; box-sizing: border-box; }
-                .inv-box {
-                    width: 49%; 
+                .inv-print-area {
+                    width: 290mm; /* A4 Landscape width */
+                    background: white;
+                    color: black;
+                    font-family: Arial, Helvetica, sans-serif;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .inv-half {
+                    width: 49%;
                     border: 1px solid #000;
+                    box-sizing: border-box;
                     font-size: 9px;
                     line-height: 1.2;
-                    color: #000;
                 }
-                .inv-top-row { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; }
-                
-                /* Header Section */
+                .inv-top {
+                    display: flex; justify-content: space-between;
+                    border-bottom: 1px solid #000;
+                    padding: 2px 5px;
+                    font-weight: bold;
+                }
                 .inv-header { display: flex; border-bottom: 1px solid #000; }
-                .inv-logo { width: 25%; background: #000; color: #fff; font-weight: bold; font-size: 20px; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
-                .inv-company { width: 75%; text-align: center; padding: 5px; }
-                .inv-company h1 { margin: 0; font-size: 14px; font-weight: bold; text-transform: uppercase; }
-                .inv-company p { margin: 1px 0; font-size: 8px; }
+                .inv-logo {
+                    width: 20%; background: #000; color: #fff;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 14px; font-weight: bold;
+                    -webkit-print-color-adjust: exact;
+                }
+                .inv-company { width: 80%; text-align: center; padding: 5px; }
+                .inv-company h1 { font-size: 14px; margin: 0; font-weight: bold; }
+                .inv-company p { font-size: 8px; margin: 2px 0; }
 
-                /* Meta Data (Invoice No, etc) */
                 .inv-meta { display: flex; border-bottom: 1px solid #000; }
-                .inv-meta-col { width: 50%; padding: 3px; }
-                .inv-meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+                .inv-meta-box { width: 50%; padding: 2px 4px; }
+                .inv-meta-box.left { border-right: 1px solid #000; }
+                .inv-row { display: flex; justify-content: space-between; }
 
-                /* Address Box */
-                .inv-bill-ship { display: flex; border-bottom: 1px solid #000; }
-                .inv-bill { width: 50%; border-right: 1px solid #000; padding: 3px; }
-                .inv-ship { width: 50%; padding: 3px; }
+                .inv-addr { display: flex; border-bottom: 1px solid #000; }
+                .inv-addr-box { width: 50%; padding: 2px 4px; }
+                .inv-addr-box.left { border-right: 1px solid #000; }
 
-                /* Table */
-                .inv-table { width: 100%; border-collapse: collapse; font-size: 9px; }
-                .inv-table th { border-bottom: 1px solid #000; border-right: 1px solid #000; font-weight: bold; text-align: center; background: #fff; }
-                .inv-table td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px; }
+                .inv-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 0; }
+                .inv-table th { background: #eee; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px; text-align: center; -webkit-print-color-adjust: exact; }
+                .inv-table td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
-                
-                /* Footer */
-                .inv-footer { display: flex; }
-                .inv-terms { width: 60%; padding: 3px; border-right: 1px solid #000; font-size: 8px; }
-                .inv-totals { width: 40%; }
-                .inv-tot-row { display: flex; justify-content: space-between; padding: 1px 3px; border-bottom: 1px solid #ccc; }
-                .inv-tot-row.final { border-bottom: none; border-top: 1px solid #000; font-weight: bold; font-size: 10px; background: #f0f0f0; -webkit-print-color-adjust: exact; }
 
-                .bank-box { border: 1px dashed #000; padding: 2px; margin-top: 2px; }
+                .inv-footer { display: flex; }
+                .inv-terms { width: 60%; padding: 4px; border-right: 1px solid #000; font-size: 8px; }
+                .inv-totals { width: 40%; }
+                .inv-tot-row { display: flex; justify-content: space-between; padding: 2px 4px; border-bottom: 1px solid #eee; }
+                .inv-tot-row.final { border-top: 1px solid #000; border-bottom: none; font-weight: bold; font-size: 10px; background: #eee; -webkit-print-color-adjust: exact; }
+                
+                .sign-area { height: 30px; text-align: right; padding-right: 10px; padding-top: 20px; font-weight: bold; }
             </style>
         `;
 
-        // 6. Template Function
-        const getTemplate = (copyType) => `
-            <div class="inv-box">
-                <div class="inv-top-row">
-                    <span>Pgs No. 1 of 1</span>
-                    <strong>TAX INVOICE</strong>
+        // 6. Template Builder
+        const getCopyHtml = (copyType) => `
+            <div class="inv-half">
+                <div class="inv-top">
+                    <span>Page 1 of 1</span>
+                    <span>TAX INVOICE</span>
                     <span>${copyType} Copy</span>
                 </div>
+                
                 <div class="inv-header">
                     <div class="inv-logo">freskey</div>
                     <div class="inv-company">
                         <h1>FRESKEYPIYO BEVERAGES</h1>
                         <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K (247661)</p>
-                        <p>GSTIN: 05AALFF0289R1ZS / PAN: AALFF0289R</p>
+                        <p>GSTIN: 05AALFF0289R1ZS &nbsp;|&nbsp; PAN: AALFF0289R</p>
                     </div>
                 </div>
+
                 <div class="inv-meta">
-                    <div class="inv-meta-col" style="border-right:1px solid #000">
-                        <div class="inv-meta-row"><span>Invoice No:</span> <b>${invNo}</b></div>
-                        <div class="inv-meta-row"><span>Invoice Date:</span> <b>${invDate}</b></div>
-                        <div class="inv-meta-row"><span>Point of Supply:</span> <b>${supplyDate}</b></div>
-                        <div class="inv-meta-row"><span>Terms:</span> <b>Due on Receipt</b></div>
+                    <div class="inv-meta-box left">
+                        <div class="inv-row"><span>Invoice No:</span> <b>${invNo}</b></div>
+                        <div class="inv-row"><span>Date:</span> <b>${invDate}</b></div>
+                        <div class="inv-row"><span>Supply:</span> <b>${supplyDate}</b></div>
                     </div>
-                    <div class="inv-meta-col">
-                        <div class="inv-meta-row"><span>Route:</span> <b>${route}</b></div>
-                        <div class="inv-meta-row"><span>Vehicle No:</span> <b>${vehicle}</b></div>
-                        <div class="inv-meta-row"><span>Salesman:</span> <b>${order.salesmanName.split(' ')[0]}</b></div>
+                    <div class="inv-meta-box">
+                        <div class="inv-row"><span>Route:</span> <b>${route}</b></div>
+                        <div class="inv-row"><span>Salesman:</span> <b>${order.salesmanName.split(' ')[0]}</b></div>
+                        <div class="inv-row"><span>Terms:</span> <b>Cash/Credit</b></div>
                     </div>
                 </div>
-                <div class="inv-bill-ship">
-                    <div class="inv-bill">
+
+                <div class="inv-addr">
+                    <div class="inv-addr-box left">
                         <b>Bill To:</b><br>
-                        Name: ${custName}<br>
-                        GSTIN: ${custGst}<br>
-                        Phn: ${custPhone}<br>
-                        Add: ${custAddress.substring(0,35)}
+                        ${custName}<br>
+                        Ph: ${custPhone} | GST: ${custGst}<br>
+                        ${custAddress.substring(0, 35)}
                     </div>
-                    <div class="inv-ship">
+                    <div class="inv-addr-box">
                         <b>Ship To:</b><br>
-                        Name: ${custName}<br>
-                        GSTIN: ${custGst}<br>
-                        Phn: ${custPhone}<br>
-                        Add: ${custAddress.substring(0,35)}
+                        ${custName}<br>
+                        ${custAddress.substring(0, 45)}
                     </div>
                 </div>
-                
+
                 <table class="inv-table">
                     <thead>
                         <tr>
-                            <th width="8%">S.No.</th>
-                            <th width="42%">Item & Description</th>
+                            <th width="8%">Sn</th>
+                            <th width="42%">Item</th>
                             <th width="10%">HSN</th>
                             <th width="10%">Qty</th>
-                            <th width="10%">UMO</th>
-                            <th width="10%">Price</th>
+                            <th width="10%">Unit</th>
+                            <th width="10%">Rate</th>
                             <th width="10%">Amt</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${order.items.map((i, idx) => `
+                        ${order.items.map((item, i) => `
                         <tr>
-                            <td align="center">${idx + 1}</td>
-                            <td>${i.name}</td>
+                            <td align="center">${i + 1}</td>
+                            <td>${item.name}</td>
                             <td align="center">2201</td>
-                            <td align="center">${i.qty}</td>
+                            <td align="center">${item.qty}</td>
                             <td align="center">Box</td>
-                            <td align="right">${i.price.toFixed(2)}</td>
-                            <td align="right">${i.lineTotal.toFixed(2)}</td>
+                            <td align="right">${item.price.toFixed(2)}</td>
+                            <td align="right">${item.lineTotal.toFixed(2)}</td>
                         </tr>`).join('')}
-                        <!-- SCHEME ROW (Static Filler) -->
+                        <!-- Empty Rows to fill space -->
+                        ${Array(Math.max(0, 5 - order.items.length)).fill(0).map(() => `
                         <tr>
-                            <td align="center">${order.items.length + 1}</td>
-                            <td colspan="6" style="text-align:center; font-size:8px;">
-                                *** Scheme: 1 LTR CASE FREE ~ 11+1 (OFFER) ***
-                            </td>
+                            <td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td><td></td>
+                        </tr>`).join('')}
+                        <tr>
+                            <td colspan="7" style="text-align:center; font-style:italic;">*** Scheme: 1 LTR CASE FREE ~ 11+1 (OFFER) ***</td>
                         </tr>
                     </tbody>
                 </table>
 
                 <div class="inv-footer">
                     <div class="inv-terms">
-                        Note: We declare that this invoice shows the actual price of the goods described.<br>
+                        Note: Actual price declared.<br>
                         <b>Declaration:</b><br>
-                        1. Goods once sold will not be taken back.<br>
+                        1. Goods sold not taken back.<br>
                         2. Subject to Roorkee Jurisdiction.<br>
-                        <div class="bank-box">
-                            <b>Payment Details</b><br>
-                            Bank: PUNB | A/C: 4882002100005628<br>
+                        <div style="border:1px dashed #666; padding:2px; margin-top:2px;">
+                            <b>Bank Details:</b><br>
+                            PUNB | A/C: 4882002100005628<br>
                             IFSC: PUNB0488200
                         </div>
                     </div>
                     <div class="inv-totals">
-                        <div class="inv-tot-row"><span>Basic Value</span> <span>${subtotal.toFixed(2)}</span></div>
+                        <div class="inv-tot-row"><span>Basic</span> <span>${subtotal.toFixed(2)}</span></div>
                         <div class="inv-tot-row"><span>CGST 2.5%</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="inv-tot-row"><span>SGST 2.5%</span> <span>${sgst.toFixed(2)}</span></div>
-                        <div class="inv-tot-row"><span>IGST 5%</span> <span>0.00</span></div>
-                        <div class="inv-tot-row final"><span>Total Tax</span> <span>${totalTax.toFixed(2)}</span></div>
-                        <div class="inv-tot-row final"><span>Taxable Value</span> <span>${grandTotal.toFixed(2)}</span></div>
-                        <div style="text-align:right; padding:20px 5px 5px 5px;">
-                            <br><b>Authorized Person</b>
-                        </div>
+                        <div class="inv-tot-row final"><span>Total</span> <span>${grandTotal.toFixed(2)}</span></div>
+                        <div class="sign-area">Auth. Signatory</div>
                     </div>
                 </div>
             </div>
         `;
 
-        // 7. Inject Content
-        container.innerHTML = styles + `
-            <div class="inv-wrapper">
-                ${getTemplate('Original')}
-                ${getTemplate('Duplicate')}
+        // 7. Inject HTML
+        const wrapperId = 'print-wrapper';
+        overlayContainer.innerHTML = `
+            ${css}
+            <div id="${wrapperId}" class="inv-print-area">
+                ${getCopyHtml('ORIGINAL')}
+                ${getCopyHtml('DUPLICATE')}
             </div>
         `;
 
-        // 8. Wait for render
+        // 8. Force Browser Paint (Wait 500ms)
         await new Promise(r => setTimeout(r, 500));
 
-        // 9. Config Options (CRITICAL: scrollY: 0)
+        // 9. Generate PDF
+        const element = document.getElementById(wrapperId);
         const opt = {
             margin: 5,
             filename: `Inv_${invNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                scrollY: 0, // <--- CRITICAL FIX FOR BLANK PDF
-                windowWidth: 1200 // Force wide render
-            },
+            html2canvas: { scale: 2, useCORS: true, logging: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
         };
 
-        // 10. Save
-        await html2pdf().set(opt).from(container).save();
-        
-        // 11. Cleanup
-        document.body.removeChild(container);
+        await html2pdf().set(opt).from(element).save();
 
     } catch (error) {
-        console.error("Invoice Gen Error:", error);
-        alert("Error: " + error.message);
+        console.error("Invoice Error:", error);
+        alert("Failed: " + error.message);
     } finally {
+        // 10. Clean Up - Remove Overlay
+        if (overlayContainer && overlayContainer.parentNode) {
+            overlayContainer.parentNode.removeChild(overlayContainer);
+        }
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
