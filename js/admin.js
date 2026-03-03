@@ -2576,3 +2576,188 @@ function escapeCsv(str) {
     }
     return str;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      GLOBAL SEARCH (ADMIN)
+// ==========================================
+
+// Global Cache for Search
+let globalOutletCache = [];
+
+// 1. Initialize Cache (Call this inside 'loadOutlets' or 'populateAllOutletsDropdown')
+// Modified populateAllOutletsDropdown to store data in globalOutletCache
+async function populateAllOutletsDropdown() {
+    const select = document.getElementById('allOutletsDropdown');
+    
+    try {
+        const snap = await getDocs(collection(db, "outlets"));
+        
+        globalOutletCache = []; // Reset Cache
+        
+        if (select) select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        
+        let outlets = [];
+        snap.forEach(doc => {
+            const data = { id: doc.id, ...doc.data() };
+            outlets.push(data);
+            globalOutletCache.push(data); // Store for global search
+        });
+
+        outlets.sort((a, b) => a.shopName.localeCompare(b.shopName));
+
+        if (select) {
+            outlets.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d.id;
+                const addressDisplay = d.address ? `{${d.address}}` : "{No Address}";
+                option.textContent = `${d.shopName} (${d.contactPhone}) ${addressDisplay}`;
+                option.dataset.name = d.shopName; 
+                select.appendChild(option);
+            });
+        }
+    } catch (e) { console.error("Error loading outlets:", e); }
+}
+
+// 2. Handle Typing in Search Bar
+window.handleAdminGlobalSearch = function() {
+    const input = document.getElementById('globalAdminSearch');
+    const resultBox = document.getElementById('globalSearchResults');
+    const term = input.value.toLowerCase().trim();
+
+    if (term.length < 2) {
+        resultBox.classList.add('hidden');
+        return;
+    }
+
+    // Filter Cache
+    const matches = globalOutletCache.filter(shop => 
+        (shop.shopName || "").toLowerCase().includes(term) ||
+        (shop.contactPhone || "").includes(term) ||
+        (shop.ownerName || "").toLowerCase().includes(term)
+    ).slice(0, 10); // Limit to 10 results
+
+    if (matches.length === 0) {
+        resultBox.innerHTML = `<div class="p-4 text-xs text-slate-400 text-center">No matching shops found.</div>`;
+    } else {
+        resultBox.innerHTML = "";
+        matches.forEach(shop => {
+            const div = document.createElement('div');
+            div.className = "p-3 border-b border-slate-50 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors";
+            div.innerHTML = `
+                <div>
+                    <p class="text-sm font-bold text-slate-700">${shop.shopName}</p>
+                    <p class="text-[10px] text-slate-500">${shop.ownerName} • ${shop.contactPhone}</p>
+                </div>
+                <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full">${shop.outletType}</span>
+            `;
+            div.onclick = () => openAdminShopDetail(shop);
+            resultBox.appendChild(div);
+        });
+    }
+    resultBox.classList.remove('hidden');
+};
+
+// 3. Open Detailed Modal
+window.openAdminShopDetail = async function(shop) {
+    // Hide search results
+    document.getElementById('globalSearchResults').classList.add('hidden');
+    document.getElementById('globalAdminSearch').value = "";
+    
+    // Show Modal
+    const modal = document.getElementById('shopDetailModal');
+    modal.classList.remove('hidden');
+
+    // Populate Basic Info
+    document.getElementById('sd-name').innerText = shop.shopName;
+    document.getElementById('sd-meta').innerText = `${shop.outletType} • ${shop.contactPhone}`;
+    document.getElementById('sd-owner').innerText = shop.ownerName;
+    document.getElementById('sd-phone').innerText = shop.contactPhone;
+    document.getElementById('sd-address').innerText = shop.address || "No Address Recorded";
+    document.getElementById('sd-balance').innerText = `₹${(shop.currentBalance || 0).toFixed(2)}`;
+    document.getElementById('sd-limit').innerText = `₹${(shop.creditLimit || 0)}`;
+    
+    // Creator Info
+    if (shop.createdBySalesman) {
+        try {
+            // Check if we have this user in cache or fetch
+            // For speed, just showing ID or fetching if critical
+            // Here assuming simple display or fetch
+            getDoc(doc(db, "users", shop.createdBySalesman)).then(snap => {
+                document.getElementById('sd-creator').innerText = snap.exists() ? (snap.data().fullName || snap.data().email) : "Unknown";
+            });
+        } catch(e) { document.getElementById('sd-creator').innerText = "System"; }
+    } else {
+        document.getElementById('sd-creator').innerText = "Admin/Import";
+    }
+
+    const createdDate = shop.createdAt ? new Date(shop.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
+    document.getElementById('sd-createdDate').innerText = `Added: ${createdDate}`;
+
+    // Map Link
+    if (shop.geo && shop.geo.lat) {
+        document.getElementById('sd-mapLink').href = `https://www.google.com/maps/search/?api=1&query=${shop.geo.lat},${shop.geo.lng}`;
+        document.getElementById('sd-mapLink').classList.remove('hidden');
+    } else {
+        document.getElementById('sd-mapLink').classList.add('hidden');
+    }
+
+    // Fetch History (Orders & Payments)
+    document.getElementById('sd-ordersList').innerHTML = "<li>Loading...</li>";
+    document.getElementById('sd-paymentsList').innerHTML = "<li>Loading...</li>";
+
+    try {
+        const [orders, payments] = await Promise.all([
+            getDocs(query(collection(db, "orders"), where("outletId", "==", shop.id), orderBy("orderDate", "desc"), limit(5))),
+            getDocs(query(collection(db, "payments"), where("outletId", "==", shop.id), orderBy("date", "desc"), limit(5)))
+        ]);
+
+        // Render Orders
+        const orderList = document.getElementById('sd-ordersList');
+        orderList.innerHTML = "";
+        if (orders.empty) orderList.innerHTML = "<li class='italic text-slate-400'>No recent orders.</li>";
+        orders.forEach(d => {
+            const o = d.data();
+            const date = o.orderDate.toDate().toLocaleDateString();
+            orderList.innerHTML += `
+                <li class="flex justify-between border-b border-slate-50 pb-1">
+                    <span>${date}</span>
+                    <span class="font-bold text-indigo-600">₹${o.financials.totalAmount}</span>
+                </li>`;
+        });
+
+        // Render Payments
+        const payList = document.getElementById('sd-paymentsList');
+        payList.innerHTML = "";
+        if (payments.empty) payList.innerHTML = "<li class='italic text-slate-400'>No recent payments.</li>";
+        payments.forEach(d => {
+            const p = d.data();
+            const date = p.date.toDate().toLocaleDateString();
+            const color = p.status === 'approved' ? 'text-green-600' : 'text-orange-500';
+            payList.innerHTML += `
+                <li class="flex justify-between border-b border-slate-50 pb-1">
+                    <span>${date} (${p.method})</span>
+                    <span class="font-bold ${color}">₹${p.amount}</span>
+                </li>`;
+        });
+
+    } catch (e) { console.error(e); }
+};
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    const container = document.querySelector('.relative.group');
+    if (container && !container.contains(e.target)) {
+        document.getElementById('globalSearchResults').classList.add('hidden');
+    }
+});
