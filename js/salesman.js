@@ -1991,3 +1991,120 @@ async function openOutletMapDetails(outletId, name, lat, lng) {
         alert("Error loading outlet history. Check Firestore Indexes.");
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      SALESMAN SEARCH LOGIC (Fix)
+// ==========================================
+
+// 1. Toggle Search Bar Visibility
+window.toggleSalesmanSearch = function() {
+    const title = document.getElementById('header-title-area');
+    const search = document.getElementById('header-search-area');
+    const actions = document.getElementById('header-actions');
+    const input = document.getElementById('salesmanGlobalSearch');
+
+    // Safety check to prevent errors if elements are missing
+    if (!title || !search || !actions) {
+        console.error("Search Header elements not found.");
+        return;
+    }
+
+    if (search.classList.contains('hidden')) {
+        // SHOW SEARCH
+        title.classList.add('hidden');
+        actions.classList.add('hidden');
+        search.classList.remove('hidden');
+        if(input) setTimeout(() => input.focus(), 100); // Focus keyboard
+    } else {
+        // HIDE SEARCH
+        title.classList.remove('hidden');
+        actions.classList.remove('hidden');
+        search.classList.add('hidden');
+        
+        // Reset
+        if(input) input.value = "";
+        const results = document.getElementById('salesmanSearchResults');
+        if(results) results.classList.add('hidden');
+    }
+};
+
+// 2. Handle Typing & Rendering Results
+window.handleSalesmanSearch = function() {
+    const input = document.getElementById('salesmanGlobalSearch');
+    const resultBox = document.getElementById('salesmanSearchResults');
+    const term = input.value.toLowerCase().trim();
+
+    if (term.length < 2) {
+        resultBox.classList.add('hidden');
+        return;
+    }
+
+    // A. SEARCH LOCAL CACHE (Lightning Fast)
+    // searches the shops currently loaded in the route
+    let matches = [];
+    if (appCache.routeOutlets) {
+        matches = appCache.routeOutlets.filter(s => s.name.toLowerCase().includes(term));
+    }
+
+    // B. RENDER RESULTS
+    resultBox.innerHTML = "";
+    if (matches.length > 0) {
+        matches.forEach(shop => {
+            // Container
+            const div = document.createElement('div');
+            div.className = "p-3 border-b border-slate-50 hover:bg-indigo-50 flex justify-between items-center transition-colors";
+            
+            // Text Area (Click to View Details)
+            const textDiv = document.createElement('div');
+            textDiv.className = "flex-1 cursor-pointer";
+            textDiv.innerHTML = `
+                <p class="font-bold text-slate-700 text-sm">${shop.name}</p>
+                <p class="text-[10px] text-green-600">In Current Route</p>
+            `;
+            textDiv.onclick = () => {
+                window.toggleSalesmanSearch(); 
+                // Open the detail modal
+                if(window.openOutletMapDetails) {
+                    window.openOutletMapDetails(shop.id, shop.name, shop.lat, shop.lng);
+                }
+            };
+
+            // Visit Button (Click to Start Visit Immediately)
+            const visitBtn = document.createElement('button');
+            visitBtn.className = "ml-3 bg-indigo-600 text-white p-2 rounded-lg shadow-sm hover:bg-indigo-700 active:scale-95 transition flex items-center justify-center";
+            visitBtn.innerHTML = `<span class="material-icons-round text-sm">near_me</span>`;
+            
+            visitBtn.onclick = (e) => {
+                e.stopPropagation();
+                
+                if (shop.lat === 0 && shop.lng === 0) {
+                    alert("⚠️ No GPS coordinates set for this shop.");
+                    return;
+                }
+
+                window.toggleSalesmanSearch(); // Close Search
+                if(window.openVisitPanel) {
+                    window.openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
+                }
+            };
+
+            div.appendChild(textDiv);
+            div.appendChild(visitBtn);
+            resultBox.appendChild(div);
+        });
+    } else {
+        resultBox.innerHTML = `<div class="p-4 text-xs text-slate-400 text-center">No matching shops in route.</div>`;
+    }
+
+    resultBox.classList.remove('hidden');
+};
