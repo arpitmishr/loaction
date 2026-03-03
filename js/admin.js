@@ -2739,22 +2739,22 @@ function escapeCsv(str) {
 
 
 // ==========================================
-//      INVOICE GENERATION LOGIC (OVERLAY FIX)
+//      INVOICE GENERATION LOGIC (A4 Landscape Split)
 // ==========================================
 
 window.generateInvoice = async function(orderId) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     
-    // 1. Create a variable to hold the container so we can remove it later
-    let overlayContainer = null;
+    // Variable to hold the temporary container
+    let overlay = null;
 
     try {
-        // UI Feedback
+        // 1. UI Feedback
         btn.disabled = true;
         btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
 
-        // 2. Fetch Data (Order + Outlet)
+        // 2. Fetch Data
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2762,244 +2762,222 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 3. Prepare Data Variables
+        // 3. Prepare Variables
         const invNo = orderId.slice(0, 6).toUpperCase(); 
-        const invDate = order.orderDate.toDate().toLocaleDateString('en-GB'); // DD/MM/YYYY
+        const invDate = order.orderDate.toDate().toLocaleDateString('en-GB');
         const supplyDate = order.deliveryDueDate ? order.deliveryDueDate.toDate().toLocaleDateString('en-GB') : invDate;
         const route = order.routeName || "N/A";
-        const vehicle = "N/A"; // Placeholder
-
+        
+        // Address Parsing
         const custName = order.outletName || "Unknown";
-        // Clean address to remove line breaks that might break layout
-        const custAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") : "N/A";
+        let custAddress = outlet.address || "N/A";
+        custAddress = custAddress.replace(/(\r\n|\n|\r)/gm, ", "); // Remove line breaks
         const custPhone = outlet.contactPhone || "N/A";
         const custGst = outlet.gstNumber || "N/A";
 
-        // Financials
+        // Calculations
         const subtotal = order.financials?.subtotal || 0;
         const totalTax = order.financials?.tax || 0;
         const grandTotal = order.financials?.totalAmount || 0;
         const cgst = totalTax / 2;
         const sgst = totalTax / 2;
 
-        // 4. Create Full Screen Overlay Container
-        // This sits ON TOP of everything to ensure html2canvas can see it
-        overlayContainer = document.createElement('div');
-        overlayContainer.id = 'invoice-overlay';
+        // 4. Create Overlay Container (Visible on screen to fix Blank PDF issue)
+        overlay = document.createElement('div');
+        overlay.id = 'invoice-overlay';
         
-        // CSS to force it to be visible and A4 Landscape width
-        overlayContainer.style.cssText = `
+        // Force Landscape dimensions
+        overlay.style.cssText = `
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: white;
-            z-index: 999999; /* Highest priority */
-            overflow-y: auto;
+            background: #555; /* Dark background to see the paper */
+            z-index: 999999;
             display: flex;
             justify-content: center;
-            align-items: flex-start;
-            padding-top: 20px;
+            align-items: center;
+            overflow: auto;
         `;
-        document.body.appendChild(overlayContainer);
+        document.body.appendChild(overlay);
 
-        // 5. CSS Content (The Invoice Design)
-        // We use specific widths (290mm total) to fit A4 Landscape
-        const css = `
-            <style>
-                .inv-print-area {
-                    width: 290mm; /* A4 Landscape width */
-                    background: white;
-                    color: black;
-                    font-family: Arial, Helvetica, sans-serif;
-                    display: flex;
-                    justify-content: space-between;
-                }
-                .inv-half {
-                    width: 49%;
-                    border: 1px solid #000;
-                    box-sizing: border-box;
-                    font-size: 9px;
-                    line-height: 1.2;
-                }
-                .inv-top {
-                    display: flex; justify-content: space-between;
-                    border-bottom: 1px solid #000;
-                    padding: 2px 5px;
-                    font-weight: bold;
-                }
-                .inv-header { display: flex; border-bottom: 1px solid #000; }
-                .inv-logo {
-                    width: 20%; background: #000; color: #fff;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 14px; font-weight: bold;
-                    -webkit-print-color-adjust: exact;
-                }
-                .inv-company { width: 80%; text-align: center; padding: 5px; }
-                .inv-company h1 { font-size: 14px; margin: 0; font-weight: bold; }
-                .inv-company p { font-size: 8px; margin: 2px 0; }
-
-                .inv-meta { display: flex; border-bottom: 1px solid #000; }
-                .inv-meta-box { width: 50%; padding: 2px 4px; }
-                .inv-meta-box.left { border-right: 1px solid #000; }
-                .inv-row { display: flex; justify-content: space-between; }
-
-                .inv-addr { display: flex; border-bottom: 1px solid #000; }
-                .inv-addr-box { width: 50%; padding: 2px 4px; }
-                .inv-addr-box.left { border-right: 1px solid #000; }
-
-                .inv-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 0; }
-                .inv-table th { background: #eee; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px; text-align: center; -webkit-print-color-adjust: exact; }
-                .inv-table td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px 4px; }
-                .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
-
-                .inv-footer { display: flex; }
-                .inv-terms { width: 60%; padding: 4px; border-right: 1px solid #000; font-size: 8px; }
-                .inv-totals { width: 40%; }
-                .inv-tot-row { display: flex; justify-content: space-between; padding: 2px 4px; border-bottom: 1px solid #eee; }
-                .inv-tot-row.final { border-top: 1px solid #000; border-bottom: none; font-weight: bold; font-size: 10px; background: #eee; -webkit-print-color-adjust: exact; }
-                
-                .sign-area { height: 30px; text-align: right; padding-right: 10px; padding-top: 20px; font-weight: bold; }
-            </style>
-        `;
-
-        // 6. Template Builder
-        const getCopyHtml = (copyType) => `
-            <div class="inv-half">
-                <div class="inv-top">
-                    <span>Page 1 of 1</span>
-                    <span>TAX INVOICE</span>
-                    <span>${copyType} Copy</span>
-                </div>
-                
-                <div class="inv-header">
-                    <div class="inv-logo">freskey</div>
-                    <div class="inv-company">
-                        <h1>FRESKEYPIYO BEVERAGES</h1>
-                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K (247661)</p>
-                        <p>GSTIN: 05AALFF0289R1ZS &nbsp;|&nbsp; PAN: AALFF0289R</p>
+        // 5. Invoice HTML Template
+        const getInvoiceHtml = (copyTitle) => `
+            <div class="invoice-half">
+                <!-- Header -->
+                <div class="header-section">
+                    <div class="logo-box">
+                        <h1 style="margin:0; font-size:24px; line-height:1;">freskey</h1>
+                        <span style="font-size:12px;">piyo</span>
+                    </div>
+                    <div class="company-box">
+                        <h2 style="margin:0; font-size:16px;">FRESKEYPIYO BEVERAGES</h2>
+                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR</p>
+                        <p>GSTIN: 05AALFF0289R1ZS | Ph: 9876543210</p>
+                    </div>
+                    <div class="copy-box">
+                        <strong>${copyTitle}</strong><br>
+                        <span>TAX INVOICE</span>
                     </div>
                 </div>
 
-                <div class="inv-meta">
-                    <div class="inv-meta-box left">
-                        <div class="inv-row"><span>Invoice No:</span> <b>${invNo}</b></div>
-                        <div class="inv-row"><span>Date:</span> <b>${invDate}</b></div>
-                        <div class="inv-row"><span>Supply:</span> <b>${supplyDate}</b></div>
+                <!-- Meta Info (Row) -->
+                <div class="meta-row">
+                    <div class="meta-item"><strong>Inv No:</strong> ${invNo}</div>
+                    <div class="meta-item"><strong>Date:</strong> ${invDate}</div>
+                    <div class="meta-item"><strong>Route:</strong> ${route}</div>
+                    <div class="meta-item"><strong>Salesman:</strong> ${order.salesmanName.split(' ')[0]}</div>
+                </div>
+
+                <!-- Address Section -->
+                <div class="address-section">
+                    <div class="addr-box" style="border-right:1px solid #000;">
+                        <div class="addr-title">Billed To:</div>
+                        <strong>${custName}</strong><br>
+                        GSTIN: ${custGst}<br>
+                        Ph: ${custPhone}
                     </div>
-                    <div class="inv-meta-box">
-                        <div class="inv-row"><span>Route:</span> <b>${route}</b></div>
-                        <div class="inv-row"><span>Salesman:</span> <b>${order.salesmanName.split(' ')[0]}</b></div>
-                        <div class="inv-row"><span>Terms:</span> <b>Cash/Credit</b></div>
+                    <div class="addr-box">
+                        <div class="addr-title">Shipped To:</div>
+                        ${custAddress.substring(0, 70)}
                     </div>
                 </div>
 
-                <div class="inv-addr">
-                    <div class="inv-addr-box left">
-                        <b>Bill To:</b><br>
-                        ${custName}<br>
-                        Ph: ${custPhone} | GST: ${custGst}<br>
-                        ${custAddress.substring(0, 35)}
-                    </div>
-                    <div class="inv-addr-box">
-                        <b>Ship To:</b><br>
-                        ${custName}<br>
-                        ${custAddress.substring(0, 45)}
-                    </div>
+                <!-- Items Table -->
+                <div class="table-container">
+                    <table class="inv-table">
+                        <thead>
+                            <tr>
+                                <th width="8%">#</th>
+                                <th width="47%">Item Name</th>
+                                <th width="12%">HSN</th>
+                                <th width="10%">Qty</th>
+                                <th width="10%">Rate</th>
+                                <th width="13%">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${order.items.map((item, i) => `
+                            <tr>
+                                <td style="text-align:center">${i + 1}</td>
+                                <td>${item.name}</td>
+                                <td style="text-align:center">2201</td>
+                                <td style="text-align:center">${item.qty}</td>
+                                <td style="text-align:right">${item.price.toFixed(2)}</td>
+                                <td style="text-align:right">${item.lineTotal.toFixed(2)}</td>
+                            </tr>`).join('')}
+                            
+                            <!-- Filler Rows for layout stability -->
+                            ${Array(Math.max(0, 6 - order.items.length)).fill(0).map(() => `
+                            <tr><td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td></tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
 
-                <table class="inv-table">
-                    <thead>
-                        <tr>
-                            <th width="8%">Sn</th>
-                            <th width="42%">Item</th>
-                            <th width="10%">HSN</th>
-                            <th width="10%">Qty</th>
-                            <th width="10%">Unit</th>
-                            <th width="10%">Rate</th>
-                            <th width="10%">Amt</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${order.items.map((item, i) => `
-                        <tr>
-                            <td align="center">${i + 1}</td>
-                            <td>${item.name}</td>
-                            <td align="center">2201</td>
-                            <td align="center">${item.qty}</td>
-                            <td align="center">Box</td>
-                            <td align="right">${item.price.toFixed(2)}</td>
-                            <td align="right">${item.lineTotal.toFixed(2)}</td>
-                        </tr>`).join('')}
-                        <!-- Empty Rows to fill space -->
-                        ${Array(Math.max(0, 5 - order.items.length)).fill(0).map(() => `
-                        <tr>
-                            <td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td><td></td>
-                        </tr>`).join('')}
-                        <tr>
-                            <td colspan="7" style="text-align:center; font-style:italic;">*** Scheme: 1 LTR CASE FREE ~ 11+1 (OFFER) ***</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div class="inv-footer">
-                    <div class="inv-terms">
-                        Note: Actual price declared.<br>
-                        <b>Declaration:</b><br>
-                        1. Goods sold not taken back.<br>
-                        2. Subject to Roorkee Jurisdiction.<br>
-                        <div style="border:1px dashed #666; padding:2px; margin-top:2px;">
-                            <b>Bank Details:</b><br>
-                            PUNB | A/C: 4882002100005628<br>
-                            IFSC: PUNB0488200
+                <!-- Footer / Totals -->
+                <div class="footer-section">
+                    <div class="terms-box">
+                        <strong>Bank Details:</strong><br>
+                        Bank: PUNB <br>
+                        A/C: 4882002100005628<br>
+                        IFSC: PUNB0488200<br><br>
+                        <span style="font-size:9px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
+                    </div>
+                    <div class="totals-box">
+                        <div class="t-row"><span>Subtotal:</span> <span>${subtotal.toFixed(2)}</span></div>
+                        <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
+                        <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
+                        <div class="t-row final"><span>Total:</span> <span>₹${grandTotal.toFixed(2)}</span></div>
+                        <div style="margin-top:25px; text-align:right; font-size:10px;">
+                            <strong>Authorized Signatory</strong>
                         </div>
                     </div>
-                    <div class="inv-totals">
-                        <div class="inv-tot-row"><span>Basic</span> <span>${subtotal.toFixed(2)}</span></div>
-                        <div class="inv-tot-row"><span>CGST 2.5%</span> <span>${cgst.toFixed(2)}</span></div>
-                        <div class="inv-tot-row"><span>SGST 2.5%</span> <span>${sgst.toFixed(2)}</span></div>
-                        <div class="inv-tot-row final"><span>Total</span> <span>${grandTotal.toFixed(2)}</span></div>
-                        <div class="sign-area">Auth. Signatory</div>
-                    </div>
                 </div>
             </div>
         `;
 
-        // 7. Inject HTML
+        // 6. Inject Full Content (CSS + Two Halves)
         const wrapperId = 'print-wrapper';
-        overlayContainer.innerHTML = `
-            ${css}
-            <div id="${wrapperId}" class="inv-print-area">
-                ${getCopyHtml('ORIGINAL')}
-                ${getCopyHtml('DUPLICATE')}
+        overlay.innerHTML = `
+            <style>
+                #print-wrapper {
+                    width: 297mm; /* Exact A4 Landscape Width */
+                    height: 200mm; /* Slightly less than A4 Height to prevent overflow */
+                    background: white;
+                    padding: 10mm;
+                    box-sizing: border-box;
+                    display: flex;
+                    justify-content: space-between;
+                    font-family: Arial, sans-serif;
+                    color: #000;
+                }
+                .invoice-half {
+                    width: 48%; /* Split page in half with gap */
+                    height: 100%;
+                    border: 1px solid #000;
+                    display: flex;
+                    flex-direction: column;
+                    font-size: 10px;
+                }
+                
+                /* Sections */
+                .header-section { display: flex; border-bottom: 1px solid #000; height: 50px; }
+                .logo-box { width: 20%; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
+                .company-box { width: 60%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
+                .copy-box { width: 20%; border-left: 1px solid #000; text-align: center; display: flex; flex-direction: column; justify-content: center; background: #eee; -webkit-print-color-adjust: exact;}
+
+                .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; -webkit-print-color-adjust: exact; }
+                .meta-item { font-size: 9px; }
+
+                .address-section { display: flex; border-bottom: 1px solid #000; height: 55px; }
+                .addr-box { width: 50%; padding: 4px; font-size: 10px; line-height: 1.2; overflow: hidden; }
+                .addr-title { font-size: 8px; color: #666; text-transform: uppercase; font-weight: bold; }
+
+                .table-container { flex-grow: 1; }
+                .inv-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                .inv-table th { background: #ddd; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 3px; text-align: center; font-weight: bold; -webkit-print-color-adjust: exact; }
+                .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
+                .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
+
+                .footer-section { display: flex; border-top: 1px solid #000; height: 85px; }
+                .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
+                .totals-box { width: 40%; padding: 5px; }
+                .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+                .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; }
+            </style>
+
+            <div id="${wrapperId}">
+                ${getInvoiceHtml("ORIGINAL")}
+                ${getInvoiceHtml("DUPLICATE")}
             </div>
         `;
 
-        // 8. Force Browser Paint (Wait 500ms)
-        await new Promise(r => setTimeout(r, 500));
+        // 7. Force Wait for Render (Crucial for Blank PDF fix)
+        await new Promise(r => setTimeout(r, 800));
 
-        // 9. Generate PDF
+        // 8. Generate PDF
         const element = document.getElementById(wrapperId);
         const opt = {
-            margin: 5,
+            margin: 0,
             filename: `Inv_${invNo}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: true },
+            html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
         };
 
         await html2pdf().set(opt).from(element).save();
 
     } catch (error) {
-        console.error("Invoice Error:", error);
+        console.error("PDF Gen Error:", error);
         alert("Failed: " + error.message);
     } finally {
-        // 10. Clean Up - Remove Overlay
-        if (overlayContainer && overlayContainer.parentNode) {
-            overlayContainer.parentNode.removeChild(overlayContainer);
-        }
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        // 9. Cleanup after a short delay to ensure download started
+        setTimeout(() => {
+            if (overlay) document.body.removeChild(overlay);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }, 1000);
     }
 };
