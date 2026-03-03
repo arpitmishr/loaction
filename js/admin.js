@@ -755,44 +755,188 @@ function generateSalesmanOptions(currentId) {
 }
 
 // 4. Populate All Outlets (UPDATED: With Address & Sorting)
+// ==========================================
+//      UNIFIED OUTLET LOGIC (Dropdown + Global Search)
+// ==========================================
+
+// Global Cache for the Search Bar
+let globalOutletCache = [];
+
+// 1. Unified Function: Populates Route Dropdown AND Search Cache
 async function populateAllOutletsDropdown() {
     const select = document.getElementById('allOutletsDropdown');
-    if (!select) return;
-
+    
     try {
         const snap = await getDocs(collection(db, "outlets"));
         
-        // Reset dropdown
-        select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        globalOutletCache = []; // Reset Cache
         
-        // Convert to array to sort
+        if (select) select.innerHTML = '<option value="">Select Outlet to Add</option>';
+        
         let outlets = [];
         snap.forEach(doc => {
-            outlets.push({ id: doc.id, ...doc.data() });
+            const data = { id: doc.id, ...doc.data() };
+            outlets.push(data);
+            globalOutletCache.push(data); // Add to search cache
         });
 
-        // Sort alphabetically by Shop Name
+        // Sort Alphabetically
         outlets.sort((a, b) => a.shopName.localeCompare(b.shopName));
 
-        outlets.forEach(d => {
-            const option = document.createElement('option');
-            option.value = d.id;
-            
-            // Format: Shop Name (Phone) {Full Address}
-            const phoneDisplay = d.contactPhone ? `(${d.contactPhone})` : "";
-            const addressDisplay = d.address ? `{${d.address}}` : "{No Address}";
-            
-            option.textContent = `${d.shopName} ${phoneDisplay} ${addressDisplay}`;
-            
-            // Store name in dataset
-            option.dataset.name = d.shopName; 
-            select.appendChild(option);
-        });
+        if (select) {
+            outlets.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d.id;
+                // Format: Shop Name (Phone) {Full Address}
+                const addressDisplay = d.address ? `{${d.address}}` : "{No Address}";
+                const phoneDisplay = d.contactPhone ? `(${d.contactPhone})` : "";
+                
+                option.textContent = `${d.shopName} ${phoneDisplay} ${addressDisplay}`;
+                option.dataset.name = d.shopName; 
+                select.appendChild(option);
+            });
+        }
+        console.log("✅ Outlets loaded for Dropdown & Global Search");
+
     } catch (e) { 
-        console.error("Error loading outlets for dropdown:", e); 
-        select.innerHTML = '<option value="">Error loading data</option>';
+        console.error("Error loading outlets:", e); 
+        if (select) select.innerHTML = '<option value="">Error loading data</option>';
     }
 }
+
+// 2. Handle Search Input (Admin Header)
+window.handleAdminGlobalSearch = function() {
+    const input = document.getElementById('globalAdminSearch');
+    const resultBox = document.getElementById('globalSearchResults');
+    const term = input.value.toLowerCase().trim();
+
+    if (term.length < 2) {
+        resultBox.classList.add('hidden');
+        return;
+    }
+
+    // Filter local cache (Lightning fast)
+    const matches = globalOutletCache.filter(shop => 
+        (shop.shopName || "").toLowerCase().includes(term) ||
+        (shop.contactPhone || "").includes(term) ||
+        (shop.ownerName || "").toLowerCase().includes(term) ||
+        (shop.contactPerson || "").toLowerCase().includes(term)
+    ).slice(0, 10); // Show top 10
+
+    if (matches.length === 0) {
+        resultBox.innerHTML = `<div class="p-4 text-xs text-slate-400 text-center">No matching shops found.</div>`;
+    } else {
+        resultBox.innerHTML = "";
+        matches.forEach(shop => {
+            const div = document.createElement('div');
+            div.className = "p-3 border-b border-slate-50 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-colors";
+            div.innerHTML = `
+                <div>
+                    <p class="text-sm font-bold text-slate-700">${shop.shopName}</p>
+                    <p class="text-[10px] text-slate-500">${shop.ownerName} • ${shop.contactPhone}</p>
+                </div>
+                <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full">${shop.outletType || 'Shop'}</span>
+            `;
+            div.onclick = () => openAdminShopDetail(shop);
+            resultBox.appendChild(div);
+        });
+    }
+    resultBox.classList.remove('hidden');
+};
+
+// 3. Open Detailed Modal
+window.openAdminShopDetail = async function(shop) {
+    // Hide search results
+    document.getElementById('globalSearchResults').classList.add('hidden');
+    document.getElementById('globalAdminSearch').value = "";
+    
+    // Show Modal
+    document.getElementById('shopDetailModal').classList.remove('hidden');
+
+    // Populate Info
+    document.getElementById('sd-name').innerText = shop.shopName;
+    document.getElementById('sd-meta').innerText = `${shop.outletType} • ${shop.contactPhone}`;
+    document.getElementById('sd-owner').innerText = shop.ownerName || "N/A";
+    document.getElementById('sd-phone').innerText = shop.contactPhone;
+    document.getElementById('sd-address').innerText = shop.address || "No Address Recorded";
+    
+    // Creator Info
+    if (shop.createdBySalesman) {
+        try {
+            const userSnap = await getDoc(doc(db, "users", shop.createdBySalesman));
+            document.getElementById('sd-creator').innerText = userSnap.exists() ? (userSnap.data().fullName || "Unknown") : "Unknown";
+        } catch(e) { document.getElementById('sd-creator').innerText = "System"; }
+    } else {
+        document.getElementById('sd-creator').innerText = "Admin/Import";
+    }
+
+    const createdDate = shop.createdAt ? new Date(shop.createdAt.seconds * 1000).toLocaleDateString() : "N/A";
+    document.getElementById('sd-createdDate').innerText = `Added: ${createdDate}`;
+
+    // Map Link
+    if (shop.geo && shop.geo.lat) {
+        document.getElementById('sd-mapLink').href = `https://www.google.com/maps/search/?api=1&query=${shop.geo.lat},${shop.geo.lng}`;
+        document.getElementById('sd-mapLink').classList.remove('hidden');
+    } else {
+        document.getElementById('sd-mapLink').classList.add('hidden');
+    }
+
+    // Fetch History (Orders & Payments)
+    document.getElementById('sd-ordersList').innerHTML = "<li>Loading...</li>";
+    document.getElementById('sd-paymentsList').innerHTML = "<li>Loading...</li>";
+
+    try {
+        const [orders, payments] = await Promise.all([
+            getDocs(query(collection(db, "orders"), where("outletId", "==", shop.id), orderBy("orderDate", "desc"), limit(5))),
+            getDocs(query(collection(db, "payments"), where("outletId", "==", shop.id), orderBy("date", "desc"), limit(5)))
+        ]);
+
+        // Render Orders
+        const orderList = document.getElementById('sd-ordersList');
+        orderList.innerHTML = "";
+        if (orders.empty) orderList.innerHTML = "<li class='italic text-slate-400'>No recent orders.</li>";
+        orders.forEach(d => {
+            const o = d.data();
+            const date = o.orderDate.toDate().toLocaleDateString();
+            const amount = o.financials ? o.financials.totalAmount : 0;
+            orderList.innerHTML += `
+                <li class="flex justify-between border-b border-slate-50 pb-1">
+                    <span>${date}</span>
+                    <span class="font-bold text-indigo-600">₹${amount.toFixed(2)}</span>
+                </li>`;
+        });
+
+        // Render Payments
+        const payList = document.getElementById('sd-paymentsList');
+        payList.innerHTML = "";
+        if (payments.empty) payList.innerHTML = "<li class='italic text-slate-400'>No recent payments.</li>";
+        payments.forEach(d => {
+            const p = d.data();
+            const date = p.date.toDate().toLocaleDateString();
+            payList.innerHTML += `
+                <li class="flex justify-between border-b border-slate-50 pb-1">
+                    <span>${date} (${p.method})</span>
+                    <span class="font-bold text-green-600">₹${p.amount}</span>
+                </li>`;
+        });
+
+    } catch (e) { console.error(e); }
+};
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    const container = document.querySelector('.relative.group'); // Adjust selector if needed based on HTML
+    const searchInput = document.getElementById('globalAdminSearch');
+    const results = document.getElementById('globalSearchResults');
+    
+    if (searchInput && results && !searchInput.contains(e.target) && !results.contains(e.target)) {
+        results.classList.add('hidden');
+    }
+});
+
+
+
+
 
 // 5. Select Route (Setup UI)
 window.selectRoute = function(routeId, routeName) {
@@ -2576,16 +2720,3 @@ function escapeCsv(str) {
     }
     return str;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
