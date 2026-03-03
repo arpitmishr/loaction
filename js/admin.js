@@ -2737,24 +2737,108 @@ function escapeCsv(str) {
 
 
 
+// ==========================================
+//      HELPER: SESSION YEAR CALCULATOR
+// ==========================================
+function getFiscalSession() {
+    const today = new Date();
+    const curMonth = today.getMonth(); // 0 = Jan, 3 = April
+    const curYear = today.getFullYear();
+    
+    // If Month is Jan-Mar (0-2), Session is (PrevYear)-(CurYear)
+    // If Month is Apr-Dec (3-11), Session is (CurYear)-(NextYear)
+    if (curMonth < 3) {
+        return `${curYear - 1}-${curYear}`;
+    } else {
+        return `${curYear}-${curYear + 1}`;
+    }
+}
 
 // ==========================================
-//      INVOICE GENERATION LOGIC (A4 Landscape Split)
+//      HELPER: USER INPUT MODAL
+// ==========================================
+function askInvoiceDetails(defaults) {
+    return new Promise((resolve, reject) => {
+        // Remove existing modal if any
+        const existing = document.getElementById('inv-settings-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'inv-settings-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000000;
+            display: flex; justify-content: center; align-items: center;
+            font-family: 'Inter', sans-serif;
+        `;
+
+        modal.innerHTML = `
+            <div style="background:white; padding:25px; rounded-xl; width:450px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+                <h3 style="margin-top:0; color:#333; font-weight:bold; font-size:18px; border-bottom:1px solid #eee; padding-bottom:10px;">Invoice Settings</h3>
+                
+                <div style="margin-top:15px;">
+                    <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Invoice Number</label>
+                    <input type="text" id="inp-inv-no" value="${defaults.invNo}" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+                </div>
+
+                <div style="margin-top:15px; display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Billing Date</label>
+                        <input type="date" id="inp-inv-date" value="${defaults.date}" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Vehicle No.</label>
+                        <input type="text" id="inp-vehicle" value="" placeholder="UK-08-XX-0000" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+                    </div>
+                </div>
+
+                <div style="margin-top:15px;">
+                    <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Buyer Address (Editable)</label>
+                    <textarea id="inp-address" rows="3" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">${defaults.address}</textarea>
+                </div>
+
+                <div style="margin-top:25px; display:flex; justify-content:end; gap:10px;">
+                    <button id="btn-inv-cancel" style="padding:10px 20px; border:none; background:#f1f5f9; color:#64748b; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button id="btn-inv-generate" style="padding:10px 20px; border:none; background:#4f46e5; color:white; border-radius:8px; font-weight:bold; cursor:pointer;">Generate PDF</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Handlers
+        document.getElementById('btn-inv-cancel').onclick = () => {
+            modal.remove();
+            reject(new Error("Cancelled by user"));
+        };
+
+        document.getElementById('btn-inv-generate').onclick = () => {
+            const data = {
+                invNo: document.getElementById('inp-inv-no').value,
+                date: document.getElementById('inp-inv-date').value,
+                vehicle: document.getElementById('inp-vehicle').value || "N/A",
+                address: document.getElementById('inp-address').value
+            };
+            modal.remove();
+            resolve(data);
+        };
+    });
+}
+
+// ==========================================
+//      MAIN GENERATION FUNCTION
 // ==========================================
 
 window.generateInvoice = async function(orderId) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
-    
-    // Variable to hold the temporary container
     let overlay = null;
 
     try {
-        // 1. UI Feedback
         btn.disabled = true;
-        btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
+        btn.innerHTML = `Wait...`;
 
-        // 2. Fetch Data
+        // 1. Fetch Data
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2762,172 +2846,224 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 3. Prepare Variables
-        const invNo = orderId.slice(0, 6).toUpperCase(); 
-        const invDate = order.orderDate.toDate().toLocaleDateString('en-GB');
-        const supplyDate = order.deliveryDueDate ? order.deliveryDueDate.toDate().toLocaleDateString('en-GB') : invDate;
-        const route = order.routeName || "N/A";
+        // 2. Prepare Defaults for Modal
+        // Invoice Format: FP/2025-2026/0001 (Using last 4 of ID as placeholder or 0001)
+        const session = getFiscalSession();
+        const shortId = orderId.slice(-4).toUpperCase();
+        const defaultInvNo = `FP/${session}/${shortId}`;
         
-        // Address Parsing
-        const custName = order.outletName || "Unknown";
-        let custAddress = outlet.address || "N/A";
-        custAddress = custAddress.replace(/(\r\n|\n|\r)/gm, ", "); // Remove line breaks
-        const custPhone = outlet.contactPhone || "N/A";
-        const custGst = outlet.gstNumber || "N/A";
+        // Date Format YYYY-MM-DD for input
+        const today = new Date().toISOString().split('T')[0];
+        
+        const defaultAddress = outlet.address 
+            ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") 
+            : "Address Not Provided";
 
-        // Calculations
-        const subtotal = order.financials?.subtotal || 0;
-        const totalTax = order.financials?.tax || 0;
-        const grandTotal = order.financials?.totalAmount || 0;
-        const cgst = totalTax / 2;
-        const sgst = totalTax / 2;
+        // 3. ASK USER FOR DETAILS
+        let userSettings;
+        try {
+            userSettings = await askInvoiceDetails({
+                invNo: defaultInvNo,
+                date: today,
+                address: defaultAddress
+            });
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            return; // Stop if cancelled
+        }
 
-        // 4. Create Overlay Container (Visible on screen to fix Blank PDF issue)
+        btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
+
+        // 4. Format Date for Display (DD-MM-YYYY)
+        const dateParts = userSettings.date.split('-'); // YYYY-MM-DD
+        const displayDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+        // 5. CALCULATION LOGIC (With Scheme 106 Logic)
+        let processedItems = [];
+        let runningTotal = 0;
+        let totalDiscount = 0;
+
+        order.items.forEach(item => {
+            const isScheme = item.name.toLowerCase().includes("scheme");
+            
+            // LOGIC: If scheme, Rate is 106. 
+            // If not scheme, use stored price.
+            let rate = isScheme ? 106.00 : Number(item.price);
+            let qty = Number(item.qty);
+            let lineAmount = rate * qty;
+
+            // If it is a scheme, we add it to the total, but we track it to DISCOUNT it later
+            if (isScheme) {
+                totalDiscount += lineAmount;
+            }
+
+            runningTotal += lineAmount;
+
+            processedItems.push({
+                name: item.name,
+                qty: qty,
+                rate: rate,
+                amount: lineAmount
+            });
+        });
+
+        // Final Maths
+        // Taxable Value = (Total of all items) - (Discount of Scheme Items)
+        const taxableValue = runningTotal - totalDiscount;
+        
+        // GST (Assuming Inclusive or Exclusive? Usually Exclusive based on format)
+        // Let's assume Taxable Value is the base, and we add 5% on top.
+        const taxRate = 0.05; // 5%
+        const taxAmount = taxableValue * taxRate;
+        const cgst = taxAmount / 2;
+        const sgst = taxAmount / 2;
+        const grandTotal = taxableValue + taxAmount;
+
+        // 6. SVG LOGO
+        const svgLogo = `
+        <svg width="150" height="50" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100%" height="100%" fill="black"/>
+            <text x="50%" y="35" font-family="Arial, sans-serif" font-weight="bold" font-size="28" fill="white" text-anchor="middle">freskey</text>
+            <text x="50%" y="52" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" letter-spacing="2">piyo</text>
+        </svg>`;
+
+        // 7. Create Overlay
         overlay = document.createElement('div');
         overlay.id = 'invoice-overlay';
-        
-        // Force Landscape dimensions
         overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #555; /* Dark background to see the paper */
-            z-index: 999999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: auto;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #333; z-index: 999999; display: flex;
+            justify-content: center; align-items: center; overflow: auto;
         `;
         document.body.appendChild(overlay);
 
-        // 5. Invoice HTML Template
+        // 8. HTML Template
         const getInvoiceHtml = (copyTitle) => `
             <div class="invoice-half">
+                <!-- Top Row -->
+                <div class="inv-top">
+                    <span>Page 1 of 1</span>
+                    <span>TAX INVOICE</span>
+                    <span>${copyTitle} Copy</span>
+                </div>
+                
                 <!-- Header -->
                 <div class="header-section">
                     <div class="logo-box">
-                        <h1 style="margin:0; font-size:24px; line-height:1;">freskey</h1>
-                        <span style="font-size:12px;">piyo</span>
+                        ${svgLogo}
                     </div>
                     <div class="company-box">
-                        <h2 style="margin:0; font-size:16px;">FRESKEYPIYO BEVERAGES</h2>
-                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR</p>
-                        <p>GSTIN: 05AALFF0289R1ZS | Ph: 9876543210</p>
-                    </div>
-                    <div class="copy-box">
-                        <strong>${copyTitle}</strong><br>
-                        <span>TAX INVOICE</span>
+                        <h2 style="margin:0; font-size:16px; text-transform:uppercase;">FRESKEYPIYO BEVERAGES</h2>
+                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K</p>
+                        <p><strong>GSTIN:</strong> 05AALFF0289R1ZS &nbsp;|&nbsp; <strong>Ph:</strong> 9876543210</p>
                     </div>
                 </div>
 
-                <!-- Meta Info (Row) -->
+                <!-- Meta Info -->
                 <div class="meta-row">
-                    <div class="meta-item"><strong>Inv No:</strong> ${invNo}</div>
-                    <div class="meta-item"><strong>Date:</strong> ${invDate}</div>
+                    <div class="meta-item"><strong>Inv No:</strong> ${userSettings.invNo}</div>
+                    <div class="meta-item"><strong>Date:</strong> ${displayDate}</div>
                     <div class="meta-item"><strong>Route:</strong> ${route}</div>
-                    <div class="meta-item"><strong>Salesman:</strong> ${order.salesmanName.split(' ')[0]}</div>
+                    <div class="meta-item"><strong>Vehicle:</strong> ${userSettings.vehicle}</div>
                 </div>
 
-                <!-- Address Section -->
+                <!-- Address -->
                 <div class="address-section">
                     <div class="addr-box" style="border-right:1px solid #000;">
                         <div class="addr-title">Billed To:</div>
                         <strong>${custName}</strong><br>
-                        GSTIN: ${custGst}<br>
-                        Ph: ${custPhone}
+                        GSTIN: ${custGst || "Unregistered"}<br>
+                        Ph: ${outlet.contactPhone || "N/A"}
                     </div>
                     <div class="addr-box">
                         <div class="addr-title">Shipped To:</div>
-                        ${custAddress.substring(0, 70)}
+                        ${userSettings.address}
                     </div>
                 </div>
 
-                <!-- Items Table -->
+                <!-- Table -->
                 <div class="table-container">
                     <table class="inv-table">
                         <thead>
                             <tr>
-                                <th width="8%">#</th>
-                                <th width="47%">Item Name</th>
-                                <th width="12%">HSN</th>
+                                <th width="5%">#</th>
+                                <th width="45%">Item Description</th>
+                                <th width="10%">HSN</th>
                                 <th width="10%">Qty</th>
+                                <th width="10%">Unit</th>
                                 <th width="10%">Rate</th>
-                                <th width="13%">Amount</th>
+                                <th width="10%">Amt</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${order.items.map((item, i) => `
+                            ${processedItems.map((item, i) => `
                             <tr>
-                                <td style="text-align:center">${i + 1}</td>
+                                <td align="center">${i + 1}</td>
                                 <td>${item.name}</td>
-                                <td style="text-align:center">2201</td>
-                                <td style="text-align:center">${item.qty}</td>
-                                <td style="text-align:right">${item.price.toFixed(2)}</td>
-                                <td style="text-align:right">${item.lineTotal.toFixed(2)}</td>
+                                <td align="center">2201</td>
+                                <td align="center">${item.qty}</td>
+                                <td align="center">Box</td>
+                                <td align="right">${item.rate.toFixed(2)}</td>
+                                <td align="right">${item.amount.toFixed(2)}</td>
                             </tr>`).join('')}
                             
-                            <!-- Filler Rows for layout stability -->
-                            ${Array(Math.max(0, 6 - order.items.length)).fill(0).map(() => `
-                            <tr><td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td></tr>
+                            <!-- Filler Rows -->
+                            ${Array(Math.max(0, 6 - processedItems.length)).fill(0).map(() => `
+                            <tr><td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Footer / Totals -->
+                <!-- Footer / Calculations -->
                 <div class="footer-section">
                     <div class="terms-box">
                         <strong>Bank Details:</strong><br>
                         Bank: PUNB <br>
                         A/C: 4882002100005628<br>
                         IFSC: PUNB0488200<br><br>
-                        <span style="font-size:9px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
+                        <span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
                     </div>
                     <div class="totals-box">
-                        <div class="t-row"><span>Subtotal:</span> <span>${subtotal.toFixed(2)}</span></div>
+                        <div class="t-row"><span>Subtotal:</span> <span>${runningTotal.toFixed(2)}</span></div>
+                        ${totalDiscount > 0 ? `<div class="t-row text-red"><span>Less: Discount:</span> <span>-${totalDiscount.toFixed(2)}</span></div>` : ''}
+                        <div class="t-row" style="border-top:1px dashed #ccc; margin-top:2px;"><span>Taxable Value:</span> <span>${taxableValue.toFixed(2)}</span></div>
                         <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
-                        <div class="t-row final"><span>Total:</span> <span>₹${grandTotal.toFixed(2)}</span></div>
-                        <div style="margin-top:25px; text-align:right; font-size:10px;">
-                            <strong>Authorized Signatory</strong>
+                        <div class="t-row final"><span>Grand Total:</span> <span>₹${Math.round(grandTotal).toFixed(2)}</span></div>
+                        
+                        <div style="margin-top:20px; text-align:right; font-size:9px;">
+                            <strong>For Freskeypiyo Beverages</strong><br><br>
+                            Auth. Signatory
                         </div>
                     </div>
                 </div>
             </div>
         `;
 
-        // 6. Inject Full Content (CSS + Two Halves)
+        // 9. Inject Full CSS & HTML
         const wrapperId = 'print-wrapper';
         overlay.innerHTML = `
             <style>
                 #print-wrapper {
-                    width: 297mm; /* Exact A4 Landscape Width */
-                    height: 200mm; /* Slightly less than A4 Height to prevent overflow */
-                    background: white;
-                    padding: 10mm;
-                    box-sizing: border-box;
-                    display: flex;
-                    justify-content: space-between;
-                    font-family: Arial, sans-serif;
-                    color: #000;
+                    width: 297mm; height: 200mm; background: white;
+                    padding: 10mm; box-sizing: border-box;
+                    display: flex; justify-content: space-between;
+                    font-family: Arial, sans-serif; color: #000;
                 }
                 .invoice-half {
-                    width: 48%; /* Split page in half with gap */
-                    height: 100%;
+                    width: 48%; height: 100%;
                     border: 1px solid #000;
-                    display: flex;
-                    flex-direction: column;
+                    display: flex; flex-direction: column;
                     font-size: 10px;
                 }
+                .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
                 
-                /* Sections */
-                .header-section { display: flex; border-bottom: 1px solid #000; height: 50px; }
-                .logo-box { width: 20%; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
-                .company-box { width: 60%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
-                .copy-box { width: 20%; border-left: 1px solid #000; text-align: center; display: flex; flex-direction: column; justify-content: center; background: #eee; -webkit-print-color-adjust: exact;}
-
+                .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
+                .logo-box { width: 25%; background: #000; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
+                .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
+                
                 .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; -webkit-print-color-adjust: exact; }
                 .meta-item { font-size: 9px; }
 
@@ -2941,11 +3077,12 @@ window.generateInvoice = async function(orderId) {
                 .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
 
-                .footer-section { display: flex; border-top: 1px solid #000; height: 85px; }
+                .footer-section { display: flex; border-top: 1px solid #000; height: 95px; }
                 .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
                 .totals-box { width: 40%; padding: 5px; }
-                .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-                .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; }
+                .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
+                .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; background: #eee; -webkit-print-color-adjust: exact; }
+                .text-red { color: #dc2626; }
             </style>
 
             <div id="${wrapperId}">
@@ -2954,14 +3091,13 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 7. Force Wait for Render (Crucial for Blank PDF fix)
+        // 10. Wait & Save
         await new Promise(r => setTimeout(r, 800));
 
-        // 8. Generate PDF
         const element = document.getElementById(wrapperId);
         const opt = {
             margin: 0,
-            filename: `Inv_${invNo}.pdf`,
+            filename: `Inv_${userSettings.invNo.replace(/\//g, '-')}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -2973,7 +3109,6 @@ window.generateInvoice = async function(orderId) {
         console.error("PDF Gen Error:", error);
         alert("Failed: " + error.message);
     } finally {
-        // 9. Cleanup after a short delay to ensure download started
         setTimeout(() => {
             if (overlay) document.body.removeChild(overlay);
             btn.disabled = false;
