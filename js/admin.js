@@ -2742,15 +2742,20 @@ function escapeCsv(str) {
 //      INVOICE GENERATION LOGIC
 // ==========================================
 
+// ==========================================
+//      INVOICE GENERATION LOGIC (FIXED)
+// ==========================================
+
 window.generateInvoice = async function(orderId) {
     const btn = event.currentTarget;
     const originalText = btn.innerHTML;
     
     try {
+        // 1. Show Loading State
         btn.disabled = true;
         btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
-        // 1. Fetch Order & Outlet Data
+        // 2. Fetch Order & Outlet Data
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2758,32 +2763,95 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 2. Prepare Data
-        const invNo = orderId.slice(0, 6).toUpperCase(); // Short Invoice No
+        // 3. Prepare Data Variables
+        const invNo = orderId.slice(0, 6).toUpperCase(); 
         const invDate = order.orderDate.toDate().toLocaleDateString('en-IN');
-        
-        // Use Delivery Date if available, else current date
         const supplyDate = order.deliveryDueDate ? order.deliveryDueDate.toDate().toLocaleDateString('en-IN') : invDate;
-        
         const route = order.routeName || "N/A";
-        // Assuming vehicle is not in DB yet, use placeholder
         const vehicle = "N/A"; 
 
         const custName = order.outletName;
-        const custAddress = outlet.address || "Address not provided";
+        // Handle address logic safely
+        const custAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") : "Address not provided";
         const custPhone = outlet.contactPhone || "";
         const custGst = outlet.gstNumber || "Unregistered";
 
-        // Tax Calculation (If GST Applied)
         const subtotal = order.financials.subtotal;
         const totalTax = order.financials.tax;
         const grandTotal = order.financials.totalAmount;
-        
-        // Assuming 5% GST Total (2.5% CGST + 2.5% SGST)
         const cgst = totalTax / 2;
         const sgst = totalTax / 2;
 
-        // 3. Build HTML Template (Function Helper)
+        // 4. Check or Create Container (FIX FOR BLANK PDF)
+        let container = document.getElementById('invoice-generator-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'invoice-generator-container';
+            document.body.appendChild(container);
+        }
+
+        // Apply styles dynamically to ensure it is visible to the PDF generator
+        // We use position fixed off-screen instead of display:none
+        container.style.cssText = `
+            position: fixed; 
+            left: -10000px; 
+            top: 0; 
+            width: 290mm; /* A4 Landscape width approx */
+            background: white; 
+            z-index: -9999;
+            color: black;
+        `;
+
+        // 5. CSS for the Invoice Content
+        const invoiceStyles = `
+            <style>
+                .invoice-wrapper { width: 100%; overflow: hidden; padding: 10px; background: white; color: black; }
+                .invoice-box {
+                    width: 48%; 
+                    float: left;
+                    margin-right: 2%;
+                    font-family: 'Helvetica', 'Arial', sans-serif;
+                    font-size: 9px;
+                    line-height: 1.2;
+                    border: 1px solid #000;
+                    box-sizing: border-box;
+                    color: black !important; /* Force black text */
+                }
+                .invoice-box:last-child { margin-right: 0; }
+                
+                .inv-header { border-bottom: 1px solid #000; display: flex; }
+                .inv-logo { width: 20%; padding: 5px; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #000; color: #fff; font-weight: bold; font-size: 16px; -webkit-print-color-adjust: exact; }
+                .inv-company { width: 80%; text-align: center; padding: 5px; }
+                .inv-company h1 { font-size: 14px; margin: 0; font-weight: bold; text-transform: uppercase; }
+                .inv-company p { margin: 2px 0; font-size: 8px; }
+
+                .inv-meta { display: flex; border-bottom: 1px solid #000; }
+                .inv-meta-col { width: 50%; padding: 4px; }
+                .inv-meta-row { display: flex; justify-content: space-between; }
+
+                .inv-address-box { display: flex; border-bottom: 1px solid #000; }
+                .inv-bill-to, .inv-ship-to { width: 50%; padding: 4px; }
+                .inv-ship-to { border-left: 1px solid #000; }
+
+                .inv-table { width: 100%; border-collapse: collapse; }
+                .inv-table th { border-bottom: 1px solid #000; border-right: 1px solid #000; background: #eee; font-weight: bold; text-align: center; padding: 2px; -webkit-print-color-adjust: exact; }
+                .inv-table td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px 4px; }
+                .inv-table th:last-child, .inv-table td:last-child { border-right: none; }
+                
+                .inv-footer { display: flex; border-top: 1px solid #000; }
+                .inv-terms { width: 60%; padding: 4px; border-right: 1px solid #000; font-size: 8px; }
+                .inv-totals { width: 40%; }
+                .inv-total-row { display: flex; justify-content: space-between; padding: 2px 4px; border-bottom: 1px solid #eee; }
+                .inv-total-row.final { border-top: 1px solid #000; font-weight: bold; font-size: 10px; background: #eee; -webkit-print-color-adjust: exact; }
+
+                .inv-bank { margin-top: 5px; border: 1px dashed #666; padding: 3px; }
+                .inv-sign { margin-top: 20px; text-align: right; font-weight: bold; padding-right: 10px; }
+                
+                .copy-label { text-align: right; font-size: 8px; font-weight: bold; padding: 2px 5px; border-bottom: 1px solid #000; }
+            </style>
+        `;
+
+        // 6. Template Builder Helper
         const createInvoiceCopy = (title) => `
             <div class="invoice-box">
                 <div class="copy-label">${title} Copy</div>
@@ -2819,7 +2887,7 @@ window.generateInvoice = async function(orderId) {
                         ${custName}<br>
                         GSTIN: ${custGst}<br>
                         Ph: ${custPhone}<br>
-                        ${custAddress.substring(0, 40)}...
+                        ${custAddress.substring(0, 45)}
                     </div>
                     <div class="inv-ship-to">
                         <strong>Ship To:</strong><br>
@@ -2852,9 +2920,8 @@ window.generateInvoice = async function(orderId) {
                             <td style="text-align:right">${item.lineTotal.toFixed(2)}</td>
                         </tr>
                         `).join('')}
-                        <!-- Filler rows to maintain height if needed -->
-                        ${order.items.length < 4 ? `
-                            <tr><td colspan="7" style="height:20px; text-align:center; font-style:italic; font-size:8px;">
+                        ${order.items.length < 5 ? `
+                            <tr><td colspan="7" style="height:25px; text-align:center; font-style:italic; font-size:8px;">
                                 *** Scheme: 1 LTR CASE FREE ~ 11+1 (OFFER) ***
                             </td></tr>` : ''
                         }
@@ -2887,28 +2954,26 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 4. Combine Original + Duplicate
-        const fullHtml = `
-            <div style="width: 100%; overflow: hidden; padding: 10px;">
+        // 7. Inject HTML into container
+        container.innerHTML = invoiceStyles + `
+            <div class="invoice-wrapper">
                 ${createInvoiceCopy("ORIGINAL")}
                 ${createInvoiceCopy("DUPLICATE")}
+                <div style="clear:both"></div>
             </div>
         `;
 
-        // 5. Inject to Hidden Container
-        const container = document.getElementById('invoice-generator-container');
-        container.innerHTML = fullHtml;
-
-        // 6. Generate PDF Options
+        // 8. Generate PDF
         const opt = {
             margin:       5,
             filename:     `Invoice_${invNo}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
         };
 
-        // 7. Save
+        // Wait a tiny bit for DOM to render styles before capturing
+        await new Promise(r => setTimeout(r, 500));
         await html2pdf().set(opt).from(container).save();
 
     } catch (error) {
