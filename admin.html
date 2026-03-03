@@ -35,6 +35,16 @@
             }
         }
     </script>
+
+
+
+
+<!-- Add html2pdf library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+
+
+    
     <!-- Google Fonts: Inter for clean, modern typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1128,6 +1138,75 @@
 </div>
     
 
+
+
+
+
+
+
+
+
+
+<!-- HIDDEN INVOICE TEMPLATE CONTAINER -->
+<div id="invoice-generator-container" style="position: fixed; left: -9999px; top: 0;"></div>
+
+<style>
+    /* INVOICE PRINT STYLES */
+    .invoice-box {
+        width: 48%; /* Slightly less than 50% to fit margins */
+        float: left;
+        margin-right: 2%;
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        font-size: 9px;
+        line-height: 1.2;
+        color: #000;
+        border: 1px solid #000;
+    }
+    .invoice-box:last-child { margin-right: 0; }
+    
+    .inv-header { border-bottom: 1px solid #000; display: flex; }
+    .inv-logo { width: 20%; padding: 5px; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #000; color: #fff; font-weight: bold; font-size: 16px; }
+    .inv-company { width: 80%; text-align: center; padding: 5px; }
+    .inv-company h1 { font-size: 14px; margin: 0; font-weight: bold; text-transform: uppercase; }
+    .inv-company p { margin: 2px 0; font-size: 8px; }
+
+    .inv-meta { display: flex; border-bottom: 1px solid #000; }
+    .inv-meta-col { width: 50%; padding: 4px; }
+    .inv-meta-row { display: flex; justify-content: space-between; }
+
+    .inv-address-box { display: flex; border-bottom: 1px solid #000; }
+    .inv-bill-to, .inv-ship-to { width: 50%; padding: 4px; }
+    .inv-ship-to { border-left: 1px solid #000; }
+
+    .inv-table { width: 100%; border-collapse: collapse; }
+    .inv-table th { border-bottom: 1px solid #000; border-right: 1px solid #000; background: #eee; font-weight: bold; text-align: center; padding: 2px; }
+    .inv-table td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 2px 4px; }
+    .inv-table th:last-child, .inv-table td:last-child { border-right: none; }
+    
+    .inv-footer { display: flex; border-top: 1px solid #000; }
+    .inv-terms { width: 60%; padding: 4px; border-right: 1px solid #000; font-size: 8px; }
+    .inv-totals { width: 40%; }
+    .inv-total-row { display: flex; justify-content: space-between; padding: 2px 4px; border-bottom: 1px solid #eee; }
+    .inv-total-row.final { border-top: 1px solid #000; font-weight: bold; font-size: 10px; background: #eee; }
+
+    .inv-bank { margin-top: 5px; border: 1px dashed #666; padding: 3px; }
+    .inv-sign { margin-top: 20px; text-align: right; font-weight: bold; padding-right: 10px; }
+    
+    .copy-label { text-align: right; font-size: 8px; font-weight: bold; padding: 2px 5px; border-bottom: 1px solid #000; }
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+    
     
 </body>
 </html>
