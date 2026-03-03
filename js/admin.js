@@ -2467,43 +2467,48 @@ window.loadPendingDeliveries = async function() {
             const itemNames = data.items ? data.items.map(i => i.name).slice(0, 1).join(", ") + (itemCount > 1 ? "..." : "") : "";
 
             // 5. Render Row
-            const row = `
-                <tr class="hover:bg-slate-50 transition border-b border-slate-50 group">
-                    <td class="p-4">
-                        <div class="${dateClass} text-sm">${dueStr}</div>
-                        <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
-                    </td>
-                    <td class="p-4">
-                        <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
-                            ${data.routeName || 'N/A'}
-                        </span>
-                    </td>
-                    <td class="p-4">
-                        <div class="font-bold text-slate-700 text-sm">${data.outletName}</div>
-                        <div class="text-xs text-slate-500">By: ${data.salesmanName}</div>
-                    </td>
-                    <!-- NEW QTY COLUMN -->
-                    <td class="p-4 text-center">
-                        <span class="bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg text-sm">${totalQty}</span>
-                    </td>
-                    <td class="p-4">
-                        <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
-                        <div class="text-xs text-slate-500 truncate max-w-[120px]" title="${data.items?.map(i=>i.name).join(', ')}">
-                            ${itemCount} Types (${itemNames})
-                        </div>
-                    </td>
-                    <!-- ACTION COLUMN WITH DELETE -->
-                    <td class="p-4 text-right">
-                        <button onclick="deleteOrder('${orderId}', ${totalAmt}, '${data.outletId}', '${data.outletName}')" 
-                                class="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors" 
-                                title="Delete Order (Reverses Balance)">
-                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                             </svg>
-                        </button>
-                    </td>
-                </tr>
-            `;
+           const row = `
+    <tr class="hover:bg-slate-50 transition border-b border-slate-50 group">
+        <td class="p-4">
+            <div class="${dateClass} text-sm">${dueStr}</div>
+            <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
+        </td>
+        <td class="p-4">
+            <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
+                ${data.routeName || 'N/A'}
+            </span>
+        </td>
+        <td class="p-4">
+            <div class="font-bold text-slate-700 text-sm">${data.outletName}</div>
+            <div class="text-xs text-slate-500">By: ${data.salesmanName}</div>
+        </td>
+        <td class="p-4 text-center">
+            <span class="bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg text-sm">${totalQty}</span>
+        </td>
+        <td class="p-4">
+            <div class="font-bold text-slate-800">₹${totalAmt.toFixed(2)}</div>
+            <div class="text-xs text-slate-500 truncate max-w-[120px]">
+                ${itemCount} Types
+            </div>
+        </td>
+        <td class="p-4 text-right flex items-center justify-end gap-2">
+            <!-- NEW INVOICE BUTTON -->
+            <button onclick="generateInvoice('${orderId}')" 
+                    class="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors flex items-center gap-1"
+                    title="Download Invoice PDF">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                 <span class="text-xs font-bold">Inv</span>
+            </button>
+
+            <!-- EXISTING DELETE BUTTON -->
+            <button onclick="deleteOrder('${orderId}', ${totalAmt}, '${data.outletId}', '${data.outletName}')" 
+                    class="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors" 
+                    title="Delete Order">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+        </td>
+    </tr>
+`;
             tbody.innerHTML += row;
         });
 
@@ -2720,3 +2725,197 @@ function escapeCsv(str) {
     }
     return str;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================
+//      INVOICE GENERATION LOGIC
+// ==========================================
+
+window.generateInvoice = async function(orderId) {
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+        // 1. Fetch Order & Outlet Data
+        const orderSnap = await getDoc(doc(db, "orders", orderId));
+        if (!orderSnap.exists()) throw new Error("Order not found");
+        const order = orderSnap.data();
+
+        const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
+        const outlet = outletSnap.exists() ? outletSnap.data() : {};
+
+        // 2. Prepare Data
+        const invNo = orderId.slice(0, 6).toUpperCase(); // Short Invoice No
+        const invDate = order.orderDate.toDate().toLocaleDateString('en-IN');
+        
+        // Use Delivery Date if available, else current date
+        const supplyDate = order.deliveryDueDate ? order.deliveryDueDate.toDate().toLocaleDateString('en-IN') : invDate;
+        
+        const route = order.routeName || "N/A";
+        // Assuming vehicle is not in DB yet, use placeholder
+        const vehicle = "N/A"; 
+
+        const custName = order.outletName;
+        const custAddress = outlet.address || "Address not provided";
+        const custPhone = outlet.contactPhone || "";
+        const custGst = outlet.gstNumber || "Unregistered";
+
+        // Tax Calculation (If GST Applied)
+        const subtotal = order.financials.subtotal;
+        const totalTax = order.financials.tax;
+        const grandTotal = order.financials.totalAmount;
+        
+        // Assuming 5% GST Total (2.5% CGST + 2.5% SGST)
+        const cgst = totalTax / 2;
+        const sgst = totalTax / 2;
+
+        // 3. Build HTML Template (Function Helper)
+        const createInvoiceCopy = (title) => `
+            <div class="invoice-box">
+                <div class="copy-label">${title} Copy</div>
+                
+                <div class="inv-header">
+                    <div class="inv-logo">
+                        freskey<br><span style="font-size:10px; font-weight:normal">piyo</span>
+                    </div>
+                    <div class="inv-company">
+                        <h1>FRESKEYPIYO BEVERAGES</h1>
+                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K (247661)</p>
+                        <p><strong>GSTIN:</strong> 05AALFF0289R1ZS &nbsp;|&nbsp; <strong>PAN:</strong> AALFF0289R</p>
+                    </div>
+                </div>
+
+                <div class="inv-meta">
+                    <div class="inv-meta-col" style="border-right:1px solid #000">
+                        <div class="inv-meta-row"><span>Invoice No:</span> <strong>${invNo}</strong></div>
+                        <div class="inv-meta-row"><span>Invoice Date:</span> <span>${invDate}</span></div>
+                        <div class="inv-meta-row"><span>Point of Supply:</span> <span>${supplyDate}</span></div>
+                        <div class="inv-meta-row"><span>Terms:</span> <span>Due on Receipt</span></div>
+                    </div>
+                    <div class="inv-meta-col">
+                        <div class="inv-meta-row"><span>Route:</span> <span>${route}</span></div>
+                        <div class="inv-meta-row"><span>Vehicle No:</span> <span>${vehicle}</span></div>
+                        <div class="inv-meta-row"><span>Salesman:</span> <span>${order.salesmanName.split(' ')[0]}</span></div>
+                    </div>
+                </div>
+
+                <div class="inv-address-box">
+                    <div class="inv-bill-to">
+                        <strong>Bill To:</strong><br>
+                        ${custName}<br>
+                        GSTIN: ${custGst}<br>
+                        Ph: ${custPhone}<br>
+                        ${custAddress.substring(0, 40)}...
+                    </div>
+                    <div class="inv-ship-to">
+                        <strong>Ship To:</strong><br>
+                        ${custName}<br>
+                        ${custAddress.substring(0, 50)}
+                    </div>
+                </div>
+
+                <table class="inv-table">
+                    <thead>
+                        <tr>
+                            <th width="5%">Sn</th>
+                            <th width="45%">Item Name</th>
+                            <th width="10%">HSN</th>
+                            <th width="10%">Qty</th>
+                            <th width="10%">Unit</th>
+                            <th width="10%">Price</th>
+                            <th width="10%">Amt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${order.items.map((item, index) => `
+                        <tr>
+                            <td style="text-align:center">${index + 1}</td>
+                            <td>${item.name}</td>
+                            <td style="text-align:center">2201</td> 
+                            <td style="text-align:center">${item.qty}</td>
+                            <td style="text-align:center">Box</td>
+                            <td style="text-align:right">${item.price.toFixed(2)}</td>
+                            <td style="text-align:right">${item.lineTotal.toFixed(2)}</td>
+                        </tr>
+                        `).join('')}
+                        <!-- Filler rows to maintain height if needed -->
+                        ${order.items.length < 4 ? `
+                            <tr><td colspan="7" style="height:20px; text-align:center; font-style:italic; font-size:8px;">
+                                *** Scheme: 1 LTR CASE FREE ~ 11+1 (OFFER) ***
+                            </td></tr>` : ''
+                        }
+                    </tbody>
+                </table>
+
+                <div class="inv-footer">
+                    <div class="inv-terms">
+                        <strong>Declaration:</strong><br>
+                        1. Goods once sold will not be taken back.<br>
+                        2. Subject to Roorkee Jurisdiction.<br>
+                        <div class="inv-bank">
+                            <strong>Payment Details:</strong><br>
+                            Bank: PUNB<br>
+                            A/C: 4882002100005628<br>
+                            IFSC: PUNB0488200
+                        </div>
+                    </div>
+                    <div class="inv-totals">
+                        <div class="inv-total-row"><span>Basic Value</span> <span>${subtotal.toFixed(2)}</span></div>
+                        <div class="inv-total-row"><span>CGST 2.5%</span> <span>${cgst.toFixed(2)}</span></div>
+                        <div class="inv-total-row"><span>SGST 2.5%</span> <span>${sgst.toFixed(2)}</span></div>
+                        <div class="inv-total-row final"><span>Grand Total</span> <span>₹${grandTotal.toFixed(2)}</span></div>
+                        <div class="inv-sign">
+                            <br><br>
+                            Authorized Person
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 4. Combine Original + Duplicate
+        const fullHtml = `
+            <div style="width: 100%; overflow: hidden; padding: 10px;">
+                ${createInvoiceCopy("ORIGINAL")}
+                ${createInvoiceCopy("DUPLICATE")}
+            </div>
+        `;
+
+        // 5. Inject to Hidden Container
+        const container = document.getElementById('invoice-generator-container');
+        container.innerHTML = fullHtml;
+
+        // 6. Generate PDF Options
+        const opt = {
+            margin:       5,
+            filename:     `Invoice_${invNo}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+
+        // 7. Save
+        await html2pdf().set(opt).from(container).save();
+
+    } catch (error) {
+        console.error("Invoice Error:", error);
+        alert("Failed to generate invoice: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+};
