@@ -801,6 +801,85 @@ async function handleDailyAttendance(user) {
 
 
 
+
+
+// 2. Handle Search (Hybrid: Cache + Server if needed)
+window.handleSalesmanSearch = async function() {
+    const input = document.getElementById('salesmanGlobalSearch');
+    const resultBox = document.getElementById('salesmanSearchResults');
+    const term = input.value.toLowerCase().trim();
+
+    if (term.length < 2) {
+        resultBox.classList.add('hidden');
+        return;
+    }
+
+    // A. SEARCH LOCAL CACHE (Current Route) - Lightning Fast
+    let matches = [];
+    if (appCache.routeOutlets) {
+        matches = appCache.routeOutlets.filter(s => s.name.toLowerCase().includes(term));
+    }
+
+    // B. RENDER RESULTS
+    resultBox.innerHTML = "";
+    if (matches.length > 0) {
+        matches.forEach(shop => {
+            // Container Row
+            const div = document.createElement('div');
+            div.className = "p-3 border-b border-slate-50 hover:bg-indigo-50 flex justify-between items-center transition-colors";
+            
+            // 1. Text Info (Clicks open Details Modal)
+            const textDiv = document.createElement('div');
+            textDiv.className = "flex-1 cursor-pointer";
+            textDiv.innerHTML = `
+                <p class="font-bold text-slate-700 text-sm">${shop.name}</p>
+                <p class="text-[10px] text-green-600">In Current Route</p>
+            `;
+            textDiv.onclick = () => {
+                toggleSalesmanSearch(); 
+                openOutletMapDetails(shop.id, shop.name, shop.lat, shop.lng);
+            };
+
+            // 2. Direct Visit Button (Clicks start Visit directly)
+            const visitBtn = document.createElement('button');
+            visitBtn.className = "ml-3 bg-indigo-600 text-white p-2 rounded-lg shadow-sm hover:bg-indigo-700 active:scale-95 transition flex items-center justify-center";
+            visitBtn.title = "Start Visit Now";
+            visitBtn.innerHTML = `<span class="material-icons-round text-sm">near_me</span>`; // 'near_me' is the navigation/visit icon
+            
+            visitBtn.onclick = (e) => {
+                e.stopPropagation(); // Prevent opening the detail modal
+                
+                if (shop.lat === 0 && shop.lng === 0) {
+                    alert("⚠️ No GPS coordinates set for this shop. Cannot start visit.");
+                    return;
+                }
+
+                toggleSalesmanSearch(); // Close Search
+                openVisitPanel(shop.id, shop.name, shop.lat, shop.lng); // Start Visit Flow
+            };
+
+            div.appendChild(textDiv);
+            div.appendChild(visitBtn);
+            resultBox.appendChild(div);
+        });
+    }
+    
+    if (matches.length === 0) {
+        resultBox.innerHTML = `<div class="p-4 text-xs text-slate-400 text-center">No matching shops in your route.</div>`;
+    }
+
+    resultBox.classList.remove('hidden');
+};
+
+
+
+
+
+
+
+
+
+
 // --- 7. MATH UTILS ---
 
 function startTimer() {
