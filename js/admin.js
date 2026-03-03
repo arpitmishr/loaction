@@ -2736,7 +2736,6 @@ function escapeCsv(str) {
 
 
 
-
 // ==========================================
 //      HELPER: SESSION YEAR CALCULATOR
 // ==========================================
@@ -2759,7 +2758,6 @@ function getFiscalSession() {
 // ==========================================
 function askInvoiceDetails(defaults) {
     return new Promise((resolve, reject) => {
-        // Remove existing modal if any
         const existing = document.getElementById('inv-settings-modal');
         if (existing) existing.remove();
 
@@ -2806,7 +2804,6 @@ function askInvoiceDetails(defaults) {
 
         document.body.appendChild(modal);
 
-        // Handlers
         document.getElementById('btn-inv-cancel').onclick = () => {
             modal.remove();
             reject(new Error("Cancelled by user"));
@@ -2826,7 +2823,7 @@ function askInvoiceDetails(defaults) {
 }
 
 // ==========================================
-//      MAIN GENERATION FUNCTION
+//      MAIN INVOICE GENERATION FUNCTION
 // ==========================================
 
 window.generateInvoice = async function(orderId) {
@@ -2846,20 +2843,23 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 2. Prepare Defaults for Modal
-        // Invoice Format: FP/2025-2026/0001 (Using last 4 of ID as placeholder or 0001)
+        // 2. DEFINE VARIABLES (Fixed: Added route and customer details here)
+        const route = order.routeName || "N/A";
+        const custName = order.outletName || "Unknown";
+        const custPhone = outlet.contactPhone || "N/A";
+        const custGst = outlet.gstNumber || "N/A";
+
+        // 3. Prepare Defaults for Modal
         const session = getFiscalSession();
         const shortId = orderId.slice(-4).toUpperCase();
         const defaultInvNo = `FP/${session}/${shortId}`;
-        
-        // Date Format YYYY-MM-DD for input
         const today = new Date().toISOString().split('T')[0];
         
         const defaultAddress = outlet.address 
             ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") 
             : "Address Not Provided";
 
-        // 3. ASK USER FOR DETAILS
+        // 4. ASK USER FOR DETAILS
         let userSettings;
         try {
             userSettings = await askInvoiceDetails({
@@ -2875,60 +2875,56 @@ window.generateInvoice = async function(orderId) {
 
         btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
 
-        // 4. Format Date for Display (DD-MM-YYYY)
+        // 5. Format Date for Display
         const dateParts = userSettings.date.split('-'); // YYYY-MM-DD
         const displayDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
 
-        // 5. CALCULATION LOGIC (With Scheme 106 Logic)
+        // 6. CALCULATION LOGIC (Scheme 106 + Discount)
         let processedItems = [];
         let runningTotal = 0;
         let totalDiscount = 0;
 
-        order.items.forEach(item => {
-            const isScheme = item.name.toLowerCase().includes("scheme");
-            
-            // LOGIC: If scheme, Rate is 106. 
-            // If not scheme, use stored price.
-            let rate = isScheme ? 106.00 : Number(item.price);
-            let qty = Number(item.qty);
-            let lineAmount = rate * qty;
+        if (order.items && Array.isArray(order.items)) {
+            order.items.forEach(item => {
+                const isScheme = item.name.toLowerCase().includes("scheme");
+                
+                // Logic: If Scheme, price is 106. Else use saved price.
+                let rate = isScheme ? 106.00 : Number(item.price);
+                let qty = Number(item.qty);
+                let lineAmount = rate * qty;
 
-            // If it is a scheme, we add it to the total, but we track it to DISCOUNT it later
-            if (isScheme) {
-                totalDiscount += lineAmount;
-            }
+                if (isScheme) {
+                    totalDiscount += lineAmount;
+                }
 
-            runningTotal += lineAmount;
+                runningTotal += lineAmount;
 
-            processedItems.push({
-                name: item.name,
-                qty: qty,
-                rate: rate,
-                amount: lineAmount
+                processedItems.push({
+                    name: item.name,
+                    qty: qty,
+                    rate: rate,
+                    amount: lineAmount
+                });
             });
-        });
+        }
 
-        // Final Maths
-        // Taxable Value = (Total of all items) - (Discount of Scheme Items)
+        // Final Math
         const taxableValue = runningTotal - totalDiscount;
-        
-        // GST (Assuming Inclusive or Exclusive? Usually Exclusive based on format)
-        // Let's assume Taxable Value is the base, and we add 5% on top.
         const taxRate = 0.05; // 5%
         const taxAmount = taxableValue * taxRate;
         const cgst = taxAmount / 2;
         const sgst = taxAmount / 2;
         const grandTotal = taxableValue + taxAmount;
 
-        // 6. SVG LOGO
+        // 7. SVG LOGO
         const svgLogo = `
-        <svg width="150" height="50" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+        <svg width="120" height="40" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
             <rect width="100%" height="100%" fill="black"/>
             <text x="50%" y="35" font-family="Arial, sans-serif" font-weight="bold" font-size="28" fill="white" text-anchor="middle">freskey</text>
             <text x="50%" y="52" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" letter-spacing="2">piyo</text>
         </svg>`;
 
-        // 7. Create Overlay
+        // 8. Create Overlay
         overlay = document.createElement('div');
         overlay.id = 'invoice-overlay';
         overlay.style.cssText = `
@@ -2938,7 +2934,7 @@ window.generateInvoice = async function(orderId) {
         `;
         document.body.appendChild(overlay);
 
-        // 8. HTML Template
+        // 9. HTML Template
         const getInvoiceHtml = (copyTitle) => `
             <div class="invoice-half">
                 <!-- Top Row -->
@@ -2950,9 +2946,7 @@ window.generateInvoice = async function(orderId) {
                 
                 <!-- Header -->
                 <div class="header-section">
-                    <div class="logo-box">
-                        ${svgLogo}
-                    </div>
+                    <div class="logo-box">${svgLogo}</div>
                     <div class="company-box">
                         <h2 style="margin:0; font-size:16px; text-transform:uppercase;">FRESKEYPIYO BEVERAGES</h2>
                         <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K</p>
@@ -2973,8 +2967,8 @@ window.generateInvoice = async function(orderId) {
                     <div class="addr-box" style="border-right:1px solid #000;">
                         <div class="addr-title">Billed To:</div>
                         <strong>${custName}</strong><br>
-                        GSTIN: ${custGst || "Unregistered"}<br>
-                        Ph: ${outlet.contactPhone || "N/A"}
+                        GSTIN: ${custGst}<br>
+                        Ph: ${custPhone}
                     </div>
                     <div class="addr-box">
                         <div class="addr-title">Shipped To:</div>
@@ -3009,14 +3003,14 @@ window.generateInvoice = async function(orderId) {
                             </tr>`).join('')}
                             
                             <!-- Filler Rows -->
-                            ${Array(Math.max(0, 6 - processedItems.length)).fill(0).map(() => `
+                            ${Array(Math.max(0, 5 - processedItems.length)).fill(0).map(() => `
                             <tr><td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Footer / Calculations -->
+                <!-- Footer -->
                 <div class="footer-section">
                     <div class="terms-box">
                         <strong>Bank Details:</strong><br>
@@ -3027,13 +3021,13 @@ window.generateInvoice = async function(orderId) {
                     </div>
                     <div class="totals-box">
                         <div class="t-row"><span>Subtotal:</span> <span>${runningTotal.toFixed(2)}</span></div>
-                        ${totalDiscount > 0 ? `<div class="t-row text-red"><span>Less: Discount:</span> <span>-${totalDiscount.toFixed(2)}</span></div>` : ''}
+                        ${totalDiscount > 0 ? `<div class="t-row" style="color:#dc2626;"><span>Less Discount:</span> <span>-${totalDiscount.toFixed(2)}</span></div>` : ''}
                         <div class="t-row" style="border-top:1px dashed #ccc; margin-top:2px;"><span>Taxable Value:</span> <span>${taxableValue.toFixed(2)}</span></div>
                         <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
                         <div class="t-row final"><span>Grand Total:</span> <span>₹${Math.round(grandTotal).toFixed(2)}</span></div>
                         
-                        <div style="margin-top:20px; text-align:right; font-size:9px;">
+                        <div style="margin-top:15px; text-align:right; font-size:9px;">
                             <strong>For Freskeypiyo Beverages</strong><br><br>
                             Auth. Signatory
                         </div>
@@ -3042,7 +3036,7 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 9. Inject Full CSS & HTML
+        // 10. Inject Full CSS & HTML
         const wrapperId = 'print-wrapper';
         overlay.innerHTML = `
             <style>
@@ -3077,12 +3071,11 @@ window.generateInvoice = async function(orderId) {
                 .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
 
-                .footer-section { display: flex; border-top: 1px solid #000; height: 95px; }
+                .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
                 .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
                 .totals-box { width: 40%; padding: 5px; }
                 .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
                 .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; background: #eee; -webkit-print-color-adjust: exact; }
-                .text-red { color: #dc2626; }
             </style>
 
             <div id="${wrapperId}">
@@ -3091,7 +3084,7 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 10. Wait & Save
+        // 11. Wait & Save
         await new Promise(r => setTimeout(r, 800));
 
         const element = document.getElementById(wrapperId);
