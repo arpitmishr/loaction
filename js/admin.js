@@ -2744,8 +2744,6 @@ function getFiscalSession() {
     const curMonth = today.getMonth(); // 0 = Jan, 3 = April
     const curYear = today.getFullYear();
     
-    // If Month is Jan-Mar (0-2), Session is (PrevYear)-(CurYear)
-    // If Month is Apr-Dec (3-11), Session is (CurYear)-(NextYear)
     if (curMonth < 3) {
         return `${curYear - 1}-${curYear}`;
     } else {
@@ -2754,68 +2752,149 @@ function getFiscalSession() {
 }
 
 // ==========================================
-//      HELPER: USER INPUT MODAL
+//      HELPER: USER INPUT MODAL (Enhanced)
 // ==========================================
-function askInvoiceDetails(defaults) {
+function askInvoiceDetails(defaults, orderItems) {
     return new Promise((resolve, reject) => {
         const existing = document.getElementById('inv-settings-modal');
         if (existing) existing.remove();
 
+        // 1. Pre-calculate default rows HTML
+        let itemsHtml = '';
+        let calculatedDiscount = 0;
+
+        orderItems.forEach((item, index) => {
+            const isScheme = item.name.toLowerCase().includes("scheme");
+            // Default Rate: 106 if scheme, else DB price
+            let defRate = isScheme ? 106.00 : Number(item.price);
+            
+            // If scheme, add to default discount total
+            if(isScheme) {
+                calculatedDiscount += (defRate * Number(item.qty));
+            }
+
+            itemsHtml += `
+                <tr class="item-row" data-name="${item.name}" data-qty="${item.qty}">
+                    <td style="padding:8px; border-bottom:1px solid #eee; font-size:11px; color:#333;">
+                        ${index + 1}. ${item.name}
+                        ${isScheme ? '<span style="color:red; font-size:9px;">(Scheme)</span>' : ''}
+                    </td>
+                    <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:11px;">
+                        ${item.qty}
+                    </td>
+                    <td style="padding:8px; border-bottom:1px solid #eee;">
+                        <input type="number" step="0.01" class="inp-rate" value="${defRate.toFixed(2)}" 
+                        style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px; text-align:right;">
+                    </td>
+                </tr>
+            `;
+        });
+
+        // 2. Create Modal
         const modal = document.createElement('div');
         modal.id = 'inv-settings-modal';
         modal.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 1000000;
+            background: rgba(0,0,0,0.6); z-index: 1000000;
             display: flex; justify-content: center; align-items: center;
             font-family: 'Inter', sans-serif;
         `;
 
         modal.innerHTML = `
-            <div style="background:white; padding:25px; rounded-xl; width:450px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-                <h3 style="margin-top:0; color:#333; font-weight:bold; font-size:18px; border-bottom:1px solid #eee; padding-bottom:10px;">Invoice Settings</h3>
+            <div style="background:white; width:550px; max-height:90vh; border-radius:12px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden; display:flex; flex-direction:column;">
                 
-                <div style="margin-top:15px;">
-                    <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Invoice Number</label>
-                    <input type="text" id="inp-inv-no" value="${defaults.invNo}" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+                <!-- Header -->
+                <div style="padding:20px; border-bottom:1px solid #eee; background:#f8fafc;">
+                    <h3 style="margin:0; color:#1e293b; font-weight:800; font-size:18px;">Invoice Configuration</h3>
+                    <p style="margin:2px 0 0 0; color:#64748b; font-size:12px;">Edit details and rates before generating PDF</p>
                 </div>
 
-                <div style="margin-top:15px; display:flex; gap:10px;">
-                    <div style="flex:1;">
-                        <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Billing Date</label>
-                        <input type="date" id="inp-inv-date" value="${defaults.date}" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+                <!-- Scrollable Content -->
+                <div style="padding:20px; overflow-y:auto;">
+                    
+                    <!-- Top Settings -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                        <div>
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Invoice No</label>
+                            <input type="text" id="inp-inv-no" value="${defaults.invNo}" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; font-weight:600;">
+                        </div>
+                        <div>
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Date</label>
+                            <input type="date" id="inp-inv-date" value="${defaults.date}" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px;">
+                        </div>
+                        <div>
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Vehicle No</label>
+                            <input type="text" id="inp-vehicle" placeholder="e.g. UK-08-AU-1234" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px;">
+                        </div>
                     </div>
-                    <div style="flex:1;">
-                        <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Vehicle No.</label>
-                        <input type="text" id="inp-vehicle" value="" placeholder="UK-08-XX-0000" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">
+
+                    <!-- Address -->
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Billing Address</label>
+                        <textarea id="inp-address" rows="2" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; resize:none;">${defaults.address}</textarea>
                     </div>
+
+                    <!-- Items Table -->
+                    <div style="border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; margin-bottom:15px;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead style="background:#f1f5f9;">
+                                <tr>
+                                    <th style="padding:8px; text-align:left; font-size:11px; color:#475569;">Item</th>
+                                    <th style="padding:8px; font-size:11px; color:#475569;">Qty</th>
+                                    <th style="padding:8px; text-align:right; font-size:11px; color:#475569;">Rate (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+                    </div>
+
+                    <!-- Discount Field -->
+                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; background:#fff1f2; padding:10px; border-radius:6px; border:1px dashed #fda4af;">
+                        <label style="font-size:12px; font-weight:bold; color:#be123c;">Less Discount (₹):</label>
+                        <input type="number" id="inp-discount" value="${calculatedDiscount.toFixed(2)}" style="width:100px; padding:6px; border:1px solid #f43f5e; border-radius:4px; text-align:right; font-weight:bold; color:#be123c;">
+                    </div>
+
                 </div>
 
-                <div style="margin-top:15px;">
-                    <label style="display:block; font-size:12px; font-weight:bold; color:#666;">Buyer Address (Editable)</label>
-                    <textarea id="inp-address" rows="3" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:6px;">${defaults.address}</textarea>
-                </div>
-
-                <div style="margin-top:25px; display:flex; justify-content:end; gap:10px;">
-                    <button id="btn-inv-cancel" style="padding:10px 20px; border:none; background:#f1f5f9; color:#64748b; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
-                    <button id="btn-inv-generate" style="padding:10px 20px; border:none; background:#4f46e5; color:white; border-radius:8px; font-weight:bold; cursor:pointer;">Generate PDF</button>
+                <!-- Footer Actions -->
+                <div style="padding:20px; border-top:1px solid #eee; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px;">
+                    <button id="btn-inv-cancel" style="padding:10px 20px; border:1px solid #cbd5e1; background:white; color:#64748b; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button id="btn-inv-generate" style="padding:10px 25px; border:none; background:#0f172a; color:white; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">Generate Invoice</button>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
+        // Handlers
         document.getElementById('btn-inv-cancel').onclick = () => {
             modal.remove();
-            reject(new Error("Cancelled by user"));
+            reject(new Error("Cancelled"));
         };
 
         document.getElementById('btn-inv-generate').onclick = () => {
+            // 1. Gather Items with updated rates
+            const updatedItems = [];
+            const inputs = document.querySelectorAll('.inp-rate');
+            const rows = document.querySelectorAll('.item-row');
+            
+            rows.forEach((row, i) => {
+                const name = row.dataset.name;
+                const qty = Number(row.dataset.qty);
+                const rate = Number(inputs[i].value); // User edited rate
+                updatedItems.push({ name, qty, rate, amount: qty * rate });
+            });
+
+            // 2. Gather Settings
             const data = {
                 invNo: document.getElementById('inp-inv-no').value,
                 date: document.getElementById('inp-inv-date').value,
                 vehicle: document.getElementById('inp-vehicle').value || "N/A",
-                address: document.getElementById('inp-address').value
+                address: document.getElementById('inp-address').value,
+                discount: Number(document.getElementById('inp-discount').value),
+                items: updatedItems
             };
+            
             modal.remove();
             resolve(data);
         };
@@ -2835,7 +2914,7 @@ window.generateInvoice = async function(orderId) {
         btn.disabled = true;
         btn.innerHTML = `Wait...`;
 
-        // 1. Fetch Data
+        // 1. Fetch Database Data
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2843,13 +2922,12 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 2. DEFINE VARIABLES (Fixed: Added route and customer details here)
+        // 2. Prepare Defaults
         const route = order.routeName || "N/A";
         const custName = order.outletName || "Unknown";
         const custPhone = outlet.contactPhone || "N/A";
         const custGst = outlet.gstNumber || "N/A";
-
-        // 3. Prepare Defaults for Modal
+        
         const session = getFiscalSession();
         const shortId = orderId.slice(-4).toUpperCase();
         const defaultInvNo = `FP/${session}/${shortId}`;
@@ -2859,64 +2937,45 @@ window.generateInvoice = async function(orderId) {
             ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") 
             : "Address Not Provided";
 
-        // 4. ASK USER FOR DETAILS
+        // 3. OPEN SETTINGS MODAL (Wait for user input)
         let userSettings;
         try {
             userSettings = await askInvoiceDetails({
                 invNo: defaultInvNo,
                 date: today,
                 address: defaultAddress
-            });
+            }, order.items || []); // Pass existing items to populate table
         } catch (e) {
             btn.disabled = false;
             btn.innerHTML = originalText;
-            return; // Stop if cancelled
+            return;
         }
 
         btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
 
-        // 5. Format Date for Display
-        const dateParts = userSettings.date.split('-'); // YYYY-MM-DD
-        const displayDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+        // 4. PERFORM CALCULATIONS (Strict Order)
+        
+        // A. Sum of (Qty * Rate) for all items
+        const subTotal = userSettings.items.reduce((sum, item) => sum + item.amount, 0);
+        
+        // B. Apply Discount (Subtotal - Discount = Taxable Value)
+        const discountAmount = userSettings.discount;
+        const taxableValue = subTotal - discountAmount;
 
-        // 6. CALCULATION LOGIC (Scheme 106 + Discount)
-        let processedItems = [];
-        let runningTotal = 0;
-        let totalDiscount = 0;
-
-        if (order.items && Array.isArray(order.items)) {
-            order.items.forEach(item => {
-                const isScheme = item.name.toLowerCase().includes("scheme");
-                
-                // Logic: If Scheme, price is 106. Else use saved price.
-                let rate = isScheme ? 106.00 : Number(item.price);
-                let qty = Number(item.qty);
-                let lineAmount = rate * qty;
-
-                if (isScheme) {
-                    totalDiscount += lineAmount;
-                }
-
-                runningTotal += lineAmount;
-
-                processedItems.push({
-                    name: item.name,
-                    qty: qty,
-                    rate: rate,
-                    amount: lineAmount
-                });
-            });
-        }
-
-        // Final Math
-        const taxableValue = runningTotal - totalDiscount;
-        const taxRate = 0.05; // 5%
+        // C. Calculate GST on Taxable Value (5%)
+        const taxRate = 0.05; 
         const taxAmount = taxableValue * taxRate;
         const cgst = taxAmount / 2;
         const sgst = taxAmount / 2;
+
+        // D. Grand Total
         const grandTotal = taxableValue + taxAmount;
 
-        // 7. SVG LOGO
+        // 5. Display Date
+        const dateParts = userSettings.date.split('-');
+        const displayDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+        // 6. SVG LOGO
         const svgLogo = `
         <svg width="120" height="40" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
             <rect width="100%" height="100%" fill="black"/>
@@ -2924,7 +2983,7 @@ window.generateInvoice = async function(orderId) {
             <text x="50%" y="52" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" letter-spacing="2">piyo</text>
         </svg>`;
 
-        // 8. Create Overlay
+        // 7. Render Template
         overlay = document.createElement('div');
         overlay.id = 'invoice-overlay';
         overlay.style.cssText = `
@@ -2934,17 +2993,14 @@ window.generateInvoice = async function(orderId) {
         `;
         document.body.appendChild(overlay);
 
-        // 9. HTML Template
         const getInvoiceHtml = (copyTitle) => `
             <div class="invoice-half">
-                <!-- Top Row -->
                 <div class="inv-top">
                     <span>Page 1 of 1</span>
                     <span>TAX INVOICE</span>
                     <span>${copyTitle} Copy</span>
                 </div>
                 
-                <!-- Header -->
                 <div class="header-section">
                     <div class="logo-box">${svgLogo}</div>
                     <div class="company-box">
@@ -2954,7 +3010,6 @@ window.generateInvoice = async function(orderId) {
                     </div>
                 </div>
 
-                <!-- Meta Info -->
                 <div class="meta-row">
                     <div class="meta-item"><strong>Inv No:</strong> ${userSettings.invNo}</div>
                     <div class="meta-item"><strong>Date:</strong> ${displayDate}</div>
@@ -2962,7 +3017,6 @@ window.generateInvoice = async function(orderId) {
                     <div class="meta-item"><strong>Vehicle:</strong> ${userSettings.vehicle}</div>
                 </div>
 
-                <!-- Address -->
                 <div class="address-section">
                     <div class="addr-box" style="border-right:1px solid #000;">
                         <div class="addr-title">Billed To:</div>
@@ -2976,7 +3030,6 @@ window.generateInvoice = async function(orderId) {
                     </div>
                 </div>
 
-                <!-- Table -->
                 <div class="table-container">
                     <table class="inv-table">
                         <thead>
@@ -2991,7 +3044,7 @@ window.generateInvoice = async function(orderId) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${processedItems.map((item, i) => `
+                            ${userSettings.items.map((item, i) => `
                             <tr>
                                 <td align="center">${i + 1}</td>
                                 <td>${item.name}</td>
@@ -3002,15 +3055,13 @@ window.generateInvoice = async function(orderId) {
                                 <td align="right">${item.amount.toFixed(2)}</td>
                             </tr>`).join('')}
                             
-                            <!-- Filler Rows -->
-                            ${Array(Math.max(0, 5 - processedItems.length)).fill(0).map(() => `
+                            ${Array(Math.max(0, 6 - userSettings.items.length)).fill(0).map(() => `
                             <tr><td style="color:white">.</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Footer -->
                 <div class="footer-section">
                     <div class="terms-box">
                         <strong>Bank Details:</strong><br>
@@ -3020,8 +3071,8 @@ window.generateInvoice = async function(orderId) {
                         <span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
                     </div>
                     <div class="totals-box">
-                        <div class="t-row"><span>Subtotal:</span> <span>${runningTotal.toFixed(2)}</span></div>
-                        ${totalDiscount > 0 ? `<div class="t-row" style="color:#dc2626;"><span>Less Discount:</span> <span>-${totalDiscount.toFixed(2)}</span></div>` : ''}
+                        <div class="t-row"><span>Subtotal:</span> <span>${subTotal.toFixed(2)}</span></div>
+                        ${discountAmount > 0 ? `<div class="t-row" style="color:#dc2626;"><span>Less Discount:</span> <span>-${discountAmount.toFixed(2)}</span></div>` : ''}
                         <div class="t-row" style="border-top:1px dashed #ccc; margin-top:2px;"><span>Taxable Value:</span> <span>${taxableValue.toFixed(2)}</span></div>
                         <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
@@ -3036,7 +3087,7 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 10. Inject Full CSS & HTML
+        // 8. Inject CSS
         const wrapperId = 'print-wrapper';
         overlay.innerHTML = `
             <style>
@@ -3053,24 +3104,19 @@ window.generateInvoice = async function(orderId) {
                     font-size: 10px;
                 }
                 .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
-                
                 .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
                 .logo-box { width: 25%; background: #000; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
                 .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
-                
                 .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; -webkit-print-color-adjust: exact; }
                 .meta-item { font-size: 9px; }
-
                 .address-section { display: flex; border-bottom: 1px solid #000; height: 55px; }
                 .addr-box { width: 50%; padding: 4px; font-size: 10px; line-height: 1.2; overflow: hidden; }
                 .addr-title { font-size: 8px; color: #666; text-transform: uppercase; font-weight: bold; }
-
                 .table-container { flex-grow: 1; }
                 .inv-table { width: 100%; border-collapse: collapse; font-size: 10px; }
                 .inv-table th { background: #ddd; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 3px; text-align: center; font-weight: bold; -webkit-print-color-adjust: exact; }
                 .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
-
                 .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
                 .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
                 .totals-box { width: 40%; padding: 5px; }
@@ -3084,7 +3130,7 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 11. Wait & Save
+        // 9. Generate PDF
         await new Promise(r => setTimeout(r, 800));
 
         const element = document.getElementById(wrapperId);
