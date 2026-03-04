@@ -360,6 +360,7 @@ function createShopListItem(shop) {
     li.className = "rounded-2xl p-4 transition-all mb-3 relative overflow-hidden group";
     li.style.cssText = bgStyle;
     
+    // Note: No 'onclick' in the HTML string for buttons anymore. We attach them below.
     li.innerHTML = `
         <div class="flex justify-between items-start">
             <div>
@@ -382,7 +383,7 @@ function createShopListItem(shop) {
                 <span class="material-icons-round text-[14px]">arrow_forward</span>
             </button>
             
-            <!-- 2. Details (New Class 'btn-details' added) -->
+            <!-- 2. Details (Info Icon) -->
             <button class="btn-details col-span-1 bg-white border border-slate-200 text-slate-600 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition flex flex-col items-center justify-center">
                 <span class="material-icons-round text-base mb-0.5">info</span>
             </button>
@@ -394,36 +395,35 @@ function createShopListItem(shop) {
         </div>
 
         <!-- HIDDEN DETAILS CONTAINER -->
-        <div id="details-${shop.id}" class="hidden mt-0 pt-0 overflow-hidden transition-all duration-300 ease-in-out">
-            <!-- Content injected via JS -->
-        </div>
+        <div id="details-${shop.id}" class="hidden mt-0 pt-0 overflow-hidden transition-all duration-300 ease-in-out"></div>
     `;
     
     // --- ATTACH LISTENERS (THE FIX) ---
+    // This ensures the functions are found regardless of scope
     
     // 1. Navigation
-    li.querySelector('.btn-nav').onclick = (e) => { 
+    li.querySelector('.btn-nav').addEventListener('click', (e) => { 
         e.stopPropagation(); 
         openGoogleMapsNavigation(shop.lat, shop.lng); 
-    };
+    });
 
     // 2. Phone Order
-    li.querySelector('.btn-phone-order').onclick = (e) => { 
+    li.querySelector('.btn-phone-order').addEventListener('click', (e) => { 
         e.stopPropagation(); 
         window.openOrderForm(shop.id, shop.name); 
-    };
+    });
 
     // 3. Start Visit
-    li.querySelector('.btn-open-map').onclick = () => {
+    li.querySelector('.btn-open-map').addEventListener('click', (e) => {
         if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
         else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
-    };
+    });
 
-    // 4. Toggle Details (THIS WAS MISSING/BROKEN)
-    li.querySelector('.btn-details').onclick = (e) => {
+    // 4. Toggle Details (The Broken Part Fixed)
+    li.querySelector('.btn-details').addEventListener('click', (e) => {
         e.stopPropagation();
         toggleShopDetails(shop.id, e.currentTarget);
-    };
+    });
 
     return li;
 }
@@ -2286,28 +2286,28 @@ window.handleSalesmanSearch = function() {
 
 
 
-// ... existing code ...
-
 // ==========================================
-//      EXPOSE FUNCTIONS TO WINDOW
+//      DETAILS & SAVE HELPERS
 // ==========================================
 
-// Ensure toggleShopDetails is available logic-wise
 async function toggleShopDetails(shopId, btn) {
-    console.log("Toggling details for:", shopId); // Debug Log
     const container = document.getElementById(`details-${shopId}`);
     
-    if (!container) return console.error("Container not found");
+    if (!container) {
+        console.error("Details container not found for ID:", shopId);
+        return;
+    }
 
     // Toggle Logic
     if (!container.classList.contains('hidden')) {
+        // Hide
         container.classList.add('hidden');
         btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100'); 
         btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
         return;
     }
 
-    // Active Style
+    // Show
     btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
     btn.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
     container.classList.remove('hidden');
@@ -2316,14 +2316,17 @@ async function toggleShopDetails(shopId, btn) {
     if (container.innerHTML.trim() !== "") return;
 
     // Loading State
-    container.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">Loading details...</div>`;
+    container.innerHTML = `
+        <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 animate-pulse text-center text-xs text-slate-400">
+            Loading details...
+        </div>`;
 
     try {
         const docRef = doc(db, "outlets", shopId);
         const docSnap = await getDoc(docRef);
 
         if (!docSnap.exists()) {
-            container.innerHTML = `<div class="p-3 text-red-500 text-xs">Shop deleted.</div>`;
+            container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs text-center bg-red-50 rounded-xl">Shop not found or deleted.</div>`;
             return;
         }
 
@@ -2334,31 +2337,37 @@ async function toggleShopDetails(shopId, btn) {
         const address = data.address || "";
 
         container.innerHTML = `
-            <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
                 <div class="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-200">
                     <div>
-                        <p class="text-[10px] uppercase font-bold text-slate-400">Outstanding</p>
+                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding</p>
                         <p class="text-xl font-black ${balColor}">₹${balance.toFixed(2)}</p>
                     </div>
                     <div class="text-right">
-                        <p class="text-[10px] uppercase font-bold text-slate-400">Last Order</p>
+                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Last Order</p>
                         <p class="text-sm font-bold text-slate-700 mt-1">${lastOrder}</p>
                     </div>
                 </div>
                 <div class="relative">
-                    <label class="text-[10px] uppercase font-bold text-indigo-400">Full Address</label>
-                    <textarea id="addr-input-${shopId}" rows="2" class="w-full p-2 text-xs bg-white border border-slate-200 rounded-lg mt-1">${address}</textarea>
-                    <button onclick="window.saveShopAddress('${shopId}')" class="mt-2 w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold">Update Address</button>
+                    <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Full Address</label>
+                    <textarea id="addr-input-${shopId}" rows="2" 
+                        class="w-full p-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg mt-1 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+                        placeholder="Enter address...">${address}</textarea>
+                    
+                    <button onclick="window.saveShopAddress('${shopId}')" 
+                        class="mt-2 w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold hover:bg-slate-900 transition flex items-center justify-center gap-1">
+                        <span class="material-icons-round text-sm">save</span> Update Address
+                    </button>
                 </div>
             </div>
         `;
     } catch (error) {
         console.error("Details Error:", error);
-        container.innerHTML = `<div class="p-2 text-center text-red-500 text-xs">Error loading.</div>`;
+        container.innerHTML = `<div class="mt-3 p-3 text-center text-red-500 text-xs bg-red-50 rounded-xl">Error loading data.</div>`;
     }
 }
 
-// Make Save Address Global
+// Make Save Address Global because it is called from an HTML string
 window.saveShopAddress = async function(shopId) {
     const textarea = document.getElementById(`addr-input-${shopId}`);
     const btn = event.currentTarget;
@@ -2366,6 +2375,7 @@ window.saveShopAddress = async function(shopId) {
 
     if (!newAddress) return alert("Address cannot be empty.");
 
+    const originalHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = "Saving...";
 
@@ -2374,16 +2384,19 @@ window.saveShopAddress = async function(shopId) {
             address: newAddress,
             lastUpdated: serverTimestamp()
         });
+        
         btn.innerHTML = "Saved!";
         btn.style.background = "#10b981"; // Green
+        
         setTimeout(() => {
-            btn.innerHTML = "Update Address";
+            btn.innerHTML = originalHtml;
             btn.disabled = false;
-            btn.style.background = "#1e293b"; // Back to dark
+            btn.style.background = "#1e293b"; // Back to Slate-800
         }, 2000);
     } catch (error) {
+        console.error("Save Error", error);
         alert("Error: " + error.message);
         btn.disabled = false;
-        btn.innerHTML = "Update Address";
+        btn.innerHTML = originalHtml;
     }
 };
