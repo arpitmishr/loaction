@@ -350,8 +350,9 @@ function createShopListItem(shop) {
     const li = document.createElement('li');
     const isVisited = shop.isVisited;
     
+    // Dynamic Styles
     const bgStyle = isVisited 
-        ? "background:#f0fdf4; border:1px solid #bbf7d0; opacity:0.9;" 
+        ? "background:#f0fdf4; border:1px solid #bbf7d0; opacity:0.95;" 
         : "background:white; border:1px solid #f1f5f9; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);";
     
     const checkMark = isVisited 
@@ -361,7 +362,6 @@ function createShopListItem(shop) {
     li.className = "rounded-2xl p-4 transition-all mb-3 relative overflow-hidden group";
     li.style.cssText = bgStyle;
     
-    // Note: No 'onclick' in the HTML string for buttons anymore. We attach them below.
     li.innerHTML = `
         <div class="flex justify-between items-start">
             <div>
@@ -371,36 +371,42 @@ function createShopListItem(shop) {
                     <span class="text-[10px] text-slate-400 font-mono">ID: ${shop.id.substr(0,4)}</span>
                 </div>
             </div>
+            <!-- Navigation Button -->
             <button class="btn-nav bg-blue-50 text-blue-600 w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition border border-blue-100" title="Navigate">
                 <span class="material-icons-round text-sm">near_me</span>
             </button>
         </div>
         
-        <!-- Action Buttons Grid -->
-        <div class="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-dashed border-slate-100">
-            <!-- 1. Start Visit (Wide) -->
-            <button class="btn-open-map col-span-2 bg-slate-800 text-white py-2 rounded-xl text-xs font-bold shadow hover:bg-slate-900 active:scale-95 transition flex items-center justify-center gap-1">
-                ${isVisited ? 'View Visit' : 'Start Visit'} 
+        <!-- Action Buttons (Grid Layout) -->
+        <div class="flex gap-2 mt-4 pt-3 border-t border-dashed border-slate-100">
+            
+            <!-- 1. Start Visit -->
+            <button class="btn-open-map flex-grow bg-slate-800 text-white py-2 px-3 rounded-xl text-xs font-bold shadow hover:bg-slate-900 active:scale-95 transition flex items-center justify-center gap-1">
+                ${isVisited ? 'View' : 'Visit'} 
                 <span class="material-icons-round text-[14px]">arrow_forward</span>
             </button>
             
-            <!-- 2. Details (Info Icon) -->
-            <button class="btn-details col-span-1 bg-white border border-slate-200 text-slate-600 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition flex flex-col items-center justify-center">
-                <span class="material-icons-round text-base mb-0.5">info</span>
+            <!-- 2. Collect Payment (Restored) -->
+            <button class="btn-collect flex-grow bg-emerald-50 text-emerald-700 border border-emerald-100 py-2 px-3 rounded-xl text-xs font-bold hover:bg-emerald-100 active:scale-95 transition flex items-center justify-center gap-1">
+                Collect
             </button>
 
-            <!-- 3. Phone -->
-            <button class="btn-phone-order col-span-1 bg-orange-50 text-orange-600 border border-orange-100 py-2 rounded-xl flex items-center justify-center hover:bg-orange-100 active:scale-95 transition">
-                <span class="material-icons-round text-base">call</span>
+            <!-- 3. Details (Info) -->
+            <button class="btn-details w-10 bg-white border border-slate-200 text-slate-500 py-2 rounded-xl flex items-center justify-center hover:bg-slate-50 active:scale-95 transition">
+                <span class="material-icons-round text-lg">info</span>
+            </button>
+
+            <!-- 4. Call -->
+            <button class="btn-phone-order w-10 bg-orange-50 text-orange-600 border border-orange-100 py-2 rounded-xl flex items-center justify-center hover:bg-orange-100 active:scale-95 transition">
+                <span class="material-icons-round text-lg">call</span>
             </button>
         </div>
 
-        <!-- HIDDEN DETAILS CONTAINER -->
+        <!-- HIDDEN DETAILS CONTAINER (Dynamic Content) -->
         <div id="details-${shop.id}" class="hidden mt-0 pt-0 overflow-hidden transition-all duration-300 ease-in-out"></div>
     `;
     
-    // --- ATTACH LISTENERS (THE FIX) ---
-    // This ensures the functions are found regardless of scope
+    // --- ATTACH EVENT LISTENERS ---
     
     // 1. Navigation
     li.querySelector('.btn-nav').addEventListener('click', (e) => { 
@@ -408,27 +414,37 @@ function createShopListItem(shop) {
         openGoogleMapsNavigation(shop.lat, shop.lng); 
     });
 
-    // 2. Phone Order
-    li.querySelector('.btn-phone-order').addEventListener('click', (e) => { 
-        e.stopPropagation(); 
-        window.openOrderForm(shop.id, shop.name); 
-    });
-
-    // 3. Start Visit
+    // 2. Start Visit
     li.querySelector('.btn-open-map').addEventListener('click', (e) => {
         if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
         else openVisitPanel(shop.id, shop.name, shop.lat, shop.lng);
     });
 
-    // 4. Toggle Details (The Broken Part Fixed)
+    // 3. Collect Payment (Restored Functionality)
+    li.querySelector('.btn-collect').addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Calls the global function defined in salesman.js
+        if (window.openQuickCollection) {
+            window.openQuickCollection(shop.id, shop.name);
+        } else {
+            alert("Error: Payment module not loaded.");
+        }
+    });
+
+    // 4. Toggle Details
     li.querySelector('.btn-details').addEventListener('click', (e) => {
         e.stopPropagation();
         toggleShopDetails(shop.id, e.currentTarget);
     });
 
+    // 5. Phone Order
+    li.querySelector('.btn-phone-order').addEventListener('click', (e) => { 
+        e.stopPropagation(); 
+        window.openOrderForm(shop.id, shop.name); 
+    });
+
     return li;
 }
-
 
 // ==========================================
 //      2. NEW: FETCH & SHOW DETAILS
