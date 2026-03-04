@@ -2741,7 +2741,7 @@ function escapeCsv(str) {
 // ==========================================
 function getFiscalSession() {
     const today = new Date();
-    const curMonth = today.getMonth(); // 0 = Jan, 3 = April
+    const curMonth = today.getMonth(); // 0 = Jan
     const curYear = today.getFullYear();
     
     if (curMonth < 3) {
@@ -2752,152 +2752,168 @@ function getFiscalSession() {
 }
 
 // ==========================================
-//      HELPER: USER INPUT MODAL (Enhanced)
+//      HELPER: USER INPUT MODAL (FIXED)
 // ==========================================
 function askInvoiceDetails(defaults, orderItems) {
     return new Promise((resolve, reject) => {
-        const existing = document.getElementById('inv-settings-modal');
-        if (existing) existing.remove();
+        try {
+            // 1. Cleanup old modal
+            const existing = document.getElementById('inv-settings-modal');
+            if (existing) existing.remove();
 
-        // 1. Pre-calculate default rows HTML
-        let itemsHtml = '';
-        let calculatedDiscount = 0;
+            // 2. Build Rows HTML safely
+            let itemsHtml = '';
+            let calculatedDiscount = 0;
+            const safeItems = Array.isArray(orderItems) ? orderItems : [];
 
-        orderItems.forEach((item, index) => {
-            const isScheme = item.name.toLowerCase().includes("scheme");
-            // Default Rate: 106 if scheme, else DB price
-            let defRate = isScheme ? 106.00 : Number(item.price);
-            
-            // If scheme, add to default discount total
-            if(isScheme) {
-                calculatedDiscount += (defRate * Number(item.qty));
+            if (safeItems.length === 0) {
+                itemsHtml = '<tr><td colspan="3" style="padding:10px; text-align:center; color:red;">No items in order</td></tr>';
+            } else {
+                safeItems.forEach((item, index) => {
+                    const itemName = item.name || "Unknown Item";
+                    const isScheme = itemName.toLowerCase().includes("scheme");
+                    
+                    // Default Rate Logic: 106 for scheme, else DB price, else 0
+                    let defRate = isScheme ? 106.00 : (Number(item.price) || 0);
+                    let qty = Number(item.qty) || 0;
+
+                    // If scheme, this amount is usually discounted later
+                    if(isScheme) {
+                        calculatedDiscount += (defRate * qty);
+                    }
+
+                    itemsHtml += `
+                        <tr class="item-row" data-name="${itemName}" data-qty="${qty}">
+                            <td style="padding:8px; border-bottom:1px solid #eee; font-size:11px; color:#333;">
+                                ${index + 1}. ${itemName}
+                                ${isScheme ? '<span style="color:red; font-size:9px; font-weight:bold;">(SCHEME)</span>' : ''}
+                            </td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:11px;">
+                                ${qty}
+                            </td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">
+                                <input type="number" step="0.01" class="inp-rate" value="${defRate.toFixed(2)}" 
+                                style="width:80px; padding:6px; border:1px solid #ccc; border-radius:4px; text-align:right; font-weight:bold;">
+                            </td>
+                        </tr>
+                    `;
+                });
             }
 
-            itemsHtml += `
-                <tr class="item-row" data-name="${item.name}" data-qty="${item.qty}">
-                    <td style="padding:8px; border-bottom:1px solid #eee; font-size:11px; color:#333;">
-                        ${index + 1}. ${item.name}
-                        ${isScheme ? '<span style="color:red; font-size:9px;">(Scheme)</span>' : ''}
-                    </td>
-                    <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:11px;">
-                        ${item.qty}
-                    </td>
-                    <td style="padding:8px; border-bottom:1px solid #eee;">
-                        <input type="number" step="0.01" class="inp-rate" value="${defRate.toFixed(2)}" 
-                        style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px; text-align:right;">
-                    </td>
-                </tr>
+            // 3. Create Modal DOM
+            const modal = document.createElement('div');
+            modal.id = 'inv-settings-modal';
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.6); z-index: 1000000;
+                display: flex; justify-content: center; align-items: center;
+                font-family: sans-serif;
             `;
-        });
 
-        // 2. Create Modal
-        const modal = document.createElement('div');
-        modal.id = 'inv-settings-modal';
-        modal.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 1000000;
-            display: flex; justify-content: center; align-items: center;
-            font-family: 'Inter', sans-serif;
-        `;
-
-        modal.innerHTML = `
-            <div style="background:white; width:550px; max-height:90vh; border-radius:12px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden; display:flex; flex-direction:column;">
-                
-                <!-- Header -->
-                <div style="padding:20px; border-bottom:1px solid #eee; background:#f8fafc;">
-                    <h3 style="margin:0; color:#1e293b; font-weight:800; font-size:18px;">Invoice Configuration</h3>
-                    <p style="margin:2px 0 0 0; color:#64748b; font-size:12px;">Edit details and rates before generating PDF</p>
-                </div>
-
-                <!-- Scrollable Content -->
-                <div style="padding:20px; overflow-y:auto;">
+            modal.innerHTML = `
+                <div style="background:white; width:600px; max-height:90vh; border-radius:12px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); display:flex; flex-direction:column; overflow:hidden;">
                     
-                    <!-- Top Settings -->
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                    <!-- Header -->
+                    <div style="padding:15px 20px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Invoice No</label>
-                            <input type="text" id="inp-inv-no" value="${defaults.invNo}" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px; font-weight:600;">
+                            <h3 style="margin:0; color:#0f172a; font-weight:800; font-size:16px;">Invoice Configuration</h3>
+                            <p style="margin:2px 0 0 0; color:#64748b; font-size:11px;">Edit details and rates before generating PDF</p>
                         </div>
-                        <div>
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Date</label>
-                            <input type="date" id="inp-inv-date" value="${defaults.date}" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px;">
+                        <button id="btn-inv-close-x" style="border:none; background:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+                    </div>
+
+                    <!-- Scrollable Body -->
+                    <div style="padding:20px; overflow-y:auto;">
+                        
+                        <!-- Top Inputs -->
+                        <div style="display:grid; grid-template-columns: 1.5fr 1fr 1fr; gap:10px; margin-bottom:15px;">
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;">Invoice No</label>
+                                <input type="text" id="inp-inv-no" value="${defaults.invNo}" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-weight:bold;">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;">Date</label>
+                                <input type="date" id="inp-inv-date" value="${defaults.date}" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                            </div>
+                            <div>
+                                <label style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;">Vehicle No</label>
+                                <input type="text" id="inp-vehicle" placeholder="XX-00-XX-0000" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                            </div>
                         </div>
-                        <div>
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Vehicle No</label>
-                            <input type="text" id="inp-vehicle" placeholder="e.g. UK-08-AU-1234" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:13px;">
+
+                        <!-- Address -->
+                        <div style="margin-bottom:15px;">
+                            <label style="font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;">Billing Address</label>
+                            <textarea id="inp-address" rows="2" style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #cbd5e1; border-radius:4px; resize:none;">${defaults.address}</textarea>
+                        </div>
+
+                        <!-- Items Table -->
+                        <div style="border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; margin-bottom:15px;">
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead style="background:#f1f5f9;">
+                                    <tr>
+                                        <th style="padding:8px; text-align:left; font-size:10px; color:#475569; font-weight:700;">ITEM DESCRIPTION</th>
+                                        <th style="padding:8px; text-align:center; font-size:10px; color:#475569; font-weight:700;">QTY</th>
+                                        <th style="padding:8px; text-align:right; font-size:10px; color:#475569; font-weight:700;">RATE (₹)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${itemsHtml}</tbody>
+                            </table>
+                        </div>
+
+                        <!-- Discount Config -->
+                        <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; background:#fff1f2; padding:10px; border-radius:6px; border:1px dashed #fda4af;">
+                            <label style="font-size:11px; font-weight:bold; color:#be123c;">LESS DISCOUNT (₹):</label>
+                            <input type="number" id="inp-discount" value="${calculatedDiscount.toFixed(2)}" style="width:100px; padding:6px; border:1px solid #f43f5e; border-radius:4px; text-align:right; font-weight:bold; color:#be123c;">
                         </div>
                     </div>
 
-                    <!-- Address -->
-                    <div style="margin-bottom:20px;">
-                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Billing Address</label>
-                        <textarea id="inp-address" rows="2" style="width:100%; padding:8px; margin-top:4px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; resize:none;">${defaults.address}</textarea>
+                    <!-- Footer -->
+                    <div style="padding:15px 20px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px;">
+                        <button id="btn-inv-cancel" style="padding:10px 20px; border:1px solid #cbd5e1; background:white; color:#475569; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+                        <button id="btn-inv-generate" style="padding:10px 25px; border:none; background:#0f172a; color:white; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">Generate PDF</button>
                     </div>
-
-                    <!-- Items Table -->
-                    <div style="border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; margin-bottom:15px;">
-                        <table style="width:100%; border-collapse:collapse;">
-                            <thead style="background:#f1f5f9;">
-                                <tr>
-                                    <th style="padding:8px; text-align:left; font-size:11px; color:#475569;">Item</th>
-                                    <th style="padding:8px; font-size:11px; color:#475569;">Qty</th>
-                                    <th style="padding:8px; text-align:right; font-size:11px; color:#475569;">Rate (₹)</th>
-                                </tr>
-                            </thead>
-                            <tbody>${itemsHtml}</tbody>
-                        </table>
-                    </div>
-
-                    <!-- Discount Field -->
-                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; background:#fff1f2; padding:10px; border-radius:6px; border:1px dashed #fda4af;">
-                        <label style="font-size:12px; font-weight:bold; color:#be123c;">Less Discount (₹):</label>
-                        <input type="number" id="inp-discount" value="${calculatedDiscount.toFixed(2)}" style="width:100px; padding:6px; border:1px solid #f43f5e; border-radius:4px; text-align:right; font-weight:bold; color:#be123c;">
-                    </div>
-
                 </div>
+            `;
 
-                <!-- Footer Actions -->
-                <div style="padding:20px; border-top:1px solid #eee; background:#f8fafc; display:flex; justify-content:flex-end; gap:10px;">
-                    <button id="btn-inv-cancel" style="padding:10px 20px; border:1px solid #cbd5e1; background:white; color:#64748b; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
-                    <button id="btn-inv-generate" style="padding:10px 25px; border:none; background:#0f172a; color:white; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">Generate Invoice</button>
-                </div>
-            </div>
-        `;
+            document.body.appendChild(modal);
 
-        document.body.appendChild(modal);
-
-        // Handlers
-        document.getElementById('btn-inv-cancel').onclick = () => {
-            modal.remove();
-            reject(new Error("Cancelled"));
-        };
-
-        document.getElementById('btn-inv-generate').onclick = () => {
-            // 1. Gather Items with updated rates
-            const updatedItems = [];
-            const inputs = document.querySelectorAll('.inp-rate');
-            const rows = document.querySelectorAll('.item-row');
+            // Handlers
+            const close = () => { modal.remove(); reject(new Error("Cancelled")); };
             
-            rows.forEach((row, i) => {
-                const name = row.dataset.name;
-                const qty = Number(row.dataset.qty);
-                const rate = Number(inputs[i].value); // User edited rate
-                updatedItems.push({ name, qty, rate, amount: qty * rate });
-            });
+            document.getElementById('btn-inv-close-x').onclick = close;
+            document.getElementById('btn-inv-cancel').onclick = close;
 
-            // 2. Gather Settings
-            const data = {
-                invNo: document.getElementById('inp-inv-no').value,
-                date: document.getElementById('inp-inv-date').value,
-                vehicle: document.getElementById('inp-vehicle').value || "N/A",
-                address: document.getElementById('inp-address').value,
-                discount: Number(document.getElementById('inp-discount').value),
-                items: updatedItems
+            document.getElementById('btn-inv-generate').onclick = () => {
+                // 1. Gather Items with updated rates
+                const updatedItems = [];
+                const inputs = document.querySelectorAll('.inp-rate');
+                const rows = document.querySelectorAll('.item-row');
+                
+                rows.forEach((row, i) => {
+                    const name = row.dataset.name;
+                    const qty = Number(row.dataset.qty);
+                    const rate = Number(inputs[i].value); // User edited rate
+                    updatedItems.push({ name, qty, rate, amount: qty * rate });
+                });
+
+                // 2. Gather Settings
+                const data = {
+                    invNo: document.getElementById('inp-inv-no').value,
+                    date: document.getElementById('inp-inv-date').value,
+                    vehicle: document.getElementById('inp-vehicle').value || "N/A",
+                    address: document.getElementById('inp-address').value,
+                    discount: Number(document.getElementById('inp-discount').value) || 0,
+                    items: updatedItems
+                };
+                
+                modal.remove();
+                resolve(data);
             };
-            
-            modal.remove();
-            resolve(data);
-        };
+
+        } catch (e) {
+            reject(e);
+        }
     });
 }
 
@@ -2912,9 +2928,9 @@ window.generateInvoice = async function(orderId) {
 
     try {
         btn.disabled = true;
-        btn.innerHTML = `Wait...`;
+        btn.innerHTML = `Loading...`;
 
-        // 1. Fetch Database Data
+        // 1. Fetch Order & Outlet Data
         const orderSnap = await getDoc(doc(db, "orders", orderId));
         if (!orderSnap.exists()) throw new Error("Order not found");
         const order = orderSnap.data();
@@ -2922,40 +2938,36 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 2. Prepare Defaults
-        const route = order.routeName || "N/A";
-        const custName = order.outletName || "Unknown";
-        const custPhone = outlet.contactPhone || "N/A";
-        const custGst = outlet.gstNumber || "N/A";
-        
+        // 2. Defaults for Modal
         const session = getFiscalSession();
         const shortId = orderId.slice(-4).toUpperCase();
         const defaultInvNo = `FP/${session}/${shortId}`;
         const today = new Date().toISOString().split('T')[0];
-        
         const defaultAddress = outlet.address 
             ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") 
             : "Address Not Provided";
 
-        // 3. OPEN SETTINGS MODAL (Wait for user input)
+        // 3. OPEN SETTINGS MODAL
+        // We pass order.items safely
         let userSettings;
         try {
             userSettings = await askInvoiceDetails({
                 invNo: defaultInvNo,
                 date: today,
                 address: defaultAddress
-            }, order.items || []); // Pass existing items to populate table
+            }, order.items || []);
         } catch (e) {
+            // User cancelled
             btn.disabled = false;
             btn.innerHTML = originalText;
             return;
         }
 
-        btn.innerHTML = `<span class="animate-pulse">Gen...</span>`;
+        btn.innerHTML = `Generating...`;
 
-        // 4. PERFORM CALCULATIONS (Strict Order)
+        // 4. PERFORM CALCULATIONS (Using User Edited Values)
         
-        // A. Sum of (Qty * Rate) for all items
+        // A. Sum of (Qty * Rate) for all items (Includes Scheme items at 106 or whatever user set)
         const subTotal = userSettings.items.reduce((sum, item) => sum + item.amount, 0);
         
         // B. Apply Discount (Subtotal - Discount = Taxable Value)
@@ -2971,7 +2983,12 @@ window.generateInvoice = async function(orderId) {
         // D. Grand Total
         const grandTotal = taxableValue + taxAmount;
 
-        // 5. Display Date
+        // 5. Other Display Variables
+        const route = order.routeName || "N/A";
+        const custName = order.outletName || "Unknown";
+        const custPhone = outlet.contactPhone || "N/A";
+        const custGst = outlet.gstNumber || "N/A";
+        
         const dateParts = userSettings.date.split('-');
         const displayDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
 
@@ -2983,7 +3000,7 @@ window.generateInvoice = async function(orderId) {
             <text x="50%" y="52" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" letter-spacing="2">piyo</text>
         </svg>`;
 
-        // 7. Render Template
+        // 7. Create Overlay for PDF Capture
         overlay = document.createElement('div');
         overlay.id = 'invoice-overlay';
         overlay.style.cssText = `
@@ -3087,7 +3104,6 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 8. Inject CSS
         const wrapperId = 'print-wrapper';
         overlay.innerHTML = `
             <style>
@@ -3130,7 +3146,6 @@ window.generateInvoice = async function(orderId) {
             </div>
         `;
 
-        // 9. Generate PDF
         await new Promise(r => setTimeout(r, 800));
 
         const element = document.getElementById(wrapperId);
@@ -3146,7 +3161,7 @@ window.generateInvoice = async function(orderId) {
 
     } catch (error) {
         console.error("PDF Gen Error:", error);
-        alert("Failed: " + error.message);
+        alert("Failed to generate PDF: " + error.message);
     } finally {
         setTimeout(() => {
             if (overlay) document.body.removeChild(overlay);
