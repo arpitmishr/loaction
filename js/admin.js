@@ -3045,6 +3045,7 @@ window.generateInvoice = async function(orderId) {
                     <div class="meta-item"><strong>Date:</strong> ${displayDate}</div>
                     <div class="meta-item"><strong>Route:</strong> ${route}</div>
                     <div class="meta-item"><strong>Vehicle:</strong> ${userSettings.vehicle}</div>
+                    <div class="meta-item"><strong>POS</strong> 05</div>
                 </div>
                 <div class="address-section">
                     <div class="addr-box" style="border-right:1px solid #000;">
@@ -3076,7 +3077,7 @@ window.generateInvoice = async function(orderId) {
                         <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
                         <div class="t-row final"><span>Grand Total:</span> <span>₹${Math.round(grandTotal).toFixed(2)}</span></div>
-                        <div style="margin-top:14px; text-align:right; font-size:6px;"><strong>For Freskeypiyo Beverages</strong><br><br>Auth. Signatory</div>
+                        <div style="margin-top:14px; text-align:right; font-size:8px;"><strong>For Freskeypiyo Beverages</strong><br><br>Auth. Signatory</div>
                     </div>
                 </div>
             </div>
