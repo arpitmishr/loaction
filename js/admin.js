@@ -3037,7 +3037,7 @@ window.generateInvoice = async function(orderId) {
                     <div class="company-box">
                         <h2 style="margin:0; font-size:16px;">FRESKEYPIYO BEVERAGES</h2>
                         <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K</p>
-                        <p><strong>GSTIN:</strong> 05AALFF0289R1ZS &nbsp;|&nbsp; <strong>Ph:</strong> 9876543210</p>
+                        <p><strong>GSTIN:</strong> 05AALFF0289R1ZS &nbsp;|&nbsp; <strong>FSSAI</strong> 12626006000056</p>
                     </div>
                 </div>
                 <div class="meta-row">
@@ -3067,7 +3067,7 @@ window.generateInvoice = async function(orderId) {
                 </div>
                 <div class="footer-section">
                     <div class="terms-box">
-                        <strong>Bank Details:</strong><br>Bank: PUNB <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
+                        <strong>Bank Details:</strong><br>Bank: PUNJAB NATIONAL BANK (BHAGWANPUR BRANCH) <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
                     </div>
                     <div class="totals-box">
                         <div class="t-row"><span>Subtotal:</span> <span>${subTotal.toFixed(2)}</span></div>
@@ -3076,7 +3076,7 @@ window.generateInvoice = async function(orderId) {
                         <div class="t-row"><span>CGST 2.5%:</span> <span>${cgst.toFixed(2)}</span></div>
                         <div class="t-row"><span>SGST 2.5%:</span> <span>${sgst.toFixed(2)}</span></div>
                         <div class="t-row final"><span>Grand Total:</span> <span>₹${Math.round(grandTotal).toFixed(2)}</span></div>
-                        <div style="margin-top:15px; text-align:right; font-size:9px;"><strong>For Freskeypiyo Beverages</strong><br><br>Auth. Signatory</div>
+                        <div style="margin-top:14px; text-align:right; font-size:6px;"><strong>For Freskeypiyo Beverages</strong><br><br>Auth. Signatory</div>
                     </div>
                 </div>
             </div>
