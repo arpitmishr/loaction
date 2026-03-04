@@ -2309,11 +2309,11 @@ window.handleSalesmanSearch = function() {
 
 
 // 1. Main Toggle Function (Uses Cache)
-async function toggleShopDetails(shopId, btn) {
+// Updated Toggle Function to fetch History
+window.toggleShopDetails = async function(shopId, btn) {
     const container = document.getElementById(`details-${shopId}`);
     if (!container) return;
 
-    // Toggle Logic
     if (!container.classList.contains('hidden')) {
         container.classList.add('hidden');
         btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100'); 
@@ -2321,55 +2321,119 @@ async function toggleShopDetails(shopId, btn) {
         return;
     }
 
-    // Show Container
     btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
     btn.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
     container.classList.remove('hidden');
 
-    // A. CHECK CACHE (Optimization: 0 Reads)
-    if (shopDetailsCache[shopId]) {
-        console.log("Loading from Cache:", shopId);
+    // Use cache if available
+    if (shopDetailsCache[shopId] && shopDetailsCache[shopId].history) {
         renderDetailsHTML(shopId, shopDetailsCache[shopId]);
         return;
     }
 
-    // B. FETCH FROM DB (Cost: 1 Read)
-    container.innerHTML = `<div class="mt-3 p-4 text-center text-xs text-slate-400 italic">Fetching live data...</div>`;
+    container.innerHTML = `<div class="mt-3 p-4 text-center text-xs text-slate-400 animate-pulse">Fetching history...</div>`;
 
     try {
-        const docSnap = await getDoc(doc(db, "outlets", shopId));
+        // 1. Fetch Basic Info, Recent Orders, and Recent Payments in parallel
+        const [outletSnap, ordersSnap, paymentsSnap] = await Promise.all([
+            getDoc(doc(db, "outlets", shopId)),
+            getDocs(query(collection(db, "orders"), where("outletId", "==", shopId), orderBy("orderDate", "desc"), limit(5))),
+            getDocs(query(collection(db, "payments"), where("outletId", "==", shopId), orderBy("date", "desc"), limit(5)))
+        ]);
 
-        if (!docSnap.exists()) {
-            container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs bg-red-50 rounded-xl">Shop removed.</div>`;
-            return;
-        }
+        if (!outletSnap.exists()) return;
+        const data = outletSnap.data();
 
-        const data = docSnap.data();
+        // 2. Process History (Merge Orders and Payments)
+        let history = [];
         
-        // Save to Cache
+        ordersSnap.forEach(doc => {
+            const d = doc.data();
+            history.push({
+                type: 'ORDER',
+                date: d.orderDate.toDate(),
+                amount: d.financials?.totalAmount || 0,
+                by: d.salesmanName || "Unknown",
+                items: d.items || [] // [{name, qty}...]
+            });
+        });
+
+        paymentsSnap.forEach(doc => {
+            const d = doc.data();
+            history.push({
+                type: 'PAYMENT',
+                date: d.date.toDate(),
+                amount: d.amount,
+                by: d.salesmanName || "Unknown",
+                method: d.method
+            });
+        });
+
+        // Sort combined history by date descending and take top 5
+        history.sort((a, b) => b.date - a.date);
+        history = history.slice(0, 5);
+
+        // 3. Update Cache
         shopDetailsCache[shopId] = {
             balance: data.currentBalance || 0,
             lastOrder: data.lastOrderDate ? data.lastOrderDate.toDate().toLocaleDateString('en-GB') : "None",
-            address: data.address || "No address set."
+            address: data.address || "No address set.",
+            history: history
         };
 
-        // Render
         renderDetailsHTML(shopId, shopDetailsCache[shopId]);
 
     } catch (error) {
         console.error("Details Error:", error);
-        container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs text-center">Connection failed.</div>`;
+        container.innerHTML = `<div class="p-3 text-red-500 text-xs text-center">Failed to load details.</div>`;
     }
 }
+
+
+
+
 
 // 2. Render Helper (Handles View Mode vs Edit Mode UI)
 function renderDetailsHTML(shopId, data) {
     const container = document.getElementById(`details-${shopId}`);
     const balColor = data.balance > 0 ? "text-red-600" : "text-emerald-600";
 
+    // Generate History HTML
+    let historyHtml = "";
+    if (data.history && data.history.length > 0) {
+        data.history.forEach(item => {
+            const dateStr = item.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+            
+            if (item.type === 'ORDER') {
+                const itemsSummary = item.items.map(i => `${i.name} (${i.qty})`).join(", ");
+                historyHtml += `
+                    <div class="mb-2 p-2 bg-white rounded-lg border-l-4 border-purple-400 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <span class="text-[10px] font-bold text-purple-600 uppercase">Order • ${dateStr}</span>
+                            <span class="text-[10px] font-bold text-slate-800">₹${item.amount.toFixed(2)}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-700 font-medium mt-1">${itemsSummary}</p>
+                        <p class="text-[9px] text-slate-400 italic">By: ${item.by}</p>
+                    </div>`;
+            } else {
+                historyHtml += `
+                    <div class="mb-2 p-2 bg-white rounded-lg border-l-4 border-emerald-400 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <span class="text-[10px] font-bold text-emerald-600 uppercase">Payment • ${dateStr}</span>
+                            <span class="text-[10px] font-bold text-emerald-700">₹${item.amount}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-600 mt-1">Method: ${item.method}</p>
+                        <p class="text-[9px] text-slate-400 italic">By: ${item.by}</p>
+                    </div>`;
+            }
+        });
+    } else {
+        historyHtml = `<p class="text-center text-[10px] text-slate-400 py-2">No recent transactions found.</p>`;
+    }
+
     container.innerHTML = `
         <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
-            <!-- Stats Row -->
+            <!-- Balance & Address Section -->
             <div class="grid grid-cols-2 gap-4 mb-3 pb-3 border-b border-slate-200">
                 <div>
                     <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding</p>
@@ -2381,33 +2445,35 @@ function renderDetailsHTML(shopId, data) {
                 </div>
             </div>
 
-            <!-- Address Section (View Mode by Default) -->
-            <div id="addr-view-${shopId}" class="relative group">
+            <!-- Recent Activity Log -->
+            <div class="mb-4">
+                <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-2 block">Recent Activity (Last 5)</label>
+                <div class="space-y-1">
+                    ${historyHtml}
+                </div>
+            </div>
+
+            <!-- Address Edit Section -->
+            <div id="addr-view-${shopId}" class="relative">
                 <div class="flex justify-between items-center mb-1">
-                    <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Address</label>
-                    <button onclick="window.enableAddressEdit('${shopId}')" class="text-xs text-indigo-600 font-bold hover:bg-indigo-100 px-2 py-1 rounded transition flex items-center gap-1">
+                    <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Shop Address</label>
+                    <button onclick="window.enableAddressEdit('${shopId}')" class="text-[10px] text-indigo-600 font-bold px-2 py-1 rounded transition flex items-center gap-1 bg-indigo-50">
                         <span class="material-icons-round text-[12px]">edit</span> Edit
                     </button>
                 </div>
-                <div class="p-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 min-h-[40px] leading-relaxed">
+                <div class="p-3 bg-white border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed">
                     ${data.address}
                 </div>
             </div>
 
-            <!-- Edit Mode (Hidden initially) -->
+            <!-- Edit Mode -->
             <div id="addr-edit-${shopId}" class="hidden">
                 <label class="text-[10px] uppercase font-bold text-orange-500 tracking-wider">Editing Address...</label>
                 <textarea id="addr-input-${shopId}" rows="3" 
-                    class="w-full p-3 text-xs font-medium text-slate-800 bg-white border-2 border-indigo-100 rounded-lg focus:border-indigo-500 focus:ring-0 outline-none resize-none mt-1"
-                    placeholder="Enter full address...">${data.address}</textarea>
-                
+                    class="w-full p-3 text-xs font-medium text-slate-800 bg-white border-2 border-indigo-100 rounded-lg outline-none resize-none mt-1">${data.address}</textarea>
                 <div class="flex gap-2 mt-2">
-                    <button onclick="window.cancelAddressEdit('${shopId}')" class="flex-1 bg-white border border-slate-300 text-slate-500 py-2 rounded-lg text-xs font-bold hover:bg-slate-50">
-                        Cancel
-                    </button>
-                    <button onclick="window.saveShopAddress('${shopId}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md">
-                        Save Changes
-                    </button>
+                    <button onclick="window.cancelAddressEdit('${shopId}')" class="flex-1 bg-white border border-slate-300 text-slate-500 py-2 rounded-lg text-xs font-bold">Cancel</button>
+                    <button onclick="window.saveShopAddress('${shopId}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold shadow-md">Save</button>
                 </div>
             </div>
         </div>
