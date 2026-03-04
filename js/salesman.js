@@ -341,15 +341,18 @@ window.loadMoreShops = function() {
     }
 };
 
-// --- HELPER: CREATE ITEM HTML ---
+// ==========================================
+//      1. UPDATE: SHOP CARD CREATION
+// ==========================================
+
+// Replace your existing createShopListItem function with this:
 function createShopListItem(shop) {
     const li = document.createElement('li');
     const isVisited = shop.isVisited;
     
-    // Visited: Greenish background, dim opacity. Unvisited: White, pop-out shadow.
     const bgStyle = isVisited 
-        ? "background:#f0fdf4; border:1px solid #bbf7d0; opacity:0.8;" 
-        : "background:white; border:1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);";
+        ? "background:#f0fdf4; border:1px solid #bbf7d0; opacity:0.9;" 
+        : "background:white; border:1px solid #f1f5f9; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);";
     
     const checkMark = isVisited 
         ? `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><span class="material-icons-round text-[10px]">check</span> Done</span>` 
@@ -367,32 +370,38 @@ function createShopListItem(shop) {
                     <span class="text-[10px] text-slate-400 font-mono">ID: ${shop.id.substr(0,4)}</span>
                 </div>
             </div>
-            <!-- Quick GPS Nav Button (Top Right) -->
-             <button class="btn-nav bg-blue-50 text-blue-600 w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition" title="Navigate">
+            <button class="btn-nav bg-blue-50 text-blue-600 w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition border border-blue-100" title="Navigate">
                 <span class="material-icons-round text-sm">near_me</span>
             </button>
         </div>
         
-        <!-- Action Bar -->
-        <div class="flex gap-2 mt-4 pt-3 border-t border-dashed border-slate-100">
-            <button class="btn-open-map flex-1 bg-slate-800 text-white py-2 rounded-xl text-xs font-bold shadow hover:bg-slate-900 active:scale-95 transition flex items-center justify-center gap-1">
-                ${isVisited ? 'View Details' : 'Start Visit'} 
+        <!-- Action Buttons Grid -->
+        <div class="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-dashed border-slate-100">
+            <!-- 1. Start Visit (Wide) -->
+            <button class="btn-open-map col-span-2 bg-slate-800 text-white py-2 rounded-xl text-xs font-bold shadow hover:bg-slate-900 active:scale-95 transition flex items-center justify-center gap-1">
+                ${isVisited ? 'View Visit' : 'Start Visit'} 
                 <span class="material-icons-round text-[14px]">arrow_forward</span>
             </button>
             
-            <button class="btn-collect flex-1 bg-emerald-50 text-emerald-700 border border-emerald-100 py-2 rounded-xl text-xs font-bold hover:bg-emerald-100 active:scale-95 transition">
-                Collect
+            <!-- 2. Details (New) -->
+            <button onclick="toggleShopDetails('${shop.id}', this)" class="col-span-1 bg-white border border-slate-200 text-slate-600 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 active:scale-95 transition flex flex-col items-center justify-center">
+                <span class="material-icons-round text-base mb-0.5">info</span>
             </button>
 
-            <button class="btn-phone-order w-10 bg-orange-50 text-orange-600 border border-orange-100 py-2 rounded-xl flex items-center justify-center hover:bg-orange-100 active:scale-95 transition">
-                <span class="material-icons-round text-sm">call</span>
+            <!-- 3. Phone -->
+            <button class="btn-phone-order col-span-1 bg-orange-50 text-orange-600 border border-orange-100 py-2 rounded-xl flex items-center justify-center hover:bg-orange-100 active:scale-95 transition">
+                <span class="material-icons-round text-base">call</span>
             </button>
+        </div>
+
+        <!-- HIDDEN DETAILS CONTAINER -->
+        <div id="details-${shop.id}" class="hidden mt-0 pt-0 overflow-hidden transition-all duration-300 ease-in-out">
+            <!-- Content injected via JS -->
         </div>
     `;
     
-    // Attach Listeners
+    // Attach Event Listeners
     li.querySelector('.btn-nav').onclick = (e) => { e.stopPropagation(); openGoogleMapsNavigation(shop.lat, shop.lng); };
-    li.querySelector('.btn-collect').onclick = (e) => { e.stopPropagation(); openQuickCollection(shop.id, shop.name); };
     li.querySelector('.btn-phone-order').onclick = (e) => { e.stopPropagation(); window.openOrderForm(shop.id, shop.name); };
     li.querySelector('.btn-open-map').onclick = () => {
         if(shop.lat === 0 && shop.lng === 0) alert("No GPS coordinates set.");
@@ -402,6 +411,145 @@ function createShopListItem(shop) {
     return li;
 }
 
+
+// ==========================================
+//      2. NEW: FETCH & SHOW DETAILS
+// ==========================================
+
+window.toggleShopDetails = async function(shopId, btn) {
+    const container = document.getElementById(`details-${shopId}`);
+    
+    // Toggle Logic
+    if (!container.classList.contains('hidden')) {
+        container.classList.add('hidden');
+        btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100'); // Reset style
+        btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+        return;
+    }
+
+    // Active Style
+    btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
+    btn.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
+    container.classList.remove('hidden');
+
+    // If already loaded, don't fetch again
+    if (container.innerHTML.trim() !== "") return;
+
+    // Show Loading Skeleton
+    container.innerHTML = `
+        <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 animate-pulse">
+            <div class="h-4 bg-slate-200 rounded w-1/3 mb-2"></div>
+            <div class="h-10 bg-slate-200 rounded w-full mb-2"></div>
+            <div class="h-8 bg-slate-200 rounded w-1/2"></div>
+        </div>
+    `;
+
+    try {
+        // 1. Fetch Real-time Data (1 Read)
+        const docRef = doc(db, "outlets", shopId);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists()) {
+            container.innerHTML = `<div class="p-3 text-red-500 text-xs text-center">Shop not found.</div>`;
+            return;
+        }
+
+        const data = docSnap.data();
+        
+        // Format Data
+        const balance = data.currentBalance || 0;
+        const balColor = balance > 0 ? "text-red-600" : "text-emerald-600";
+        const lastOrder = data.lastOrderDate ? data.lastOrderDate.toDate().toLocaleDateString('en-GB') : "No orders yet";
+        const address = data.address || "";
+
+        // 2. Render Details Form
+        container.innerHTML = `
+            <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                
+                <!-- Stats Row -->
+                <div class="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-200">
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding</p>
+                        <p class="text-xl font-black ${balColor}">₹${balance.toFixed(2)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Last Order</p>
+                        <p class="text-sm font-bold text-slate-700 mt-1">${lastOrder}</p>
+                    </div>
+                </div>
+
+                <!-- Editable Address -->
+                <div class="relative">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Full Address</label>
+                        <span id="save-msg-${shopId}" class="text-[10px] text-emerald-600 font-bold hidden">Saved!</span>
+                    </div>
+                    <textarea id="addr-input-${shopId}" rows="2" 
+                        class="w-full p-3 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-none shadow-sm"
+                        placeholder="Enter full shop address...">${address}</textarea>
+                    
+                    <button onclick="saveShopAddress('${shopId}')" 
+                        class="mt-2 w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold shadow hover:bg-slate-900 transition flex items-center justify-center gap-2">
+                        <span class="material-icons-round text-sm">save</span> Update Address
+                    </button>
+                </div>
+
+            </div>
+        `;
+
+    } catch (error) {
+        console.error("Details Error:", error);
+        container.innerHTML = `<div class="p-3 text-red-500 text-xs text-center">Failed to load details. Check internet.</div>`;
+    }
+};
+
+
+// ==========================================
+//      3. NEW: SAVE ADDRESS FUNCTION
+// ==========================================
+
+window.saveShopAddress = async function(shopId) {
+    const textarea = document.getElementById(`addr-input-${shopId}`);
+    const btn = event.currentTarget;
+    const msg = document.getElementById(`save-msg-${shopId}`);
+    const newAddress = textarea.value.trim();
+
+    if (!newAddress) return alert("Address cannot be empty.");
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full mr-2"></span> Saving...`;
+
+    try {
+        const docRef = doc(db, "outlets", shopId);
+        await updateDoc(docRef, {
+            address: newAddress,
+            lastUpdated: serverTimestamp() // Optional: Track when it was updated
+        });
+
+        // Success UI
+        btn.innerHTML = `<span class="material-icons-round text-sm mr-1">check</span> Updated`;
+        btn.classList.remove('bg-slate-800');
+        btn.classList.add('bg-emerald-600');
+        
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 2000);
+
+        // Revert button after delay
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            btn.classList.add('bg-slate-800');
+            btn.classList.remove('bg-emerald-600');
+        }, 2000);
+
+    } catch (error) {
+        console.error("Save Error:", error);
+        alert("Failed to save address: " + error.message);
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+};
 
 
 // --- ROUTE MAP LOGIC ---
