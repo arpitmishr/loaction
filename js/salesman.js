@@ -9,6 +9,7 @@ import { appCache, getCachedUserProfile } from "./auth.js"; // <--- Add this imp
 // --- GLOBAL VARIABLES ---
 const content = document.getElementById('content');
 const loader = document.getElementById('loader');
+const shopDetailsCache = {};
 
 let map = null;
 let userMarker = null;
@@ -2290,113 +2291,170 @@ window.handleSalesmanSearch = function() {
 //      DETAILS & SAVE HELPERS
 // ==========================================
 
+
+// 1. Main Toggle Function (Uses Cache)
 async function toggleShopDetails(shopId, btn) {
     const container = document.getElementById(`details-${shopId}`);
-    
-    if (!container) {
-        console.error("Details container not found for ID:", shopId);
-        return;
-    }
+    if (!container) return;
 
     // Toggle Logic
     if (!container.classList.contains('hidden')) {
-        // Hide
         container.classList.add('hidden');
         btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'border-indigo-100'); 
         btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
         return;
     }
 
-    // Show
+    // Show Container
     btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
     btn.classList.add('bg-indigo-50', 'text-indigo-600', 'border-indigo-100');
     container.classList.remove('hidden');
 
-    // Only fetch if empty
-    if (container.innerHTML.trim() !== "") return;
+    // A. CHECK CACHE (Optimization: 0 Reads)
+    if (shopDetailsCache[shopId]) {
+        console.log("Loading from Cache:", shopId);
+        renderDetailsHTML(shopId, shopDetailsCache[shopId]);
+        return;
+    }
 
-    // Loading State
-    container.innerHTML = `
-        <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 animate-pulse text-center text-xs text-slate-400">
-            Loading details...
-        </div>`;
+    // B. FETCH FROM DB (Cost: 1 Read)
+    container.innerHTML = `<div class="mt-3 p-4 text-center text-xs text-slate-400 italic">Fetching live data...</div>`;
 
     try {
-        const docRef = doc(db, "outlets", shopId);
-        const docSnap = await getDoc(docRef);
+        const docSnap = await getDoc(doc(db, "outlets", shopId));
 
         if (!docSnap.exists()) {
-            container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs text-center bg-red-50 rounded-xl">Shop not found or deleted.</div>`;
+            container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs bg-red-50 rounded-xl">Shop removed.</div>`;
             return;
         }
 
         const data = docSnap.data();
-        const balance = data.currentBalance || 0;
-        const balColor = balance > 0 ? "text-red-600" : "text-emerald-600";
-        const lastOrder = data.lastOrderDate ? data.lastOrderDate.toDate().toLocaleDateString('en-GB') : "None";
-        const address = data.address || "";
+        
+        // Save to Cache
+        shopDetailsCache[shopId] = {
+            balance: data.currentBalance || 0,
+            lastOrder: data.lastOrderDate ? data.lastOrderDate.toDate().toLocaleDateString('en-GB') : "None",
+            address: data.address || "No address set."
+        };
 
-        container.innerHTML = `
-            <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
-                <div class="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-200">
-                    <div>
-                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding</p>
-                        <p class="text-xl font-black ${balColor}">₹${balance.toFixed(2)}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Last Order</p>
-                        <p class="text-sm font-bold text-slate-700 mt-1">${lastOrder}</p>
-                    </div>
-                </div>
-                <div class="relative">
-                    <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Full Address</label>
-                    <textarea id="addr-input-${shopId}" rows="2" 
-                        class="w-full p-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg mt-1 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
-                        placeholder="Enter address...">${address}</textarea>
-                    
-                    <button onclick="window.saveShopAddress('${shopId}')" 
-                        class="mt-2 w-full bg-slate-800 text-white py-2 rounded-lg text-xs font-bold hover:bg-slate-900 transition flex items-center justify-center gap-1">
-                        <span class="material-icons-round text-sm">save</span> Update Address
-                    </button>
-                </div>
-            </div>
-        `;
+        // Render
+        renderDetailsHTML(shopId, shopDetailsCache[shopId]);
+
     } catch (error) {
         console.error("Details Error:", error);
-        container.innerHTML = `<div class="mt-3 p-3 text-center text-red-500 text-xs bg-red-50 rounded-xl">Error loading data.</div>`;
+        container.innerHTML = `<div class="mt-3 p-3 text-red-500 text-xs text-center">Connection failed.</div>`;
     }
 }
 
-// Make Save Address Global because it is called from an HTML string
+// 2. Render Helper (Handles View Mode vs Edit Mode UI)
+function renderDetailsHTML(shopId, data) {
+    const container = document.getElementById(`details-${shopId}`);
+    const balColor = data.balance > 0 ? "text-red-600" : "text-emerald-600";
+
+    container.innerHTML = `
+        <div class="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 gap-4 mb-3 pb-3 border-b border-slate-200">
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outstanding</p>
+                    <p class="text-xl font-black ${balColor}">₹${data.balance.toFixed(2)}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Last Order</p>
+                    <p class="text-sm font-bold text-slate-700 mt-1">${data.lastOrder}</p>
+                </div>
+            </div>
+
+            <!-- Address Section (View Mode by Default) -->
+            <div id="addr-view-${shopId}" class="relative group">
+                <div class="flex justify-between items-center mb-1">
+                    <label class="text-[10px] uppercase font-bold text-indigo-400 tracking-wider">Address</label>
+                    <button onclick="window.enableAddressEdit('${shopId}')" class="text-xs text-indigo-600 font-bold hover:bg-indigo-100 px-2 py-1 rounded transition flex items-center gap-1">
+                        <span class="material-icons-round text-[12px]">edit</span> Edit
+                    </button>
+                </div>
+                <div class="p-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 min-h-[40px] leading-relaxed">
+                    ${data.address}
+                </div>
+            </div>
+
+            <!-- Edit Mode (Hidden initially) -->
+            <div id="addr-edit-${shopId}" class="hidden">
+                <label class="text-[10px] uppercase font-bold text-orange-500 tracking-wider">Editing Address...</label>
+                <textarea id="addr-input-${shopId}" rows="3" 
+                    class="w-full p-3 text-xs font-medium text-slate-800 bg-white border-2 border-indigo-100 rounded-lg focus:border-indigo-500 focus:ring-0 outline-none resize-none mt-1"
+                    placeholder="Enter full address...">${data.address}</textarea>
+                
+                <div class="flex gap-2 mt-2">
+                    <button onclick="window.cancelAddressEdit('${shopId}')" class="flex-1 bg-white border border-slate-300 text-slate-500 py-2 rounded-lg text-xs font-bold hover:bg-slate-50">
+                        Cancel
+                    </button>
+                    <button onclick="window.saveShopAddress('${shopId}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 3. Enable Edit Mode
+window.enableAddressEdit = function(shopId) {
+    document.getElementById(`addr-view-${shopId}`).classList.add('hidden');
+    document.getElementById(`addr-edit-${shopId}`).classList.remove('hidden');
+    // Focus cursor at end of text
+    const textarea = document.getElementById(`addr-input-${shopId}`);
+    const val = textarea.value; 
+    textarea.value = ''; 
+    textarea.value = val;
+    textarea.focus();
+};
+
+// 4. Cancel Edit Mode
+window.cancelAddressEdit = function(shopId) {
+    document.getElementById(`addr-view-${shopId}`).classList.remove('hidden');
+    document.getElementById(`addr-edit-${shopId}`).classList.add('hidden');
+    // Reset text to cached value
+    if(shopDetailsCache[shopId]) {
+        document.getElementById(`addr-input-${shopId}`).value = shopDetailsCache[shopId].address;
+    }
+};
+
+// 5. Save Address (Optimized: Update Cache + DB)
 window.saveShopAddress = async function(shopId) {
     const textarea = document.getElementById(`addr-input-${shopId}`);
-    const btn = event.currentTarget;
     const newAddress = textarea.value.trim();
+    const btn = event.currentTarget;
 
     if (!newAddress) return alert("Address cannot be empty.");
+    if (newAddress === shopDetailsCache[shopId].address) {
+        window.cancelAddressEdit(shopId); // No changes made
+        return;
+    }
 
-    const originalHtml = btn.innerHTML;
+    const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = "Saving...";
 
     try {
+        // A. Write to Firestore (Cost: 1 Write)
         await updateDoc(doc(db, "outlets", shopId), {
             address: newAddress,
             lastUpdated: serverTimestamp()
         });
-        
-        btn.innerHTML = "Saved!";
-        btn.style.background = "#10b981"; // Green
-        
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-            btn.style.background = "#1e293b"; // Back to Slate-800
-        }, 2000);
+
+        // B. Update Local Cache (Crucial: prevents needing a re-read)
+        if (shopDetailsCache[shopId]) {
+            shopDetailsCache[shopId].address = newAddress;
+        }
+
+        // C. Re-render View
+        renderDetailsHTML(shopId, shopDetailsCache[shopId]);
+
     } catch (error) {
-        console.error("Save Error", error);
-        alert("Error: " + error.message);
+        console.error("Save Error:", error);
+        alert("Failed to save: " + error.message);
         btn.disabled = false;
-        btn.innerHTML = originalHtml;
+        btn.innerHTML = originalText;
     }
 };
