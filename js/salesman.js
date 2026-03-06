@@ -1385,36 +1385,34 @@ window.submitOrder = async function() {
 
     try {
         const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned";
-        
-        // Calculate Totals
-        const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
-        const tax = applyTax ? (subtotal * 0.05) : 0;
-        const total = subtotal + tax;
 
-        // --- START TRANSACTION FOR SEQUENTIAL ID ---
+        // 1. START TRANSACTION (Ensures sequential numbers are never duplicated)
         const finalInvoiceNo = await runTransaction(db, async (transaction) => {
             const counterRef = doc(db, "app_metadata", "invoice_counter");
             const counterSnap = await transaction.get(counterRef);
 
-            if (!counterSnap.exists()) {
-                throw "Counter document does not exist!";
-            }
+            if (!counterSnap.exists()) throw "Counter document missing!";
 
-            // Calculate next number
+            // Increment the counter
             const nextVal = (counterSnap.data().lastValue || 0) + 1;
             const prefix = counterSnap.data().prefix || "INV/";
             
-            // Format: FP/24-25/00001 (5-digit padding)
-            const formattedID = `${prefix}${String(nextVal).padStart(5, '0')}`;
+            // Format to 5 digits: 00001, 00002...
+            const formattedSerial = String(nextVal).padStart(5, '0');
+            const invoiceNo = `${prefix}${formattedSerial}`;
 
-            // 1. Update the counter
+            // 2. Update the counter in DB
             transaction.update(counterRef, { lastValue: nextVal });
 
-            // 2. Prepare Order Data
-            const newOrderRef = doc(collection(db, "orders")); // Create ref with auto-ID for doc, but we save our serial ID inside
-            const orderData = {
-                 invoiceNo: formattedID, // <--- MAKE SURE THIS IS NAMED 'invoiceNo'
-    salesmanId: auth.currentUser.uid,
+            // 3. Prepare Order Data
+            const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
+            const tax = applyTax ? (subtotal * 0.05) : 0;
+            const total = subtotal + tax;
+
+            const newOrderRef = doc(collection(db, "orders")); 
+            transaction.set(newOrderRef, {
+                invoiceNo: invoiceNo, // <--- SAVED PERMANENTLY
+                salesmanId: auth.currentUser.uid,
                 salesmanName: appCache.user?.fullName || auth.currentUser.email,
                 outletId: currentOrderOutlet.id,
                 outletName: currentOrderOutlet.name,
@@ -1424,33 +1422,30 @@ window.submitOrder = async function() {
                 deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)),
                 orderType: isPhone ? "Phone" : "Visit",
                 items: orderCart,
-                financials: { subtotal, tax, totalAmount: total },
+                financials: { totalAmount: total, subtotal, tax },
                 status: "pending"
-            };
+            });
 
-            // 3. Set the order
-            transaction.set(newOrderRef, orderData);
-
-            // 4. Update Outlet Balance
+            // 4. Update Balance
             const outletRef = doc(db, "outlets", currentOrderOutlet.id);
             transaction.update(outletRef, {
                 currentBalance: increment(total),
                 lastOrderDate: serverTimestamp()
             });
 
-            return formattedID; // Return this to the main flow
+            return invoiceNo;
         });
 
         alert(`✅ Order Placed!\nInvoice No: ${finalInvoiceNo}`);
         
-        // UI Cleanup
+        // Return to View
         document.getElementById('order-view').style.display = 'none';
         if(currentVisitId) document.getElementById('visit-view').style.display = 'block';
         else document.getElementById('route-view').style.display = 'block';
 
     } catch (error) {
-        console.error("Sequential Order Error:", error);
-        alert("Failed to submit order. Please try again.");
+        console.error("Order Error:", error);
+        alert("Failed: " + error);
     } finally {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
