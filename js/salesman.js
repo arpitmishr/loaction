@@ -1413,8 +1413,8 @@ window.submitOrder = async function() {
             // 2. Prepare Order Data
             const newOrderRef = doc(collection(db, "orders")); // Create ref with auto-ID for doc, but we save our serial ID inside
             const orderData = {
-                invoiceNo: formattedID, // This is your sequential ID
-                salesmanId: auth.currentUser.uid,
+                 invoiceNo: formattedID, // <--- MAKE SURE THIS IS NAMED 'invoiceNo'
+    salesmanId: auth.currentUser.uid,
                 salesmanName: appCache.user?.fullName || auth.currentUser.email,
                 outletId: currentOrderOutlet.id,
                 outletName: currentOrderOutlet.name,
