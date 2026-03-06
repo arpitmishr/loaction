@@ -2972,18 +2972,21 @@ window.generateInvoice = async function(orderId) {
         const outletSnap = await getDoc(doc(db, "outlets", order.outletId));
         const outlet = outletSnap.exists() ? outletSnap.data() : {};
 
-        // 2. Defaults
+        // --- 2. UPDATED DEFAULTS (FIX IS HERE) ---
+        // Priority 1: Use the sequential 'invoiceNo' from the database
+        // Priority 2: Fallback to the old random ID method if it's an old order
         const session = getFiscalSession();
-        const shortId = orderId.slice(-4).toUpperCase();
-        const defaultInvNo = order.invoiceNo || "N/A";
+        const fallbackId = `FP/${session}/${orderId.slice(-4).toUpperCase()}`;
+        const finalInvNo = order.invoiceNo || fallbackId; 
+
         const today = new Date().toISOString().split('T')[0];
         const defaultAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") : "Address Not Provided";
 
-        // 3. Open Modal
+        // 3. Open Modal (Pass the finalInvNo here)
         let userSettings;
         try {
             userSettings = await askInvoiceDetails({
-                invNo: defaultInvNo,
+                invNo: finalInvNo, // This ensures the modal shows the correct number
                 date: today,
                 address: defaultAddress
             }, order.items || []);
