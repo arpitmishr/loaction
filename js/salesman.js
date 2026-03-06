@@ -1366,8 +1366,6 @@ window.removeFromCart = function(index) {
 };
 
 // 5. SUBMIT ORDER
-// js/salesman.js - Updated submitOrder
-
 window.submitOrder = async function() {
     const isPhone = document.getElementById('isPhoneOrder').checked;
     const applyTax = document.getElementById('applyGst').checked;
@@ -1375,43 +1373,44 @@ window.submitOrder = async function() {
     const btn = document.getElementById('btn-submit-order');
 
     if (orderCart.length === 0) return alert("Cart is empty!");
-    if (!dueDateVal) return alert("⚠️ Please select a Delivery Due Date.");
+    if (!dueDateVal) return alert("⚠️ Select Delivery Due Date.");
     if (!isPhone && !currentVisitId) return alert("❌ Check-in required.");
 
     if (!confirm("Confirm Order Submission?")) return;
 
     btn.disabled = true;
-    btn.innerText = "Generating Invoice #...";
+    btn.innerText = "Generating Serial #...";
 
     try {
         const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned";
 
-        // 1. START TRANSACTION (Ensures sequential numbers are never duplicated)
+        // TRANSACTION: This prevents two people from getting the same number
         const finalInvoiceNo = await runTransaction(db, async (transaction) => {
             const counterRef = doc(db, "app_metadata", "invoice_counter");
             const counterSnap = await transaction.get(counterRef);
 
             if (!counterSnap.exists()) throw "Counter document missing!";
 
-            // Increment the counter
-            const nextVal = (counterSnap.data().lastValue || 0) + 1;
-            const prefix = counterSnap.data().prefix || "INV/";
+            const data = counterSnap.data();
+            const nextVal = (data.lastValue || 0) + 1;
+            const prefix = data.prefix || "FP/2025-2026/";
             
-            // Format to 5 digits: 00001, 00002...
-            const formattedSerial = String(nextVal).padStart(5, '0');
-            const invoiceNo = `${prefix}${formattedSerial}`;
+            // This turns "1" into "00001"
+            const formattedNumber = String(nextVal).padStart(5, '0');
+            const invoiceNo = `${prefix}${formattedNumber}`;
 
-            // 2. Update the counter in DB
+            // 1. Update counter in DB
             transaction.update(counterRef, { lastValue: nextVal });
 
-            // 3. Prepare Order Data
+            // 2. Prepare Totals
             const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
             const tax = applyTax ? (subtotal * 0.05) : 0;
             const total = subtotal + tax;
 
+            // 3. Save Order with the NEW Serial Number
             const newOrderRef = doc(collection(db, "orders")); 
             transaction.set(newOrderRef, {
-                invoiceNo: invoiceNo, // <--- SAVED PERMANENTLY
+                invoiceNo: invoiceNo, // <--- SAVED PERMANENTLY AS 00001, 00002...
                 salesmanId: auth.currentUser.uid,
                 salesmanName: appCache.user?.fullName || auth.currentUser.email,
                 outletId: currentOrderOutlet.id,
@@ -1426,7 +1425,7 @@ window.submitOrder = async function() {
                 status: "pending"
             });
 
-            // 4. Update Balance
+            // 4. Update Outlet Balance
             const outletRef = doc(db, "outlets", currentOrderOutlet.id);
             transaction.update(outletRef, {
                 currentBalance: increment(total),
@@ -1436,21 +1435,27 @@ window.submitOrder = async function() {
             return invoiceNo;
         });
 
-        alert(`✅ Order Placed!\nInvoice No: ${finalInvoiceNo}`);
-        
-        // Return to View
+        alert(`✅ Order Success!\nInvoice: ${finalInvoiceNo}`);
         document.getElementById('order-view').style.display = 'none';
-        if(currentVisitId) document.getElementById('visit-view').style.display = 'block';
-        else document.getElementById('route-view').style.display = 'block';
+        currentVisitId ? document.getElementById('visit-view').style.display = 'block' : document.getElementById('route-view').style.display = 'block';
 
     } catch (error) {
         console.error("Order Error:", error);
-        alert("Failed: " + error);
+        alert("Failed to submit. Try again.");
     } finally {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
     }
 };
+
+
+
+
+
+
+
+
+
 
 
 
