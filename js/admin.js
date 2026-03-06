@@ -3106,7 +3106,7 @@ const defaultInvNo = finalInvNo;
                 .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
                 .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
-                .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
+                .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 8px; }
                 .totals-box { width: 40%; padding: 5px; }
                 .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
                 .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; background: #eee; -webkit-print-color-adjust: exact; }
