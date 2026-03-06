@@ -2976,7 +2976,7 @@ window.generateInvoice = async function(orderId) {
         // Priority 1: Use the sequential 'invoiceNo' from the database
         // Priority 2: Fallback to the old random ID method if it's an old order
         const session = getFiscalSession();
-        const fallbackId = `FP/${session}/${orderId.slice(-4).toUpperCase()}`;
+        const defaultInvNo = order.invoiceNo || `OLD-${orderId.slice(-4)}`; 
         const finalInvNo = order.invoiceNo || fallbackId; 
 
         const today = new Date().toISOString().split('T')[0];
