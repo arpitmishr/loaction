@@ -1,7 +1,7 @@
 // 1. IMPORTS
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
 import { 
-    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment, serverTimestamp, limit
+    doc, getDoc, collection, query, where, getDocs, orderBy, addDoc, updateDoc, Timestamp, GeoPoint, increment, serverTimestamp, limit, runTransaction
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { logoutUser } from "./auth.js";
@@ -1374,87 +1374,83 @@ window.submitOrder = async function() {
     const dueDateVal = document.getElementById('orderDueDate').value;
     const btn = document.getElementById('btn-submit-order');
 
-    // Validation
     if (orderCart.length === 0) return alert("Cart is empty!");
     if (!dueDateVal) return alert("⚠️ Please select a Delivery Due Date.");
-    
-    if (!isPhone && !currentVisitId) {
-        alert("❌ Geo-Fence Error: You must be Checked-In.");
-        return;
-    }
+    if (!isPhone && !currentVisitId) return alert("❌ Check-in required.");
 
     if (!confirm("Confirm Order Submission?")) return;
 
     btn.disabled = true;
-    btn.innerText = "Processing...";
+    btn.innerText = "Generating Invoice #...";
 
     try {
-        // CAPTURE ROUTE NAME (From UI or Default)
-        // This grabs the route name displayed on the dashboard
-        const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned/Phone";
-
-        // Update route last visit date
-        if (appCache.routes) {
-            appCache.routes.forEach(async (r) => {
-                try {
-                    await updateDoc(doc(db, "routes", r.id), { 
-                        lastVisitDate: new Date().toLocaleDateString() 
-                    });
-                } catch(e) { console.warn("Route update silent fail"); }
-            });
-        }
+        const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned";
         
-        // Calculate Financials
+        // Calculate Totals
         const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
         const tax = applyTax ? (subtotal * 0.05) : 0;
         const total = subtotal + tax;
 
-        // Prepare Order Data
-        const orderData = {
-            salesmanId: auth.currentUser.uid,
-            salesmanName: appCache.user?.fullName || auth.currentUser.email,
-            outletId: currentOrderOutlet.id,
-            outletName: currentOrderOutlet.name,
-            routeName: currentRouteName, // <--- NEW FIELD ADDED HERE
-            visitId: isPhone ? null : currentVisitId,
-            orderDate: Timestamp.now(),
-            deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)),
-            orderType: isPhone ? "Phone Call" : "Physical Visit",
-            isGstApplied: applyTax,
-            items: orderCart,
-            financials: {
-                subtotal: subtotal,
-                tax: tax,
-                totalAmount: total
-            },
-            status: "pending"
-        };
+        // --- START TRANSACTION FOR SEQUENTIAL ID ---
+        const finalInvoiceNo = await runTransaction(db, async (transaction) => {
+            const counterRef = doc(db, "app_metadata", "invoice_counter");
+            const counterSnap = await transaction.get(counterRef);
 
-        // Save to 'orders' Collection
-        await addDoc(collection(db, "orders"), orderData);
+            if (!counterSnap.exists()) {
+                throw "Counter document does not exist!";
+            }
 
-        // Update Outlet Balance
-        const outletRef = doc(db, "outlets", currentOrderOutlet.id);
-        await updateDoc(outletRef, {
-            currentBalance: increment(total),
-            lastOrderDate: Timestamp.now()
+            // Calculate next number
+            const nextVal = (counterSnap.data().lastValue || 0) + 1;
+            const prefix = counterSnap.data().prefix || "INV/";
+            
+            // Format: FP/24-25/00001 (5-digit padding)
+            const formattedID = `${prefix}${String(nextVal).padStart(5, '0')}`;
+
+            // 1. Update the counter
+            transaction.update(counterRef, { lastValue: nextVal });
+
+            // 2. Prepare Order Data
+            const newOrderRef = doc(collection(db, "orders")); // Create ref with auto-ID for doc, but we save our serial ID inside
+            const orderData = {
+                invoiceNo: formattedID, // This is your sequential ID
+                salesmanId: auth.currentUser.uid,
+                salesmanName: appCache.user?.fullName || auth.currentUser.email,
+                outletId: currentOrderOutlet.id,
+                outletName: currentOrderOutlet.name,
+                routeName: currentRouteName,
+                visitId: isPhone ? null : currentVisitId,
+                orderDate: serverTimestamp(),
+                deliveryDueDate: Timestamp.fromDate(new Date(dueDateVal)),
+                orderType: isPhone ? "Phone" : "Visit",
+                items: orderCart,
+                financials: { subtotal, tax, totalAmount: total },
+                status: "pending"
+            };
+
+            // 3. Set the order
+            transaction.set(newOrderRef, orderData);
+
+            // 4. Update Outlet Balance
+            const outletRef = doc(db, "outlets", currentOrderOutlet.id);
+            transaction.update(outletRef, {
+                currentBalance: increment(total),
+                lastOrderDate: serverTimestamp()
+            });
+
+            return formattedID; // Return this to the main flow
         });
 
-        alert("✅ Order Placed Successfully!");
+        alert(`✅ Order Placed!\nInvoice No: ${finalInvoiceNo}`);
         
-        // Cleanup UI
+        // UI Cleanup
         document.getElementById('order-view').style.display = 'none';
-        document.getElementById('orderDueDate').value = "";
-        
-        if(currentVisitId) {
-            document.getElementById('visit-view').style.display = 'block';
-        } else {
-            document.getElementById('route-view').style.display = 'block';
-        }
+        if(currentVisitId) document.getElementById('visit-view').style.display = 'block';
+        else document.getElementById('route-view').style.display = 'block';
 
     } catch (error) {
-        console.error("Order Error:", error);
-        alert("Failed to submit order: " + error.message);
+        console.error("Sequential Order Error:", error);
+        alert("Failed to submit order. Please try again.");
     } finally {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
