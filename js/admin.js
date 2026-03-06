@@ -3071,7 +3071,7 @@ const defaultInvNo = finalInvNo;
                 </div>
                 <div class="footer-section">
                     <div class="terms-box">
-                        <strong>Bank Details:</strong><br>Bank: PUNJAB NATIONAL BANK (BHAGWANPUR BRANCH) <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction. <br>3. Repeat Order/ Customer Support : 7017251402, 753588134</span>
+                        <strong>Bank Details:</strong><br>Bank: PUNJAB NATIONAL BANK (BHAGWANPUR BRANCH) <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction. <br>3. Repeat Order/ Customer Support : 7017251402, 753588134</span>
                     </div>
                     <div class="totals-box">
                         <div class="t-row"><span>Subtotal:</span> <span>${subTotal.toFixed(2)}</span></div>
