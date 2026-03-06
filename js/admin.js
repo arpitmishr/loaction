@@ -3038,9 +3038,9 @@ const defaultInvNo = finalInvNo;
                 <div class="header-section">
                     <div class="logo-box">${svgLogo}</div>
                     <div class="company-box">
-                        <h2 style="margin:0; font-size:16px;">FRESKEYPIYO BEVERAGES</h2>
-                        <p>01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K</p>
-                        <p><strong>GSTIN:</strong> 05AALFF0289R1ZS &nbsp;|&nbsp; <strong>FSSAI</strong> 12626006000056</p>
+                       <h2 style="margin:0; font-size:16px; display:inline; font-weight:bold;">FRESKEYPIYO BEVERAGES</h2>
+<span style="margin-left:10px; font-weight:bold;">01, MAIN BAZAR, BHAGWANPUR, HARIDWAR, U.K</span>
+<span style="margin-left:10px; font-weight:bold;"><strong>GSTIN:</strong> 05AALFF0289R1ZS | <strong>FSSAI:</strong> 12626006000056 | Ph. 7060607763</span>
                     </div>
                 </div>
                 <div class="meta-row">
@@ -3071,7 +3071,7 @@ const defaultInvNo = finalInvNo;
                 </div>
                 <div class="footer-section">
                     <div class="terms-box">
-                        <strong>Bank Details:</strong><br>Bank: PUNJAB NATIONAL BANK (BHAGWANPUR BRANCH) <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction.</span>
+                        <strong>Bank Details:</strong><br>Bank: PUNJAB NATIONAL BANK (BHAGWANPUR BRANCH) <br>A/C: 4882002100005628<br>IFSC: PUNB0488200<br><br><span style="font-size:8px;">1. Goods once sold not returnable.<br>2. Subject to Roorkee Jurisdiction. <br>3. Repeat Order/ Customer Support : 7017251402, 753588134</span>
                     </div>
                     <div class="totals-box">
                         <div class="t-row"><span>Subtotal:</span> <span>${subTotal.toFixed(2)}</span></div>
