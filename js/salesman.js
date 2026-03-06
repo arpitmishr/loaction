@@ -1379,38 +1379,40 @@ window.submitOrder = async function() {
     if (!confirm("Confirm Order Submission?")) return;
 
     btn.disabled = true;
-    btn.innerText = "Generating Serial #...";
+    btn.innerText = "Processing...";
 
     try {
         const currentRouteName = document.getElementById('route-name')?.innerText || "Unassigned";
 
-        // TRANSACTION: This prevents two people from getting the same number
+        // This block calculates the next number and saves the order at the same time
         const finalInvoiceNo = await runTransaction(db, async (transaction) => {
             const counterRef = doc(db, "app_metadata", "invoice_counter");
             const counterSnap = await transaction.get(counterRef);
 
-            if (!counterSnap.exists()) throw "Counter document missing!";
+            // ERROR CHECK: If you didn't create the doc in Firebase, this will stop the error
+            if (!counterSnap.exists()) {
+                throw new Error("Counter document 'app_metadata/invoice_counter' is missing in Firestore!");
+            }
 
             const data = counterSnap.data();
             const nextVal = (data.lastValue || 0) + 1;
             const prefix = data.prefix || "FP/2025-2026/";
             
-            // This turns "1" into "00001"
+            // Format number to 00001
             const formattedNumber = String(nextVal).padStart(5, '0');
             const invoiceNo = `${prefix}${formattedNumber}`;
 
-            // 1. Update counter in DB
-            transaction.update(counterRef, { lastValue: nextVal });
-
-            // 2. Prepare Totals
+            // 1. Calculate Financials
             const subtotal = orderCart.reduce((sum, item) => sum + item.lineTotal, 0);
             const tax = applyTax ? (subtotal * 0.05) : 0;
             const total = subtotal + tax;
 
-            // 3. Save Order with the NEW Serial Number
+            // 2. Prepare Order Doc
             const newOrderRef = doc(collection(db, "orders")); 
+            
+            // 3. Write Order
             transaction.set(newOrderRef, {
-                invoiceNo: invoiceNo, // <--- SAVED PERMANENTLY AS 00001, 00002...
+                invoiceNo: invoiceNo,
                 salesmanId: auth.currentUser.uid,
                 salesmanName: appCache.user?.fullName || auth.currentUser.email,
                 outletId: currentOrderOutlet.id,
@@ -1425,7 +1427,10 @@ window.submitOrder = async function() {
                 status: "pending"
             });
 
-            // 4. Update Outlet Balance
+            // 4. Update Global Counter
+            transaction.update(counterRef, { lastValue: nextVal });
+
+            // 5. Update Shop Balance
             const outletRef = doc(db, "outlets", currentOrderOutlet.id);
             transaction.update(outletRef, {
                 currentBalance: increment(total),
@@ -1435,13 +1440,13 @@ window.submitOrder = async function() {
             return invoiceNo;
         });
 
-        alert(`✅ Order Success!\nInvoice: ${finalInvoiceNo}`);
+        alert(`✅ Success!\nInvoice: ${finalInvoiceNo}`);
         document.getElementById('order-view').style.display = 'none';
         currentVisitId ? document.getElementById('visit-view').style.display = 'block' : document.getElementById('route-view').style.display = 'block';
 
     } catch (error) {
-        console.error("Order Error:", error);
-        alert("Failed to submit. Try again.");
+        console.error("CRITICAL ORDER ERROR:", error); // This shows exactly why it failed in F12 console
+        alert("Failed to submit: " + error.message);
     } finally {
         btn.disabled = false;
         btn.innerText = "Confirm Order";
