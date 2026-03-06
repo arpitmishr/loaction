@@ -2975,7 +2975,7 @@ window.generateInvoice = async function(orderId) {
         // 2. Defaults
         const session = getFiscalSession();
         const shortId = orderId.slice(-4).toUpperCase();
-        const defaultInvNo = `FP/${session}/${shortId}`;
+        const defaultInvNo = order.invoiceNo || "N/A";
         const today = new Date().toISOString().split('T')[0];
         const defaultAddress = outlet.address ? outlet.address.replace(/(\r\n|\n|\r)/gm, ", ") : "Address Not Provided";
 
