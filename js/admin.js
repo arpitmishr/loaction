@@ -2405,14 +2405,14 @@ window.loadPendingDeliveries = async function() {
 
         snap.forEach(docSnap => {
             const data = docSnap.data();
-            const orderId = docSnap.id; // The unique ID of the order doc
+             const orderId = docSnap.id;
             
             // Safety: Get total amount regardless of where it's stored
             const totalAmt = (data.financials && data.financials.totalAmount) ? data.financials.totalAmount : (data.totalAmount || 0);
             
             // Create a clean object to store in the checkbox
             const orderData = {
-                id: orderId,
+                 id: orderId,       // Explicitly set ID
                 outletId: data.outletId,
                 amount: Number(totalAmt)
             };
@@ -3083,18 +3083,20 @@ window.toggleSelectAll = function(masterCheckbox) {
     checkboxes.forEach(cb => {
         cb.checked = masterCheckbox.checked;
         if (cb.checked) {
-            const orderData = JSON.parse(cb.dataset.order);
-            selectedOrders.push(orderData);
+            // Get the object from the data attribute
+            const data = JSON.parse(cb.dataset.order);
+            selectedOrders.push(data);
         }
     });
     updateBulkBar();
 };
 
-window.toggleOrderSelection = function(checkbox, orderData) {
+window.toggleOrderSelection = function(checkbox, orderId) {
+    const data = JSON.parse(checkbox.dataset.order);
     if (checkbox.checked) {
-        selectedOrders.push(orderData);
+        selectedOrders.push(data);
     } else {
-        selectedOrders = selectedOrders.filter(o => o.id !== orderData.id);
+        selectedOrders = selectedOrders.filter(o => o.id !== orderId);
         document.getElementById('selectAllDeliveries').checked = false;
     }
     updateBulkBar();
@@ -3159,26 +3161,28 @@ window.bulkDeleteOrders = async function() {
 // --- COMBINED BULK PRINTING LOGIC ---
 
 window.printSelectedInvoices = async function() {
-    if (selectedOrders.length === 0) return;
+    // Check if we actually have orders and if they have IDs
+    const validOrders = selectedOrders.filter(o => o && o.id);
+    
+    if (validOrders.length === 0) {
+        alert("No valid orders selected for printing.");
+        return;
+    }
     
     const btn = event.currentTarget;
     const originalContent = btn.innerHTML;
     
     try {
         btn.disabled = true;
-        btn.innerHTML = `<span class="animate-spin text-xs">...</span>`;
+        btn.innerHTML = `...`;
 
-        // 1. Show a global loading overlay (since generating many PDFs takes time)
-        const loaderOverlay = document.createElement('div');
-        loaderOverlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100000; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;";
-        loaderOverlay.innerHTML = `<div class="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full mb-4"></div>
-                                   <h2 class="text-xl font-bold">Generating ${selectedOrders.length} Invoices</h2>
-                                   <p class="text-sm opacity-70">Please do not close this tab...</p>`;
-        document.body.appendChild(loaderOverlay);
+        // Create Promises safely
+        const fullOrderPromises = validOrders.map(o => {
+            // This is where the error was happening. 
+            // We now use the filtered 'validOrders' list.
+            return getDoc(doc(db, "orders", o.id));
+        });
 
-        // 2. Fetch full data for each order and unique outlets
-        // (The checkbox only has ID/Amount, we need items and full addresses)
-        const fullOrderPromises = selectedOrders.map(o => getDoc(doc(db, "orders", o.id)));
         const orderSnaps = await Promise.all(fullOrderPromises);
         
         const outletIds = [...new Set(orderSnaps.map(s => s.data().outletId))];
@@ -3282,8 +3286,8 @@ window.printSelectedInvoices = async function() {
         alert("Combined PDF Downloaded!");
 
     } catch (e) {
-        console.error(e);
-        alert("Print Error: " + e.message);
+        console.error("Print Logic Error:", e);
+        alert("Failed to generate PDF. Check console for details.");
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalContent;
