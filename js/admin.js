@@ -2378,46 +2378,7 @@ window.changeRouteSalesman = async function(routeId, newSalesmanId) {
 //      PENDING DELIVERY LOGIC
 // ==========================================
 
-// --- 1. SELECTION STATE ---
-let selectedOrders = [];
 
-// --- 2. UI HELPERS ---
-window.toggleSelectAll = function(masterCheckbox) {
-    const checkboxes = document.querySelectorAll('.order-checkbox');
-    selectedOrders = [];
-    
-    checkboxes.forEach(cb => {
-        cb.checked = masterCheckbox.checked;
-        if (cb.checked) {
-            selectedOrders.push(JSON.parse(cb.dataset.order));
-        }
-    });
-    updateBulkBar();
-};
-
-window.toggleOrderSelection = function(checkbox, orderId) {
-    const orderData = JSON.parse(checkbox.dataset.order);
-    if (checkbox.checked) {
-        selectedOrders.push(orderData);
-    } else {
-        selectedOrders = selectedOrders.filter(o => o.id !== orderId);
-        document.getElementById('selectAllDeliveries').checked = false;
-    }
-    updateBulkBar();
-};
-
-function updateBulkBar() {
-    const bar = document.getElementById('bulk-actions-bar');
-    const countEl = document.getElementById('selected-count');
-    if (!bar) return;
-    
-    if (selectedOrders.length > 0) {
-        bar.classList.remove('hidden');
-        countEl.innerText = selectedOrders.length;
-    } else {
-        bar.classList.add('hidden');
-    }
-}
 
 // --- 3. FIXED LOAD FUNCTION ---
 window.loadPendingDeliveries = async function() {
