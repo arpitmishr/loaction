@@ -3052,7 +3052,7 @@ const defaultInvNo = finalInvNo;
                 </div>
                 <div class="address-section">
                     <div class="addr-box" style="border-right:1px solid #000;">
-                        <div class="addr-title">Billed To:</div><strong>${custName}</strong><br><span style="font-size:9px; line-height:1.1; display:block; margin-bottom:2px;">${userSettings.address.substring(0, 65)}</span>
+                        <div class="addr-title">Billed To:</div><strong>${custName}</strong><br><span style="font-size:9px; line-height:1.1; display:block; margin-bottom:2px;">Add: ${userSettings.address.substring(0, 65)}</span>
                         GSTIN: ${custGst}<br>Ph: ${custPhone}
                     </div>
                     <div class="addr-box"><div class="addr-title">Shipped To:</div>${userSettings.address}</div>
@@ -3089,16 +3089,19 @@ const defaultInvNo = finalInvNo;
 
         const wrapperId = 'print-wrapper';
         overlay.innerHTML = `
-            <style>
+<style>
                 #print-wrapper { width: 297mm; height: 200mm; background: white; padding: 10mm; box-sizing: border-box; display: flex; justify-content: space-between; font-family: Arial, sans-serif; color: #000; }
                 .invoice-half { width: 48%; height: 100%; border: 1px solid #000; display: flex; flex-direction: column; font-size: 10px; }
                 .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
                 .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
-                .logo-box { width: 25%; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
+                .logo-box { width: 25%; background: #000; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
                 .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
                 .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; -webkit-print-color-adjust: exact; }
                 .meta-item { font-size: 9px; }
-                .address-section { display: flex; border-bottom: 1px solid #000; height: 55px; }
+                
+                /* Increased Height to 70px to fit address */
+                .address-section { display: flex; border-bottom: 1px solid #000; height: 70px; } 
+                
                 .addr-box { width: 50%; padding: 4px; font-size: 10px; line-height: 1.2; overflow: hidden; }
                 .addr-title { font-size: 8px; color: #666; text-transform: uppercase; font-weight: bold; }
                 .table-container { flex-grow: 1; }
@@ -3107,7 +3110,7 @@ const defaultInvNo = finalInvNo;
                 .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
                 .inv-table td:last-child, .inv-table th:last-child { border-right: none; }
                 .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
-                .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 8px; }
+                .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 9px; }
                 .totals-box { width: 40%; padding: 5px; }
                 .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
                 .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; margin-top: 2px; padding-top: 2px; background: #eee; -webkit-print-color-adjust: exact; }
