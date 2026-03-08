@@ -2383,15 +2383,10 @@ window.changeRouteSalesman = async function(routeId, newSalesmanId) {
 // --- 3. FIXED LOAD FUNCTION ---
 window.loadPendingDeliveries = async function() {
     const tbody = document.getElementById('deliveries-table-body');
-    const totalEl = document.getElementById('delivery-total-count');
-    const upcomingEl = document.getElementById('delivery-upcoming-count');
-
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center italic">Loading orders...</td></tr>';
 
     try {
-        // We filter for PENDING only, and order by deliveryDueDate
-        // IMPORTANT: This query requires a Composite Index in Firebase
         const q = query(
             collection(db, "orders"), 
             where("status", "==", "pending"),
@@ -2400,67 +2395,48 @@ window.loadPendingDeliveries = async function() {
         
         const snap = await getDocs(q);
         tbody.innerHTML = "";
-        selectedOrders = []; // Reset selection on reload
+        selectedOrders = []; 
         updateBulkBar();
 
         if (snap.empty) {
             tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">No pending deliveries.</td></tr>';
-            if(totalEl) totalEl.innerText = "0";
             return;
         }
 
-        let totalPending = 0;
-        let upcomingCount = 0;
-        const now = new Date();
-        now.setHours(0,0,0,0);
-
         snap.forEach(docSnap => {
             const data = docSnap.data();
-            const orderId = docSnap.id;
-            const totalAmt = data.financials ? data.financials.totalAmount : (data.totalAmount || 0);
-            const dueDateObj = data.deliveryDueDate ? data.deliveryDueDate.toDate() : null;
+            const orderId = docSnap.id; // The unique ID of the order doc
             
-            // Logic for "Upcoming" count (next 7 days)
-            if (dueDateObj) {
-                const diff = (dueDateObj - now) / (1000 * 60 * 60 * 24);
-                if (diff >= 0 && diff <= 7) upcomingCount++;
-            }
-            totalPending++;
-
-            // Prepare data for checkbox
-            const orderJson = JSON.stringify({
+            // Safety: Get total amount regardless of where it's stored
+            const totalAmt = (data.financials && data.financials.totalAmount) ? data.financials.totalAmount : (data.totalAmount || 0);
+            
+            // Create a clean object to store in the checkbox
+            const orderData = {
                 id: orderId,
                 outletId: data.outletId,
-                outletName: data.outletName,
-                financials: { totalAmount: totalAmt },
-                items: data.items || [],
-                invoiceNo: data.invoiceNo || 'N/A',
-                orderDate: data.orderDate
-            }).replace(/'/g, "&apos;");
+                amount: Number(totalAmt)
+            };
 
             const row = `
                 <tr class="hover:bg-slate-50 border-b border-slate-50">
                     <td class="p-4">
                         <input type="checkbox" class="order-checkbox w-4 h-4 rounded border-slate-300" 
-                            data-order='${orderJson}' 
+                            data-order='${JSON.stringify(orderData)}' 
                             onchange="toggleOrderSelection(this, '${orderId}')">
                     </td>
-                    <td class="p-4 text-xs font-bold text-slate-700">
-                        ${dueDateObj ? dueDateObj.toLocaleDateString('en-IN') : 'N/A'}
+                    <td class="p-4 text-xs font-bold">
+                        ${data.deliveryDueDate ? data.deliveryDueDate.toDate().toLocaleDateString('en-IN') : 'N/A'}
                     </td>
-                    <td class="p-4">
-                        <span class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold">${data.routeName || 'N/A'}</span>
-                    </td>
+                    <td class="p-4 text-[10px] font-bold">${data.routeName || 'N/A'}</td>
                     <td class="p-4">
                         <div class="font-bold text-sm">${data.outletName}</div>
-                        <div class="text-[10px] text-slate-400">By: ${data.salesmanName}</div>
                     </td>
-                    <td class="p-4 text-center font-bold text-indigo-600">
+                    <td class="p-4 text-center font-bold">
                         ${data.items ? data.items.reduce((s, i) => s + Number(i.qty), 0) : 0}
                     </td>
-                    <td class="p-4 font-bold">₹${totalAmt.toFixed(2)}</td>
+                    <td class="p-4 font-bold text-indigo-600">₹${totalAmt.toFixed(2)}</td>
                     <td class="p-4 text-right">
-                        <button onclick="generateInvoice('${orderId}')" class="text-blue-600 p-1 hover:bg-blue-50 rounded">
+                        <button onclick="generateInvoice('${orderId}')" class="text-blue-500 hover:bg-blue-50 p-1 rounded">
                             <span class="material-icons-round text-sm">print</span>
                         </button>
                     </td>
@@ -2468,37 +2444,57 @@ window.loadPendingDeliveries = async function() {
             tbody.innerHTML += row;
         });
 
-        if(totalEl) totalEl.innerText = totalPending;
-        if(upcomingEl) upcomingEl.innerText = upcomingCount;
-
     } catch (error) {
-        console.error("Critical Error in loadPendingDeliveries:", error);
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-red-500">
-            Error: ${error.message}<br>
-            <small>If this is an index error, check the browser console and click the provided link.</small>
-        </td></tr>`;
+        console.error("Load Error:", error);
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-red-500">Error: ${error.message}</td></tr>`;
     }
 };
 
 // --- 4. BULK DELETE ---
 window.bulkDeleteOrders = async function() {
-    if(!confirm(`Delete ${selectedOrders.length} orders and adjust shop balances?`)) return;
+    if (selectedOrders.length === 0) return;
     
+    const confirmMsg = `⚠️ PERMANENT ACTION\n\nAre you sure you want to delete ${selectedOrders.length} orders?\n\nBalances for these shops will be reduced automatically.`;
+    if (!confirm(confirmMsg)) return;
+
     try {
         const batch = writeBatch(db);
+        
         selectedOrders.forEach(order => {
-            batch.delete(doc(db, "orders", order.id));
-            batch.update(doc(db, "outlets", order.outletId), {
-                currentBalance: increment(-order.financials.totalAmount)
+            // Safety Check: If ID is missing, skip this item to avoid the 'indexOf' crash
+            if (!order.id || !order.outletId) {
+                console.warn("Skipping invalid order data:", order);
+                return;
+            }
+
+            const orderRef = doc(db, "orders", order.id);
+            const outletRef = doc(db, "outlets", order.outletId);
+
+            // 1. Delete the order
+            batch.delete(orderRef);
+
+            // 2. Reverse the balance (Subtract the order amount from the shop debt)
+            // Using increment with a negative number
+            batch.update(outletRef, {
+                currentBalance: increment(-order.amount)
             });
         });
+
         await batch.commit();
-        alert("Bulk delete successful");
+        
+        alert(`✅ Successfully deleted ${selectedOrders.length} orders.`);
+        
+        // Refresh UI
+        selectedOrders = [];
+        updateBulkBar();
         loadPendingDeliveries();
-    } catch (e) { alert(e.message); }
+        loadDashboardStats(); // Refresh the total credit stat on the home tab
+
+    } catch (error) {
+        console.error("Bulk Delete Error:", error);
+        alert("Failed to delete: " + error.message);
+    }
 };
-
-
 
 // ==========================================
 //      EXPORT TO EXCEL (CSV) LOGIC
