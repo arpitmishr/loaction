@@ -3094,7 +3094,7 @@ const defaultInvNo = finalInvNo;
                 .invoice-half { width: 48%; height: 100%; border: 1px solid #000; display: flex; flex-direction: column; font-size: 10px; }
                 .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
                 .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
-                .logo-box { width: 25%; background: #000; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
+                .logo-box { width: 25%; display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; }
                 .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
                 .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; -webkit-print-color-adjust: exact; }
                 .meta-item { font-size: 9px; }
