@@ -789,13 +789,26 @@
 
 
 
+     <div class="flex gap-2">
+        <!-- Bulk Actions (Hidden by default) -->
+        <div id="bulk-actions-bar" class="hidden flex gap-2 animate-fadeIn">
+            <button onclick="printSelectedInvoices()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md flex items-center gap-2">
+                <span class="material-icons-round text-sm">print</span> Print Combined (<span id="selected-count">0</span>)
+            </button>
+            <button onclick="bulkDeleteOrders()" class="bg-red-100 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                <span class="material-icons-round text-sm">delete_sweep</span> Delete
+            </button>
+        </div>
+        
+        <button onclick="openExportModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 transition-colors">
+            <span class="material-icons-round text-sm">file_download</span> CSV Export
+        </button>
+    </div>
+</div>
 
- <button onclick="openExportModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md flex items-center gap-2 transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-        </svg>
-        Export to Excel
-    </button>
+
+
+            
 
 
 
@@ -811,20 +824,23 @@
         </div>
     </div>
 
-    <!-- Deliveries Table -->
-    <div class="bg-surface rounded-2xl shadow-card border border-slate-100 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
-    <tr>
-        <th class="p-4">Due Date</th>
-        <th class="p-4">Route</th>
-        <th class="p-4">Shop & Salesman</th>
-        <th class="p-4 text-center">Qty</th> <!-- NEW COLUMN -->
-        <th class="p-4">Amount / Items</th>
-        <th class="p-4 text-right">Action</th> <!-- CHANGED TO ACTION -->
-    </tr>
-</thead>
+<!-- Table Container -->
+<div class="bg-surface rounded-2xl shadow-card overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                <tr>
+                    <th class="p-4 w-10">
+                        <input type="checkbox" id="selectAllDeliveries" onchange="toggleSelectAll(this)" class="w-4 h-4 rounded border-slate-300">
+                    </th>
+                    <th class="p-4">Due Date</th>
+                    <th class="p-4">Route</th>
+                    <th class="p-4">Shop & Salesman</th>
+                    <th class="p-4 text-center">Qty</th>
+                    <th class="p-4">Amount</th>
+                    <th class="p-4 text-right">Action</th>
+                </tr>
+            </thead>
                 <tbody id="deliveries-table-body" class="divide-y divide-slate-100 text-slate-600">
                     <tr><td colspan="4" class="p-6 text-center text-slate-400">Loading deliveries...</td></tr>
                 </tbody>
