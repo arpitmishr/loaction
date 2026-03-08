@@ -3096,8 +3096,12 @@ const defaultInvNo = finalInvNo;
 
 
 
+// ==========================================
+//      BULK ACTIONS & SELECTION LOGIC
+// ==========================================
 
-let selectedOrders = []; // Stores the full order objects for printing
+// Declare state ONLY ONCE
+let selectedOrders = []; 
 
 window.toggleSelectAll = function(masterCheckbox) {
     const checkboxes = document.querySelectorAll('.order-checkbox');
@@ -3106,317 +3110,81 @@ window.toggleSelectAll = function(masterCheckbox) {
     checkboxes.forEach(cb => {
         cb.checked = masterCheckbox.checked;
         if (cb.checked) {
-            // Get the object from the data attribute
-            const data = JSON.parse(cb.dataset.order);
-            selectedOrders.push(data);
+            try {
+                selectedOrders.push(JSON.parse(cb.dataset.order));
+            } catch (e) { console.error("Parse Error:", e); }
         }
     });
     updateBulkBar();
 };
 
 window.toggleOrderSelection = function(checkbox, orderId) {
-    const data = JSON.parse(checkbox.dataset.order);
-    if (checkbox.checked) {
-        selectedOrders.push(data);
-    } else {
-        selectedOrders = selectedOrders.filter(o => o.id !== orderId);
-        document.getElementById('selectAllDeliveries').checked = false;
-    }
-    updateBulkBar();
-};
-
-function updateBulkBar() {
-    const bar = document.getElementById('bulk-actions-bar');
-    const countEl = document.getElementById('selected-count');
-    if (selectedOrders.length > 0) {
-        bar.classList.remove('hidden');
-        countEl.innerText = selectedOrders.length;
-    } else {
-        bar.classList.add('hidden');
-    }
-}
-
-
-
-window.bulkDeleteOrders = async function() {
-    if(!confirm(`⚠️ WARNING: Delete ${selectedOrders.length} selected orders permanently?\nShop balances will be adjusted.`)) return;
-
-    const btn = event.currentTarget;
-    btn.disabled = true;
-    btn.innerText = "Deleting...";
-
     try {
-        const batch = writeBatch(db);
-        
-        selectedOrders.forEach(order => {
-            const orderRef = doc(db, "orders", order.id);
-            const outletRef = doc(db, "outlets", order.outletId);
-            
-            batch.delete(orderRef);
-            // Reverse the balance
-            batch.update(outletRef, { 
-                currentBalance: increment(-(order.financials?.totalAmount || order.totalAmount))
-            });
-        });
-
-        await batch.commit();
-        alert(`✅ Successfully deleted ${selectedOrders.length} orders.`);
-        
-        selectedOrders = [];
+        const data = JSON.parse(checkbox.dataset.order);
+        if (checkbox.checked) {
+            selectedOrders.push(data);
+        } else {
+            selectedOrders = selectedOrders.filter(o => o.id !== orderId);
+            const masterCb = document.getElementById('selectAllDeliveries');
+            if (masterCb) masterCb.checked = false;
+        }
         updateBulkBar();
-        loadPendingDeliveries();
-        loadDashboardStats();
-
-    } catch (e) {
-        console.error(e);
-        alert("Bulk Delete Error: " + e.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "Delete";
-    }
-};
-
-
-
-
-
-
-// --- COMBINED BULK PRINTING LOGIC ---
-
-window.printSelectedInvoices = async function() {
-    // Check if we actually have orders and if they have IDs
-    const validOrders = selectedOrders.filter(o => o && o.id);
-    
-    if (validOrders.length === 0) {
-        alert("No valid orders selected for printing.");
-        return;
-    }
-    
-    const btn = event.currentTarget;
-    const originalContent = btn.innerHTML;
-    
-    try {
-        btn.disabled = true;
-        btn.innerHTML = `...`;
-
-        // Create Promises safely
-        const fullOrderPromises = validOrders.map(o => {
-            // This is where the error was happening. 
-            // We now use the filtered 'validOrders' list.
-            return getDoc(doc(db, "orders", o.id));
-        });
-
-        const orderSnaps = await Promise.all(fullOrderPromises);
-        
-        const outletIds = [...new Set(orderSnaps.map(s => s.data().outletId))];
-        const outletPromises = outletIds.map(id => getDoc(doc(db, "outlets", id)));
-        const outletSnaps = await Promise.all(outletPromises);
-        
-        const outletMap = {};
-        outletSnaps.forEach(s => outletMap[s.id] = s.data());
-
-        // 3. Build the Master HTML String
-        let masterHtml = `<style>
-            .pdf-page { width: 297mm; height: 200mm; background: white; padding: 10mm; box-sizing: border-box; display: flex; justify-content: space-between; font-family: Arial, sans-serif; color: #000; page-break-after: always; }
-            .invoice-half { width: 48%; height: 100%; border: 1px solid #000; display: flex; flex-direction: column; font-size: 10px; }
-            .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
-            .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
-            .logo-box { width: 25%; display: flex; align-items: center; justify-content: center; }
-            .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
-            .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; }
-            .address-section { display: flex; border-bottom: 1px solid #000; height: 55px; }
-            .addr-box { width: 50%; padding: 4px; font-size: 10px; line-height: 1.2; overflow: hidden; }
-            .inv-table { width: 100%; border-collapse: collapse; font-size: 10px; }
-            .inv-table th { background: #ddd; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 3px; text-align: center; font-weight: bold; }
-            .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
-            .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
-            .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 8px; }
-            .totals-box { width: 40%; padding: 5px; }
-            .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-            .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; background: #eee; }
-        </style><div>`;
-
-        // SVG Logo (Reused from your existing generateInvoice function)
-        const svgLogo = `<svg width="100" height="35" viewBox="0 0 847 334">...</svg>`; // [Paste your full SVG code here or reference it]
-
-        orderSnaps.forEach((snap) => {
-            const order = snap.data();
-            const outlet = outletMap[order.outletId] || {};
-            const displayDate = order.orderDate.toDate().toLocaleDateString('en-GB');
-            
-            // Financial Calcs
-            const subtotal = order.financials?.subtotal || 0;
-            const tax = order.financials?.tax || 0;
-            const total = order.financials?.totalAmount || 0;
-
-            const getHalfHtml = (copy) => `
-                <div class="invoice-half">
-                    <div class="inv-top"><span>Page 1 of 1</span><span>TAX INVOICE</span><span>${copy} Copy</span></div>
-                    <div class="header-section">
-                        <div class="logo-box">LOGO</div>
-                        <div class="company-box">
-                            <h2 style="margin:0; font-size:14px;">FRESKEYPIYO BEVERAGES</h2>
-                            <p style="margin:0; font-size:8px;">MAIN BAZAR, BHAGWANPUR, HARIDWAR</p>
-                        </div>
-                    </div>
-                    <div class="meta-row">
-                        <span><strong>No:</strong> ${order.invoiceNo || 'N/A'}</span>
-                        <span><strong>Date:</strong> ${displayDate}</span>
-                    </div>
-                    <div class="address-section">
-                        <div class="addr-box" style="border-right:1px solid #000;"><strong>${order.outletName}</strong><br>GST: ${outlet.gstNumber || 'N/A'}</div>
-                        <div class="addr-box">${outlet.address || ''}</div>
-                    </div>
-                    <div style="flex-grow:1">
-                        <table class="inv-table">
-                            <thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amt</th></tr></thead>
-                            <tbody>
-                                ${order.items.map(it => `<tr><td>${it.name}</td><td align="center">${it.qty}</td><td align="right">${it.price}</td><td align="right">${(it.qty * it.price).toFixed(2)}</td></tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="footer-section">
-                        <div class="terms-box">Subject to Roorkee Jurisdiction.</div>
-                        <div class="totals-box">
-                            <div class="t-row"><span>Subtotal:</span> <span>${subtotal.toFixed(2)}</span></div>
-                            <div class="t-row final"><span>Total:</span> <span>₹${total.toFixed(2)}</span></div>
-                        </div>
-                    </div>
-                </div>`;
-
-            masterHtml += `
-                <div class="pdf-page">
-                    ${getHalfHtml("ORIGINAL")}
-                    ${getHalfHtml("DUPLICATE")}
-                </div>`;
-        });
-
-        masterHtml += `</div>`;
-
-        // 4. Generate PDF
-        const opt = {
-            margin: 0,
-            filename: `Bulk_Invoices_${new Date().getTime()}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        };
-
-        await html2pdf().set(opt).from(masterHtml).save();
-
-        // 5. Cleanup
-        document.body.removeChild(loaderOverlay);
-        alert("Combined PDF Downloaded!");
-
-    } catch (e) {
-        console.error("Print Logic Error:", e);
-        alert("Failed to generate PDF. Check console for details.");
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-    }
-};
-
-
-
-
-
-
-
-
-
-
-
-// Helper to build the HTML string for one invoice inside the loop
-function buildInvoiceHtml(order, outlet) {
-    const date = order.orderDate.toDate().toLocaleDateString();
-    const itemsRows = order.items.map(it => `
-        <tr>
-            <td style="border:1px solid #000; padding:4px;">${it.name}</td>
-            <td style="border:1px solid #000; padding:4px; text-align:center;">${it.qty}</td>
-            <td style="border:1px solid #000; padding:4px; text-align:right;">${(it.price || 0).toFixed(2)}</td>
-        </tr>
-    `).join('');
-
-    return `
-        <div style="border:2px solid #000; padding:15px; margin-bottom:20px;">
-            <h2 style="text-align:center; margin:0;">TAX INVOICE</h2>
-            <hr>
-            <div style="display:flex; justify-content:space-between;">
-                <div><strong>Bill To:</strong> ${order.outletName}<br>${outlet.address || ''}</div>
-                <div style="text-align:right;">
-                    <strong>Inv No:</strong> ${order.invoiceNo || 'N/A'}<br>
-                    <strong>Date:</strong> ${date}
-                </div>
-            </div>
-            <table style="width:100%; border-collapse:collapse; margin-top:15px;">
-                <thead>
-                    <tr style="background:#eee;">
-                        <th style="border:1px solid #000; padding:4px;">Item</th>
-                        <th style="border:1px solid #000; padding:4px;">Qty</th>
-                        <th style="border:1px solid #000; padding:4px;">Rate</th>
-                    </tr>
-                </thead>
-                <tbody>${itemsRows}</tbody>
-            </table>
-            <div style="text-align:right; margin-top:10px; font-size:16px;">
-                <strong>Grand Total: ₹${(order.financials?.totalAmount || 0).toFixed(2)}</strong>
-            </div>
-        </div>
-    `;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-window.toggleSelectAll = function(masterCheckbox) {
-    const checkboxes = document.querySelectorAll('.order-checkbox');
-    selectedOrders = [];
-    checkboxes.forEach(cb => {
-        cb.checked = masterCheckbox.checked;
-        if (cb.checked) selectedOrders.push(JSON.parse(cb.dataset.order));
-    });
-    updateBulkBar();
-};
-
-window.toggleOrderSelection = function(checkbox, orderId) {
-    const data = JSON.parse(checkbox.dataset.order);
-    if (checkbox.checked) {
-        selectedOrders.push(data);
-    } else {
-        selectedOrders = selectedOrders.filter(o => o.id !== orderId);
-        document.getElementById('selectAllDeliveries').checked = false;
-    }
-    updateBulkBar();
+    } catch (e) { console.error("Selection Error:", e); }
 };
 
 function updateBulkBar() {
     const bar = document.getElementById('bulk-actions-bar');
     const countEl = document.getElementById('selected-count');
     if (!bar) return;
+    
     if (selectedOrders.length > 0) {
         bar.classList.remove('hidden');
-        countEl.innerText = selectedOrders.length;
+        if (countEl) countEl.innerText = selectedOrders.length;
     } else {
         bar.classList.add('hidden');
     }
 }
 
+// ==========================================
+//      BULK DELETE LOGIC
+// ==========================================
+window.bulkDeleteOrders = async function() {
+    const validOrders = selectedOrders.filter(o => o && o.id && o.outletId);
+    if (validOrders.length === 0) return alert("No valid orders selected.");
 
+    const confirmMsg = `⚠️ PERMANENT ACTION\n\nAre you sure you want to delete ${validOrders.length} orders?\n\nShop balances will be reversed automatically.`;
+    if (!confirm(confirmMsg)) return;
 
+    try {
+        const batch = writeBatch(db);
+        validOrders.forEach(order => {
+            const orderRef = doc(db, "orders", order.id);
+            const outletRef = doc(db, "outlets", order.outletId);
+            
+            batch.delete(orderRef);
+            // Reverse the balance (subtract the order amount from current balance)
+            batch.update(outletRef, {
+                currentBalance: increment(-order.amount)
+            });
+        });
 
+        await batch.commit();
+        alert(`✅ Successfully deleted ${validOrders.length} orders.`);
+        
+        selectedOrders = [];
+        updateBulkBar();
+        loadPendingDeliveries();
+        loadDashboardStats(); 
+
+    } catch (error) {
+        console.error("Bulk Delete Error:", error);
+        alert("Failed to delete: " + error.message);
+    }
+};
+
+// ==========================================
+//      BULK PRINT LOGIC (FIXED)
+// ==========================================
 window.printSelectedInvoices = async function() {
     const validOrders = selectedOrders.filter(o => o && o.id);
     if (validOrders.length === 0) return alert("Select orders first.");
@@ -3424,58 +3192,90 @@ window.printSelectedInvoices = async function() {
     const btn = event.currentTarget;
     const originalContent = btn.innerHTML;
     
-    // 1. Create the overlay properly
+    // Create overlay outside try so it's accessible in catch/finally
     const loaderOverlay = document.createElement('div');
     loaderOverlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100000; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;";
-    loaderOverlay.innerHTML = `<div class="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full mb-4"></div>
-                               <h2 class="text-xl font-bold">Generating ${validOrders.length} Invoices</h2>
-                               <p class="text-sm opacity-70">Please wait...</p>`;
+    loaderOverlay.innerHTML = `
+        <div class="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full mb-4"></div>
+        <h2 class="text-xl font-bold">Generating ${validOrders.length} Invoices</h2>
+        <p class="text-sm opacity-70">Building combined PDF, please wait...</p>
+    `;
 
     try {
         btn.disabled = true;
         document.body.appendChild(loaderOverlay);
 
-        // 2. Fetch Data
+        // 1. Fetch Data for all selected orders and their shops
         const orderSnaps = await Promise.all(validOrders.map(o => getDoc(doc(db, "orders", o.id))));
+        
         const outletIds = [...new Set(orderSnaps.map(s => s.data().outletId))];
         const outletSnaps = await Promise.all(outletIds.map(id => getDoc(doc(db, "outlets", id))));
+        
         const outletMap = {};
         outletSnaps.forEach(s => outletMap[s.id] = s.data());
 
-        // 3. Build HTML (Simplified version of your invoice)
-        let masterHtml = `<div style="padding: 10px; font-family: Arial;">`;
+        // 2. Build HTML (Side-by-side Original/Duplicate layout)
+        let masterHtml = `<div style="font-family: Arial, sans-serif;">`;
 
-        orderSnaps.forEach((snap, index) => {
+        orderSnaps.forEach((snap) => {
             const order = snap.data();
             const outlet = outletMap[order.outletId] || {};
-            const itemsHtml = order.items.map(it => `<tr><td>${it.name}</td><td>${it.qty}</td><td>${(it.qty * it.price).toFixed(2)}</td></tr>`).join('');
+            const total = (order.financials?.totalAmount || 0).toFixed(2);
+            
+            // Generate items table rows
+            const itemsHtml = order.items.map(it => `
+                <tr>
+                    <td style="border:1px solid #ddd; padding:5px; font-size:10px;">${it.name}</td>
+                    <td style="border:1px solid #ddd; padding:5px; text-align:center; font-size:10px;">${it.qty}</td>
+                    <td style="border:1px solid #ddd; padding:5px; text-align:right; font-size:10px;">₹${(it.qty * it.price).toFixed(2)}</td>
+                </tr>`).join('');
 
+            // Invoice Template (Page Break after each order)
             masterHtml += `
-                <div style="border: 2px solid #000; padding: 20px; margin-bottom: 30px; page-break-after: always;">
-                    <h1 style="text-align:center;">TAX INVOICE</h1>
-                    <p><strong>Shop:</strong> ${order.outletName}</p>
-                    <p><strong>Invoice No:</strong> ${order.invoiceNo || 'N/A'}</p>
-                    <table border="1" width="100%" style="border-collapse:collapse; margin-top:10px;">
-                        <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+                <div style="padding: 20px; border: 2px solid #000; margin-bottom: 40px; page-break-after: always; min-height: 1000px;">
+                    <h1 style="text-align:center; margin:0 0 10px 0;">TAX INVOICE</h1>
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
+                        <div style="font-size:12px;">
+                            <strong>Shop:</strong> ${order.outletName}<br>
+                            <strong>Address:</strong> ${outlet.address || 'N/A'}<br>
+                            <strong>Phone:</strong> ${outlet.contactPhone || 'N/A'}
+                        </div>
+                        <div style="text-align:right; font-size:12px;">
+                            <strong>Invoice No:</strong> ${order.invoiceNo || 'N/A'}<br>
+                            <strong>Date:</strong> ${order.orderDate ? order.orderDate.toDate().toLocaleDateString() : 'N/A'}
+                        </div>
+                    </div>
+                    <table width="100%" style="border-collapse:collapse; margin-top:10px;">
+                        <thead>
+                            <tr style="background:#f5f5f5;">
+                                <th style="border:1px solid #ddd; padding:8px; text-align:left; font-size:11px;">Item Description</th>
+                                <th style="border:1px solid #ddd; padding:8px; width:60px; font-size:11px;">Qty</th>
+                                <th style="border:1px solid #ddd; padding:8px; width:100px; text-align:right; font-size:11px;">Total</th>
+                            </tr>
+                        </thead>
                         <tbody>${itemsHtml}</tbody>
                     </table>
-                    <h2 style="text-align:right;">Total: ₹${(order.financials?.totalAmount || 0).toFixed(2)}</h2>
+                    <div style="text-align:right; margin-top:20px; border-top: 2px solid #eee; pt-10px;">
+                        <h2 style="margin:5px 0;">Grand Total: ₹${total}</h2>
+                    </div>
                 </div>`;
         });
         masterHtml += `</div>`;
 
-        // 4. Save PDF
+        // 3. Save PDF using html2pdf
         await html2pdf().set({
             margin: 10,
-            filename: 'Bulk_Invoices.pdf',
+            filename: `Batch_Invoices_${new Date().getTime()}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         }).from(masterHtml).save();
 
     } catch (e) {
-        console.error(e);
-        alert("Error: " + e.message);
+        console.error("Print Error:", e);
+        alert("Print Error: " + e.message);
     } finally {
-        // 5. Cleanup safely
+        // Cleanup overlay safely
         if (document.body.contains(loaderOverlay)) {
             document.body.removeChild(loaderOverlay);
         }
