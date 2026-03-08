@@ -3052,7 +3052,8 @@ const defaultInvNo = finalInvNo;
                 </div>
                 <div class="address-section">
                     <div class="addr-box" style="border-right:1px solid #000;">
-                        <div class="addr-title">Billed To:</div><strong>${custName}</strong><br>GSTIN: ${custGst}<br>Ph: ${custPhone}
+                        <div class="addr-title">Billed To:</div><strong>${custName}</strong><br><span style="font-size:9px; line-height:1.1; display:block; margin-bottom:2px;">${userSettings.address.substring(0, 65)}</span>
+                        GSTIN: ${custGst}<br>Ph: ${custPhone}
                     </div>
                     <div class="addr-box"><div class="addr-title">Shipped To:</div>${userSettings.address}</div>
                 </div>
