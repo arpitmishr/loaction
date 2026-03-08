@@ -2383,6 +2383,9 @@ window.changeRouteSalesman = async function(routeId, newSalesmanId) {
 // --- 3. FIXED LOAD FUNCTION ---
 window.loadPendingDeliveries = async function() {
     const tbody = document.getElementById('deliveries-table-body');
+    const totalEl = document.getElementById('delivery-total-count');
+    const upcomingEl = document.getElementById('delivery-upcoming-count');
+
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center italic">Loading orders...</td></tr>';
 
@@ -2395,48 +2398,63 @@ window.loadPendingDeliveries = async function() {
         
         const snap = await getDocs(q);
         tbody.innerHTML = "";
-        selectedOrders = []; 
+        selectedOrders = []; // Reset selection on reload
         updateBulkBar();
 
         if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">No pending deliveries.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">No pending deliveries found.</td></tr>';
+            if(totalEl) totalEl.innerText = "0";
             return;
         }
 
+        let totalPending = 0;
+        let upcomingCount = 0;
+        const now = new Date();
+        now.setHours(0,0,0,0);
+
         snap.forEach(docSnap => {
             const data = docSnap.data();
-             const orderId = docSnap.id;
+            const orderId = docSnap.id;
+            const totalAmt = data.financials ? data.financials.totalAmount : (data.totalAmount || 0);
             
-            // Safety: Get total amount regardless of where it's stored
-            const totalAmt = (data.financials && data.financials.totalAmount) ? data.financials.totalAmount : (data.totalAmount || 0);
-            
-            // Create a clean object to store in the checkbox
-            const orderData = {
-                 id: orderId,       // Explicitly set ID
+            // Due Date Logic
+            const dueDateObj = data.deliveryDueDate ? data.deliveryDueDate.toDate() : null;
+            if (dueDateObj) {
+                const diff = (dueDateObj - now) / (1000 * 60 * 60 * 24);
+                if (diff >= 0 && diff <= 7) upcomingCount++;
+            }
+            totalPending++;
+
+            // PREPARE DATA FOR CHECKBOX
+            const orderJson = JSON.stringify({
+                id: orderId,
                 outletId: data.outletId,
-                amount: Number(totalAmt)
-            };
+                amount: totalAmt
+            }).replace(/'/g, "&apos;");
 
             const row = `
                 <tr class="hover:bg-slate-50 border-b border-slate-50">
                     <td class="p-4">
                         <input type="checkbox" class="order-checkbox w-4 h-4 rounded border-slate-300" 
-                            data-order='${JSON.stringify(orderData)}' 
+                            data-order='${orderJson}' 
                             onchange="toggleOrderSelection(this, '${orderId}')">
                     </td>
-                    <td class="p-4 text-xs font-bold">
-                        ${data.deliveryDueDate ? data.deliveryDueDate.toDate().toLocaleDateString('en-IN') : 'N/A'}
+                    <td class="p-4 text-xs font-bold text-slate-700">
+                        ${dueDateObj ? dueDateObj.toLocaleDateString('en-IN') : 'N/A'}
                     </td>
-                    <td class="p-4 text-[10px] font-bold">${data.routeName || 'N/A'}</td>
+                    <td class="p-4">
+                        <span class="text-[10px] bg-slate-100 px-2 py-1 rounded font-bold">${data.routeName || 'N/A'}</span>
+                    </td>
                     <td class="p-4">
                         <div class="font-bold text-sm">${data.outletName}</div>
+                        <div class="text-[10px] text-slate-400">By: ${data.salesmanName}</div>
                     </td>
-                    <td class="p-4 text-center font-bold">
+                    <td class="p-4 text-center font-bold text-indigo-600">
                         ${data.items ? data.items.reduce((s, i) => s + Number(i.qty), 0) : 0}
                     </td>
-                    <td class="p-4 font-bold text-indigo-600">₹${totalAmt.toFixed(2)}</td>
+                    <td class="p-4 font-bold">₹${totalAmt.toFixed(2)}</td>
                     <td class="p-4 text-right">
-                        <button onclick="generateInvoice('${orderId}')" class="text-blue-500 hover:bg-blue-50 p-1 rounded">
+                        <button onclick="generateInvoice('${orderId}')" class="text-blue-600 p-1 hover:bg-blue-50 rounded">
                             <span class="material-icons-round text-sm">print</span>
                         </button>
                     </td>
@@ -2444,11 +2462,16 @@ window.loadPendingDeliveries = async function() {
             tbody.innerHTML += row;
         });
 
+        if(totalEl) totalEl.innerText = totalPending;
+        if(upcomingEl) upcomingEl.innerText = upcomingCount;
+
     } catch (error) {
         console.error("Load Error:", error);
         tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-red-500">Error: ${error.message}</td></tr>`;
     }
 };
+
+
 
 // --- 4. BULK DELETE ---
 window.bulkDeleteOrders = async function() {
@@ -3342,3 +3365,121 @@ function buildInvoiceHtml(order, outlet) {
         </div>
     `;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+window.toggleSelectAll = function(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    selectedOrders = [];
+    checkboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        if (cb.checked) selectedOrders.push(JSON.parse(cb.dataset.order));
+    });
+    updateBulkBar();
+};
+
+window.toggleOrderSelection = function(checkbox, orderId) {
+    const data = JSON.parse(checkbox.dataset.order);
+    if (checkbox.checked) {
+        selectedOrders.push(data);
+    } else {
+        selectedOrders = selectedOrders.filter(o => o.id !== orderId);
+        document.getElementById('selectAllDeliveries').checked = false;
+    }
+    updateBulkBar();
+};
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const countEl = document.getElementById('selected-count');
+    if (!bar) return;
+    if (selectedOrders.length > 0) {
+        bar.classList.remove('hidden');
+        countEl.innerText = selectedOrders.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+
+
+
+window.printSelectedInvoices = async function() {
+    const validOrders = selectedOrders.filter(o => o && o.id);
+    if (validOrders.length === 0) return alert("Select orders first.");
+    
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    
+    // 1. Create the overlay properly
+    const loaderOverlay = document.createElement('div');
+    loaderOverlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100000; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;";
+    loaderOverlay.innerHTML = `<div class="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full mb-4"></div>
+                               <h2 class="text-xl font-bold">Generating ${validOrders.length} Invoices</h2>
+                               <p class="text-sm opacity-70">Please wait...</p>`;
+
+    try {
+        btn.disabled = true;
+        document.body.appendChild(loaderOverlay);
+
+        // 2. Fetch Data
+        const orderSnaps = await Promise.all(validOrders.map(o => getDoc(doc(db, "orders", o.id))));
+        const outletIds = [...new Set(orderSnaps.map(s => s.data().outletId))];
+        const outletSnaps = await Promise.all(outletIds.map(id => getDoc(doc(db, "outlets", id))));
+        const outletMap = {};
+        outletSnaps.forEach(s => outletMap[s.id] = s.data());
+
+        // 3. Build HTML (Simplified version of your invoice)
+        let masterHtml = `<div style="padding: 10px; font-family: Arial;">`;
+
+        orderSnaps.forEach((snap, index) => {
+            const order = snap.data();
+            const outlet = outletMap[order.outletId] || {};
+            const itemsHtml = order.items.map(it => `<tr><td>${it.name}</td><td>${it.qty}</td><td>${(it.qty * it.price).toFixed(2)}</td></tr>`).join('');
+
+            masterHtml += `
+                <div style="border: 2px solid #000; padding: 20px; margin-bottom: 30px; page-break-after: always;">
+                    <h1 style="text-align:center;">TAX INVOICE</h1>
+                    <p><strong>Shop:</strong> ${order.outletName}</p>
+                    <p><strong>Invoice No:</strong> ${order.invoiceNo || 'N/A'}</p>
+                    <table border="1" width="100%" style="border-collapse:collapse; margin-top:10px;">
+                        <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+                        <tbody>${itemsHtml}</tbody>
+                    </table>
+                    <h2 style="text-align:right;">Total: ₹${(order.financials?.totalAmount || 0).toFixed(2)}</h2>
+                </div>`;
+        });
+        masterHtml += `</div>`;
+
+        // 4. Save PDF
+        await html2pdf().set({
+            margin: 10,
+            filename: 'Bulk_Invoices.pdf',
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(masterHtml).save();
+
+    } catch (e) {
+        console.error(e);
+        alert("Error: " + e.message);
+    } finally {
+        // 5. Cleanup safely
+        if (document.body.contains(loaderOverlay)) {
+            document.body.removeChild(loaderOverlay);
+        }
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+};
