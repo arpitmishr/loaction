@@ -3156,60 +3156,149 @@ window.bulkDeleteOrders = async function() {
 
 
 
-window.printSelectedInvoices = async function() {
-    const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = `Generating PDF...`;
+// --- COMBINED BULK PRINTING LOGIC ---
 
+window.printSelectedInvoices = async function() {
+    if (selectedOrders.length === 0) return;
+    
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+    
     try {
-        // 1. Fetch all unique outlet details for the selected orders
-        const outletIds = [...new Set(selectedOrders.map(o => o.outletId))];
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-spin text-xs">...</span>`;
+
+        // 1. Show a global loading overlay (since generating many PDFs takes time)
+        const loaderOverlay = document.createElement('div');
+        loaderOverlay.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100000; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;";
+        loaderOverlay.innerHTML = `<div class="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full mb-4"></div>
+                                   <h2 class="text-xl font-bold">Generating ${selectedOrders.length} Invoices</h2>
+                                   <p class="text-sm opacity-70">Please do not close this tab...</p>`;
+        document.body.appendChild(loaderOverlay);
+
+        // 2. Fetch full data for each order and unique outlets
+        // (The checkbox only has ID/Amount, we need items and full addresses)
+        const fullOrderPromises = selectedOrders.map(o => getDoc(doc(db, "orders", o.id)));
+        const orderSnaps = await Promise.all(fullOrderPromises);
+        
+        const outletIds = [...new Set(orderSnaps.map(s => s.data().outletId))];
+        const outletPromises = outletIds.map(id => getDoc(doc(db, "outlets", id)));
+        const outletSnaps = await Promise.all(outletPromises);
+        
         const outletMap = {};
-        const outletSnaps = await Promise.all(outletIds.map(id => getDoc(doc(db, "outlets", id))));
         outletSnaps.forEach(s => outletMap[s.id] = s.data());
 
-        // 2. Build the combined HTML
-        let combinedHtml = `<style>
-            .page-break { page-break-after: always; }
-            .print-container { padding: 10px; font-family: sans-serif; }
-            /* Reuse your existing invoice styles here */
-        </style><div class="print-container">`;
+        // 3. Build the Master HTML String
+        let masterHtml = `<style>
+            .pdf-page { width: 297mm; height: 200mm; background: white; padding: 10mm; box-sizing: border-box; display: flex; justify-content: space-between; font-family: Arial, sans-serif; color: #000; page-break-after: always; }
+            .invoice-half { width: 48%; height: 100%; border: 1px solid #000; display: flex; flex-direction: column; font-size: 10px; }
+            .inv-top { display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding: 2px 5px; font-weight: bold; font-size:9px; }
+            .header-section { display: flex; border-bottom: 1px solid #000; height: 60px; }
+            .logo-box { width: 25%; display: flex; align-items: center; justify-content: center; }
+            .company-box { width: 75%; text-align: center; padding: 5px; display: flex; flex-direction: column; justify-content: center; }
+            .meta-row { display: flex; justify-content: space-between; padding: 4px; border-bottom: 1px solid #000; background: #f9f9f9; }
+            .address-section { display: flex; border-bottom: 1px solid #000; height: 55px; }
+            .addr-box { width: 50%; padding: 4px; font-size: 10px; line-height: 1.2; overflow: hidden; }
+            .inv-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            .inv-table th { background: #ddd; border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 3px; text-align: center; font-weight: bold; }
+            .inv-table td { border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; padding: 3px 4px; }
+            .footer-section { display: flex; border-top: 1px solid #000; height: 105px; }
+            .terms-box { width: 60%; padding: 5px; border-right: 1px solid #000; font-size: 8px; }
+            .totals-box { width: 40%; padding: 5px; }
+            .t-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+            .t-row.final { font-weight: bold; font-size: 12px; border-top: 1px solid #000; background: #eee; }
+        </style><div>`;
 
-        for (let i = 0; i < selectedOrders.length; i++) {
-            const order = selectedOrders[i];
+        // SVG Logo (Reused from your existing generateInvoice function)
+        const svgLogo = `<svg width="100" height="35" viewBox="0 0 847 334">...</svg>`; // [Paste your full SVG code here or reference it]
+
+        orderSnaps.forEach((snap) => {
+            const order = snap.data();
             const outlet = outletMap[order.outletId] || {};
+            const displayDate = order.orderDate.toDate().toLocaleDateString('en-GB');
             
-            // Format your invoice HTML for this specific order
-            // (Use the logic from your existing generateInvoice function)
-            const invoiceHtml = buildInvoiceHtml(order, outlet); 
-            
-            combinedHtml += invoiceHtml;
-            
-            // Add page break if it's not the last one
-            if (i < selectedOrders.length - 1) {
-                combinedHtml += `<div class="page-break"></div>`;
-            }
-        }
-        combinedHtml += `</div>`;
+            // Financial Calcs
+            const subtotal = order.financials?.subtotal || 0;
+            const tax = order.financials?.tax || 0;
+            const total = order.financials?.totalAmount || 0;
 
-        // 3. Generate PDF
-        const worker = html2pdf().set({
-            margin: 5,
-            filename: `Combined_Invoices_${new Date().getTime()}.pdf`,
+            const getHalfHtml = (copy) => `
+                <div class="invoice-half">
+                    <div class="inv-top"><span>Page 1 of 1</span><span>TAX INVOICE</span><span>${copy} Copy</span></div>
+                    <div class="header-section">
+                        <div class="logo-box">LOGO</div>
+                        <div class="company-box">
+                            <h2 style="margin:0; font-size:14px;">FRESKEYPIYO BEVERAGES</h2>
+                            <p style="margin:0; font-size:8px;">MAIN BAZAR, BHAGWANPUR, HARIDWAR</p>
+                        </div>
+                    </div>
+                    <div class="meta-row">
+                        <span><strong>No:</strong> ${order.invoiceNo || 'N/A'}</span>
+                        <span><strong>Date:</strong> ${displayDate}</span>
+                    </div>
+                    <div class="address-section">
+                        <div class="addr-box" style="border-right:1px solid #000;"><strong>${order.outletName}</strong><br>GST: ${outlet.gstNumber || 'N/A'}</div>
+                        <div class="addr-box">${outlet.address || ''}</div>
+                    </div>
+                    <div style="flex-grow:1">
+                        <table class="inv-table">
+                            <thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amt</th></tr></thead>
+                            <tbody>
+                                ${order.items.map(it => `<tr><td>${it.name}</td><td align="center">${it.qty}</td><td align="right">${it.price}</td><td align="right">${(it.qty * it.price).toFixed(2)}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="footer-section">
+                        <div class="terms-box">Subject to Roorkee Jurisdiction.</div>
+                        <div class="totals-box">
+                            <div class="t-row"><span>Subtotal:</span> <span>${subtotal.toFixed(2)}</span></div>
+                            <div class="t-row final"><span>Total:</span> <span>₹${total.toFixed(2)}</span></div>
+                        </div>
+                    </div>
+                </div>`;
+
+            masterHtml += `
+                <div class="pdf-page">
+                    ${getHalfHtml("ORIGINAL")}
+                    ${getHalfHtml("DUPLICATE")}
+                </div>`;
+        });
+
+        masterHtml += `</div>`;
+
+        // 4. Generate PDF
+        const opt = {
+            margin: 0,
+            filename: `Bulk_Invoices_${new Date().getTime()}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(combinedHtml).save();
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+
+        await html2pdf().set(opt).from(masterHtml).save();
+
+        // 5. Cleanup
+        document.body.removeChild(loaderOverlay);
+        alert("Combined PDF Downloaded!");
 
     } catch (e) {
         console.error(e);
-        alert("PDF Error: " + e.message);
+        alert("Print Error: " + e.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = originalText;
+        btn.innerHTML = originalContent;
     }
 };
+
+
+
+
+
+
+
+
+
+
 
 // Helper to build the HTML string for one invoice inside the loop
 function buildInvoiceHtml(order, outlet) {
