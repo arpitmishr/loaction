@@ -2468,10 +2468,14 @@ window.loadPendingDeliveries = async function() {
 
             // 5. Render Row
            const row = `
-    <tr class="hover:bg-slate-50 transition border-b border-slate-50 group">
+    <tr class="hover:bg-slate-50 border-b border-slate-50">
+        <td class="p-4">
+            <input type="checkbox" class="order-checkbox w-4 h-4 rounded border-slate-300" 
+                data-order='${orderDataForCb.replace(/'/g, "&apos;")}' 
+                onchange="toggleOrderSelection(this, ${orderDataForCb.replace(/'/g, "&apos;")})">
+        </td>
         <td class="p-4">
             <div class="${dateClass} text-sm">${dueStr}</div>
-            <div class="text-[10px] text-slate-400">Ord: ${data.orderDate.toDate().toLocaleDateString()}</div>
         </td>
         <td class="p-4">
             <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold uppercase whitespace-nowrap">
@@ -3138,3 +3142,192 @@ const defaultInvNo = finalInvNo;
         }, 1000);
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let selectedOrders = []; // Stores the full order objects for printing
+
+window.toggleSelectAll = function(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    selectedOrders = [];
+    
+    checkboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        if (cb.checked) {
+            const orderData = JSON.parse(cb.dataset.order);
+            selectedOrders.push(orderData);
+        }
+    });
+    updateBulkBar();
+};
+
+window.toggleOrderSelection = function(checkbox, orderData) {
+    if (checkbox.checked) {
+        selectedOrders.push(orderData);
+    } else {
+        selectedOrders = selectedOrders.filter(o => o.id !== orderData.id);
+        document.getElementById('selectAllDeliveries').checked = false;
+    }
+    updateBulkBar();
+};
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const countEl = document.getElementById('selected-count');
+    if (selectedOrders.length > 0) {
+        bar.classList.remove('hidden');
+        countEl.innerText = selectedOrders.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+
+
+window.bulkDeleteOrders = async function() {
+    if(!confirm(`⚠️ WARNING: Delete ${selectedOrders.length} selected orders permanently?\nShop balances will be adjusted.`)) return;
+
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.innerText = "Deleting...";
+
+    try {
+        const batch = writeBatch(db);
+        
+        selectedOrders.forEach(order => {
+            const orderRef = doc(db, "orders", order.id);
+            const outletRef = doc(db, "outlets", order.outletId);
+            
+            batch.delete(orderRef);
+            // Reverse the balance
+            batch.update(outletRef, { 
+                currentBalance: increment(-(order.financials?.totalAmount || order.totalAmount))
+            });
+        });
+
+        await batch.commit();
+        alert(`✅ Successfully deleted ${selectedOrders.length} orders.`);
+        
+        selectedOrders = [];
+        updateBulkBar();
+        loadPendingDeliveries();
+        loadDashboardStats();
+
+    } catch (e) {
+        console.error(e);
+        alert("Bulk Delete Error: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Delete";
+    }
+};
+
+
+
+
+
+
+window.printSelectedInvoices = async function() {
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `Generating PDF...`;
+
+    try {
+        // 1. Fetch all unique outlet details for the selected orders
+        const outletIds = [...new Set(selectedOrders.map(o => o.outletId))];
+        const outletMap = {};
+        const outletSnaps = await Promise.all(outletIds.map(id => getDoc(doc(db, "outlets", id))));
+        outletSnaps.forEach(s => outletMap[s.id] = s.data());
+
+        // 2. Build the combined HTML
+        let combinedHtml = `<style>
+            .page-break { page-break-after: always; }
+            .print-container { padding: 10px; font-family: sans-serif; }
+            /* Reuse your existing invoice styles here */
+        </style><div class="print-container">`;
+
+        for (let i = 0; i < selectedOrders.length; i++) {
+            const order = selectedOrders[i];
+            const outlet = outletMap[order.outletId] || {};
+            
+            // Format your invoice HTML for this specific order
+            // (Use the logic from your existing generateInvoice function)
+            const invoiceHtml = buildInvoiceHtml(order, outlet); 
+            
+            combinedHtml += invoiceHtml;
+            
+            // Add page break if it's not the last one
+            if (i < selectedOrders.length - 1) {
+                combinedHtml += `<div class="page-break"></div>`;
+            }
+        }
+        combinedHtml += `</div>`;
+
+        // 3. Generate PDF
+        const worker = html2pdf().set({
+            margin: 5,
+            filename: `Combined_Invoices_${new Date().getTime()}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(combinedHtml).save();
+
+    } catch (e) {
+        console.error(e);
+        alert("PDF Error: " + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+};
+
+// Helper to build the HTML string for one invoice inside the loop
+function buildInvoiceHtml(order, outlet) {
+    const date = order.orderDate.toDate().toLocaleDateString();
+    const itemsRows = order.items.map(it => `
+        <tr>
+            <td style="border:1px solid #000; padding:4px;">${it.name}</td>
+            <td style="border:1px solid #000; padding:4px; text-align:center;">${it.qty}</td>
+            <td style="border:1px solid #000; padding:4px; text-align:right;">${(it.price || 0).toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    return `
+        <div style="border:2px solid #000; padding:15px; margin-bottom:20px;">
+            <h2 style="text-align:center; margin:0;">TAX INVOICE</h2>
+            <hr>
+            <div style="display:flex; justify-content:space-between;">
+                <div><strong>Bill To:</strong> ${order.outletName}<br>${outlet.address || ''}</div>
+                <div style="text-align:right;">
+                    <strong>Inv No:</strong> ${order.invoiceNo || 'N/A'}<br>
+                    <strong>Date:</strong> ${date}
+                </div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin-top:15px;">
+                <thead>
+                    <tr style="background:#eee;">
+                        <th style="border:1px solid #000; padding:4px;">Item</th>
+                        <th style="border:1px solid #000; padding:4px;">Qty</th>
+                        <th style="border:1px solid #000; padding:4px;">Rate</th>
+                    </tr>
+                </thead>
+                <tbody>${itemsRows}</tbody>
+            </table>
+            <div style="text-align:right; margin-top:10px; font-size:16px;">
+                <strong>Grand Total: ₹${(order.financials?.totalAmount || 0).toFixed(2)}</strong>
+            </div>
+        </div>
+    `;
+}
